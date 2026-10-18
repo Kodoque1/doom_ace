@@ -5,10 +5,22 @@ OPT = -O2 -g0
 BOTH = -fno-pie
 CFLAGS = ${BOTH} ${OPT} -mgeneral-regs-only -fdata-sections -ffunction-sections -fomit-frame-pointer -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-stack-protector -fno-reorder-blocks-and-partition -fcf-protection=none -Wno-address-of-packed-member -U_FORTIFY_SOURCE
 
+# matryoshka nested-instance host (sibling working tree).
+# Override with `make MTX_DIR=/path/to/nested` if it lives elsewhere.
+MTX_DIR ?= ../../nested
+MTX_OBJ = ${MTX_DIR}/mtx_core.o ${MTX_DIR}/mtx_switch.o ${MTX_DIR}/dos_state.o ${MTX_DIR}/dos_alloc.o ${MTX_DIR}/dos_wire.o ${MTX_DIR}/ldr1n.o ${MTX_DIR}/mtx_sched.o
+CFLAGS += -I${MTX_DIR} -DMTX_DOS_NO_STATIC_POOL
+OBJ += ${MTX_OBJ}
+
+${MTX_DIR}/%.o: ${MTX_DIR}/%.c
+	${CC} ${CFLAGS} -c -o $@ $<
+${MTX_DIR}/%.o: ${MTX_DIR}/%.S
+	${CC} ${CFLAGS} -c -o $@ $<
+
 build: ${program}.lmp
 
 clean:
-	rm -f *.o ${program} ${program}.rel ${program}.bin ${program}.lmp
+	rm -f *.o ${program} ${program}.rel ${program}.bin ${program}.lmp ${MTX_OBJ}
 
 ${program}.lmp: ${OBJ}
 	${CC} ${OBJ} ${LIBS} ${BOTH} -o ${program} -nostdlib -Wl,--gc-sections -Wl,--no-ld-generated-unwind-info -Wl,--no-dynamic-linker -Wl,--omagic -Wl,-T linker.ld -Wl,-Map=code.map

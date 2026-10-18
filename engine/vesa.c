@@ -4,6 +4,7 @@
 #include "engine.h"
 #include "utils.h"
 #include "vesa.h"
+#include "mtx_sched.h"	// matryoshka: nested-instance yield point
 
 typedef struct
 {
@@ -97,6 +98,12 @@ static const hook_t patch_vesa[] =
 static __attribute((regparm(2),no_caller_saved_registers))
 void swap_buffers()
 {
+	// matryoshka: this is the per-frame yield point (I_FinishUpdate replacement,
+	// hooked at 0x0001D4A6 / 0x0001D4FC). Services a pending depth switch at a
+	// frame boundary - frame rendered, nothing half-mutated. No-op until a host
+	// is booted, and same call convention as this function, so it is safe here.
+	mtx_frame_tick();
+
 	wipebuffer = framebase + vesa_offset;
 	vesa_offset ^= SCREENWIDTH * SCREENHEIGHT;
 	framebuffer = framebase + vesa_offset;
