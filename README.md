@@ -69,6 +69,35 @@ descriptor walk mirrors ACE_LDR1 exactly (fd field at lumpinfo+8, consecutive
 dedup, previous seeded to -1 so leading `-1` entries drop too, `-1` terminator)
 — and is unit-tested against those semantics.
 
+## The yield point (`mtx_sched.c`)
+
+A cooperative switch only happens if the running instance reaches the yield
+point — and the running instance is Doom's frame loop, which never returns. So a
+request is set from anywhere (input handler, debugger, timer) and serviced at the
+next frame boundary, never mid-render or mid-think:
+
+    mtx_request_yield();          /* or mtx_request_switch(depth) */
+    ...
+    mtx_frame_tick();             /* once per frame: consumes and switches */
+
+The request is cleared *before* switching, so neither the incoming depth nor this
+one on resume re-services it. A request naming a non-live depth is dropped by
+`mtx_switch_to` rather than crashing.
+
+**The hook.** In ACE the frame boundary is `swap_buffers()` in `engine/vesa.c`,
+which *is* the engine's replacement for Doom's `I_FinishUpdate`, hooked at
+`0x0001D4A6` and `0x0001D4FC`. It runs at least once per frame, after the frame is
+rendered and before it is presented. (`P_Ticker`, `0x0002081A`, is the
+once-per-tic alternative for a logic-only yield.)
+
+**The call-convention trap.** `swap_buffers` is declared
+`__attribute((regparm(2),no_caller_saved_registers))` — it promises not to clobber
+eax/ecx/edx. A plain C function called from inside it would break that promise and
+could corrupt Doom. `mtx_frame_tick` therefore carries the same attribute, so gcc
+preserves those registers around the switch for us. (This also forces
+`-mgeneral-regs-only`, since a `no_caller_saved_registers` function may not touch
+x87 — which the engine already used.)
+
 ## ABI
 
     void mtx_init(uint8_t max_depth, const mtx_host_ops_t *ops,
@@ -105,6 +134,7 @@ continuation, `4(%esp)` = banner.
     dos_state.h/.c   engine-agnostic per-depth state: regions, hooks, pins
     dos_wire.h/.c    concrete ACE wiring (regions, pins, hook registration)
     dos_alloc.h/.c   arena, budget planner, one-call boot
+    mtx_sched.h/.c   yield point: request queue, serviced at the frame boundary
     ldr0N.S          reentrant first-stage loader
     ldr1n.h/.c       reentrant second stage (continuation-based, non-destructive)
     ldr1N.S          its final hand-off (ESI/EDI/ECX, jmp *%ecx)
@@ -125,6 +155,7 @@ continuation, `4(%esp)` = banner.
       [6] state snapshot + isolation PASS
       [7] arena + budget + boot .. PASS
       [8] reentrant 2nd stage .... PASS
+      [9] yield point (frame tick) PASS
     ALL PASS
 
 [1] three depths nest and unwind in order (A C E D B).
@@ -142,11 +173,38 @@ continuation, `4(%esp)` = banner.
 [8] descriptor-list dedup semantics (including leading `-1`), refusal instead of
     overflow on a too-small output, and the load path in exactly two reads and
     one allocation with `[bss_size][code…]` laid out correctly.
+[9] the yield point. Depth 1 runs two frames, requests an upward yield, and the
+    next `mtx_frame_tick` services it; the root then requests a switch back down
+    and the child resumes mid-loop and finishes. Interleaving is frame-aligned
+    (`1,1,0,1,1,0`) with each depth holding its own frame count, the request is
+    consumed exactly once, and a request for a non-live depth is dropped rather
+    than crashing.
 
-`make doscheck` — all seven DOS-target sources (`mtx_core.c`, `mtx_switch.S`,
-`dos_state.c`, `dos_alloc.c`, `dos_wire.c`, `ldr1n.c`, `ldr1N.S`) compile clean
-with the exact flags from `doom_ace/engine/makefile` (`-m32 -march=i386
--mgeneral-regs-only …`), with the static pool compiled out as ACE would need.
+### Wired into the engine, and verified not to regress
+
+`engine/vesa.c` calls `mtx_frame_tick()` as the first statement of
+`swap_buffers()`, and `engine/makefile` links the host (`MTX_DIR ?= ../../nested`,
+overridable; `-DMTX_DOS_NO_STATIC_POOL` so the 7.5 MiB static pool is compiled
+out).
+
+Building the engine with that in place, then booting the same WAD in DOSBox:
+
+    code size  286048 -> 286496   (+448 B)
+    .bss size   53792 ->  54054   (+262 B)
+    boot log   identical to baseline except the WAD byte count
+    screenshot byte-identical to baseline
+
+It is that small because nothing calls `mtx_init` yet: `--gc-sections` keeps only
+`mtx_frame_tick` and the switch path it reaches (`mtx_yield`, `mtx_switch_to`,
+`mtx_switch`, `mtx_switch_ctx`, `mtx_ctx`) and strips `mtx_init` entirely
+(`nm` confirms). So the yield point is installed and inert until a host is booted
+— which is what makes it a safe first integration.
+
+`make doscheck` — all eight DOS-target sources (`mtx_core.c`, `mtx_switch.S`,
+`dos_state.c`, `dos_alloc.c`, `dos_wire.c`, `ldr1n.c`, `ldr1N.S`, `mtx_sched.c`)
+compile clean with the exact flags from `doom_ace/engine/makefile`
+(`-m32 -march=i386 -mgeneral-regs-only …`), with the static pool compiled out as
+ACE would need.
 
 `make ldr0n` — assembles to a 24-byte image, well inside the 256-byte ACE_LDR0
 patch budget.
@@ -188,10 +246,14 @@ measured; `snapshot` is reported by `mtx_dos_snapshot_bytes()`.
   `PROVIDE(_data_start/_data_end)` pair in `engine/linker.ld`. Don't forget it:
   `mod_config` lives there. (`dos_wire.c` says so inline.)
 * The DOS-side *caller* exists (`mtx_dos_boot`) but nothing invokes it from the
-  engine yet: the engine's init has to own the arena and call it.
-* No per-frame yield point. The switch only happens if the running instance
-  reaches it, so the host needs a hook (ACE already hooks draw/think) that calls
-  `mtx_yield()` / services a pending `mtx_switch_to()`.
+  engine yet: the engine's init has to own the arena and call it. Until then the
+  yield point is installed but inert.
+* Video is not virtualised yet. Each depth has its own `screen_buffer` pointer,
+  but they all present through the same `swap_buffers` IRQ, so the visible screen
+  is whichever depth presented last. The child needs an off-screen buffer with
+  the root blitting the active one.
+* Nothing sets a switch request from the game yet — there is no key bound to
+  `mtx_request_yield()` / `mtx_request_switch()`. That is the input side.
 * Zone/heap grooming for nested loads — ZONE's split logic differs once ACE owns
   it, so the original 8192-byte assumption does not carry.
 * Hook registration is manual (`mtx_dos_wire_hook`); it should be called from

@@ -13,6 +13,7 @@
 #include "dos_state.h"
 #include "dos_alloc.h"
 #include "ldr1n.h"
+#include "mtx_sched.h"
 
 /* ---------------------------------------------------------------- runtime */
 /* int 0x80 clobbers ecx and edx (Linux i386 ABI), so declare them modified or
@@ -424,6 +425,72 @@ static int test8(void)
 	return ok;
 }
 
+/* ------------------------------ test 9: yield point / frame-boundary ---- */
+static int t9_ord[64];
+static int t9_n;
+static int t9_frames[MTX_MAX_DEPTH];
+
+static void t9_child(void *a)
+{
+	int i;
+	(void)a;
+	for(i = 0; i < 4; i++)
+	{
+		t9_frames[mtx_depth()]++;
+		t9_ord[t9_n++] = (int)mtx_depth();
+		if(i == 1)
+			mtx_request_yield();	/* serviced at the NEXT frame boundary */
+		mtx_frame_tick();
+	}
+	mtx_finish();
+}
+
+static int test9(void)
+{
+	int ok = 1;
+
+	t9_n = 0;
+	t9_frames[0] = t9_frames[1] = 0;
+	mtx_request_cancel();
+
+	mtx_init(MTX_MAX_DEPTH, 0, 0, 0);
+
+	/* depth 1 runs two frames, then requests an upward yield, which the next
+	   frame_tick services - so control is back here after the push */
+	mtx_push(t9_child, 0);
+	ok &= (t9_frames[1] == 2);
+	ok &= (!mtx_request_pending());		/* consumed exactly once */
+
+	/* root frame, then ask to go back down */
+	t9_frames[0]++;
+	t9_ord[t9_n++] = 0;
+	mtx_request_switch(1);
+	ok &= (mtx_request_pending());
+	mtx_frame_tick();			/* -> depth 1 resumes here */
+
+	/* depth 1 finished its remaining two frames and returned */
+	ok &= (t9_frames[1] == 4);
+	t9_frames[0]++;
+	t9_ord[t9_n++] = 0;
+	ok &= (!mtx_request_pending());
+
+	/* interleaving must be frame-aligned: 1,1,0,1,1,0 */
+	ok &= (t9_n == 6);
+	ok &= (t9_ord[0] == 1 && t9_ord[1] == 1 && t9_ord[2] == 0 &&
+	       t9_ord[3] == 1 && t9_ord[4] == 1 && t9_ord[5] == 0);
+	ok &= (t9_frames[0] == 2 && t9_frames[1] == 4);
+
+	/* a request naming a depth that is not live must be dropped, not crash */
+	mtx_request_switch(7);
+	mtx_frame_tick();
+	ok &= (!mtx_request_pending());
+	ok &= (mtx_depth() == 0);
+
+	/* a snapshot taken now must show nothing pending */
+	ok &= (mtx_request_kind() == MTX_REQ_NONE);
+	return ok;
+}
+
 /* ------------------------------------------------------------------- main */
 void _start(void)
 {
@@ -442,6 +509,7 @@ void _start(void)
 	r = test6(); puts_("  [6] state snapshot + isolation "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test7(); puts_("  [7] arena + budget + boot .. "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test8(); puts_("  [8] reentrant 2nd stage .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
+	r = test9(); puts_("  [9] yield point (frame tick) "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 
 	puts_(ok ? "ALL PASS\n" : "SOME FAILED\n");
 	sys_exit(ok ? 0 : 1);

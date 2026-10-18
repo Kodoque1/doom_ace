@@ -10,10 +10,13 @@ CC = gcc
 # host proof: mtx_core/mtx_switch/dos_state/dos_alloc/ldr1n.
 # dos_wire.c is NOT here - it references engine symbols (doom_data_segment,
 # mainzone, screen_buffer, _bss_start) and only builds inside ACE.
-CORE = mtx_core.c mtx_switch.S dos_state.c dos_alloc.c ldr1n.c
+CORE = mtx_core.c mtx_switch.S dos_state.c dos_alloc.c ldr1n.c mtx_sched.c
 
+# host proof: freestanding, no libc, raw syscalls.
+# -mgeneral-regs-only matches the engine (no x87/SSE), and is required for the
+# no_caller_saved_registers attribute on mtx_frame_tick in mtx_sched.h.
 HOSTFLAGS = -m32 -nostdlib -fno-pie -ffreestanding -fno-builtin \
-            -fno-stack-protector -O2 -Wall
+            -fno-stack-protector -O2 -Wall -mgeneral-regs-only
 
 # exact flags from doom_ace/engine/makefile
 ENGFLAGS = -m32 -march=i386 -fno-pie -O2 -g0 -mgeneral-regs-only \
@@ -32,7 +35,7 @@ run: mtx_test
 
 # In ACE there is no static snapshot pool: the host passes zone memory, so the
 # 7.5 MiB static pool is compiled out.
-DOSSRC = mtx_core.c mtx_switch.S dos_state.c dos_alloc.c dos_wire.c ldr1n.c ldr1N.S
+DOSSRC = mtx_core.c mtx_switch.S dos_state.c dos_alloc.c dos_wire.c ldr1n.c ldr1N.S mtx_sched.c
 
 doscheck:
 	@for f in $(DOSSRC); do \
