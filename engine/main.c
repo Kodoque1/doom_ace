@@ -4,6 +4,7 @@
 #include "engine.h"
 #include "utils.h"
 #include "vesa.h"
+#include "mtx_boot.h"	// matryoshka: nested-instance arena + frame entry
 #include "wadfile.h"
 #include "dehacked.h"
 #include "decorate.h"
@@ -513,6 +514,11 @@ void *zone_alloc(uint32_t *psz)
 static __attribute((regparm(2),no_caller_saved_registers))
 void Z_Init()
 {
+	// matryoshka: claim the nested-instance arena BEFORE the zone takes the rest
+	// of RAM. Z_Init below walks dpmi_get_ram() down until malloc succeeds, so
+	// anything requested after this point cannot be satisfied.
+	mtx_engine_reserve();
+
 	// Due to previous zone allocation it does not seem to be
 	// possible to get large enough block to cover entire RAM.
 	memblock_t *block;

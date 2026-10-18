@@ -5,6 +5,7 @@
 #include "engine.h"
 #include "utils.h"
 #include "vesa.h"
+#include "mtx_boot.h"	// matryoshka: engine-side frame entry
 #include "decorate.h"
 #include "inventory.h"
 #include "wadfile.h"
@@ -428,6 +429,13 @@ static __attribute((regparm(2),no_caller_saved_registers))
 void hook_draw_stbar(uint32_t fullscreen, uint32_t refresh)
 {
 	static uint_fast8_t was_in_menu;
+
+	// matryoshka: the reachable per-frame yield point. The .hooks section is
+	// installed unconditionally, so this runs every frame D_Display draws the
+	// status bar (GS_LEVEL), which is where the nested host boots and switches.
+	// It is a request/consume pair, so being called only in GS_LEVEL is safe -
+	// a pending request simply waits for the next frame that reaches here.
+	mtx_engine_frame();
 
 	ST_doPaletteStuff();
 

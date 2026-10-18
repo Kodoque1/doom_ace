@@ -183,6 +183,14 @@ skip_menu_draw:
 // I_FinishUpdate replacement
 .global I_FinishUpdate
 I_FinishUpdate:
+	// NOTE (matryoshka): do NOT call C from here. Adding
+	// `call mtx_engine_frame` at this point crashes the game with an illegal
+	// read (CS:IP jumps to a garbage address) the first time D_Display presents
+	// a frame. This routine is entered from Doom's own code path and evidently
+	// runs in a context where the C calling convention does not hold (segment /
+	// register state), unlike ACE's other asm hooks which are entered from
+	// Doom call sites that were prepared for it. The nested host is driven from
+	// hook_draw_stbar() instead (GS_LEVEL only) - see the README.
 	push	%edi
 	push	%esi
 	push	%ecx

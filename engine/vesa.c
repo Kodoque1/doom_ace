@@ -4,7 +4,7 @@
 #include "engine.h"
 #include "utils.h"
 #include "vesa.h"
-#include "mtx_sched.h"	// matryoshka: nested-instance yield point
+#include "mtx_boot.h"	// matryoshka: engine-side frame entry
 
 typedef struct
 {
@@ -99,10 +99,11 @@ static __attribute((regparm(2),no_caller_saved_registers))
 void swap_buffers()
 {
 	// matryoshka: this is the per-frame yield point (I_FinishUpdate replacement,
-	// hooked at 0x0001D4A6 / 0x0001D4FC). Services a pending depth switch at a
-	// frame boundary - frame rendered, nothing half-mutated. No-op until a host
-	// is booted, and same call convention as this function, so it is safe here.
-	mtx_frame_tick();
+	// hooked at 0x0001D4A6 / 0x0001D4FC). mtx_engine_frame boots the nested
+	// host once, runs the demo switch policy, then services a pending depth
+	// switch at the frame boundary - frame rendered, nothing half-mutated.
+	// Same call convention as this function, so it is safe here.
+	mtx_engine_frame();
 
 	wipebuffer = framebase + vesa_offset;
 	vesa_offset ^= SCREENWIDTH * SCREENHEIGHT;
