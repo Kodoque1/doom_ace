@@ -362,7 +362,7 @@ uint32_t count_textures()
 	uint32_t count = 0;
 
 	//
-	// check what exploit broke first
+	// check what the loader changed first
 
 	wad_hide_lump("PNAMES");
 	wad_hide_lump("TEXTURE1");

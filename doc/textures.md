@@ -9,10 +9,10 @@ Further, *medusa-bug* was fixed. You can use multipatch textures on middle walls
 
 Original power-of-two **width** limitation **is still present**.
 
-## Exploit workaround
+## Loader workaround
 
 If you don't care about compatibility with other source ports, and don't intend to use original texture definition system, you can just enable `doomtex.workaround` [config](config.md) option.  
-This option will invalidate all conflicting lumps that exploit uses, thus original `doom2.wad` lumps will be found instead.
+This option will invalidate all conflicting lumps that the loader uses, thus original `doom2.wad` lumps will be found instead.
 
 Alternatively, you can rename `PNAMES`, `TEXTURE1` and `TEXTURE2` using `DEHACKED`. This should allow you to make mod compatible with other source ports.  
 Except, this does not work in GZDoom!

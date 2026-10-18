@@ -30,7 +30,7 @@ uint8_t ds_maskcolor;
 uint8_t *draw_patch_color;
 
 static uint8_t am_forced_color;
-static fixed_t mhax_y, mhax_h;
+static fixed_t map_grid_y, map_grid_h;
 
 static const uint8_t unknown_flat[4] = {96, 111, 111, 96};
 
@@ -851,8 +851,8 @@ void draw_map_grid(uint32_t color)
 	tmp += 5;
 	tmp *= MAPBLOCKUNITS << FRACBITS;
 
-	mhax_y = am_y - tmp;
-	mhax_h = tmp * 2;
+	map_grid_y = am_y - tmp;
+	map_grid_h = tmp * 2;
 
 	AM_drawGrid(color);
 }
@@ -897,12 +897,12 @@ static const hook_t hooks[] __attribute__((used,section(".hooks"),aligned(4))) =
 	// replace call to 'AM_drawGrid' in 'AM_Drawer'
 	{0x00026339, CODE_HOOK | HOOK_CALL_ACE, (uint32_t)draw_map_grid},
 	// replace 'm_y' in 'AM_drawGrid'
-	{0x00025D1E, CODE_HOOK | HOOK_UINT32, (uint32_t)&mhax_y},
-	{0x00025D56, CODE_HOOK | HOOK_UINT32, (uint32_t)&mhax_y},
-	{0x00025D7C, CODE_HOOK | HOOK_UINT32, (uint32_t)&mhax_y},
+	{0x00025D1E, CODE_HOOK | HOOK_UINT32, (uint32_t)&map_grid_y},
+	{0x00025D56, CODE_HOOK | HOOK_UINT32, (uint32_t)&map_grid_y},
+	{0x00025D7C, CODE_HOOK | HOOK_UINT32, (uint32_t)&map_grid_y},
 	// replace 'm_h' in 'AM_drawGrid'
-	{0x00025D24, CODE_HOOK | HOOK_UINT32, (uint32_t)&mhax_h},
-	{0x00025D82, CODE_HOOK | HOOK_UINT32, (uint32_t)&mhax_h},
+	{0x00025D24, CODE_HOOK | HOOK_UINT32, (uint32_t)&map_grid_h},
+	{0x00025D82, CODE_HOOK | HOOK_UINT32, (uint32_t)&map_grid_h},
 	// (automap) use netgame player drawing code, fixed color
 	{0x000260A6, CODE_HOOK | HOOK_UINT16, 0x69EB},
 	{0x00026146, CODE_HOOK | HOOK_UINT32, 0x0FEBD1B1},

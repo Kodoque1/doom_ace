@@ -1,5 +1,5 @@
-program = exploit
-OBJ = exploit.o
+program = loader
+OBJ = loader.o
 CC=gcc -m32 -nostdlib
 CFLAGS=${OPT}
 

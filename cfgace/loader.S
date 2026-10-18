@@ -1,9 +1,9 @@
 //// kgsws' DOOM2 ACE engine
 //////////////////////////////
 //
-// The exploit actually uses Doom title text as an executable code.
+// The loader actually uses Doom title text as its entry code.
 // This is probably the only guaranteed byte stream with known location.
-// For compatibility with shareware version there are two variations, both handled by the same exploit.
+// For compatibility with shareware version there are two variations, both handled by the same loader.
 // All this works because of luck. Luck that those texts happen to translate into useful opcodes.
 // Well, at least indirectly. Useful opcode modifies next instruction for something better - 'jmp *%esp'.
 //
@@ -28,15 +28,15 @@
 
 _start:
 	// dummy config option name + separator
-	.ascii	"haax\t"
+	.ascii	"wads\t"
 
 	//// This part has to contain exact number of any characters except NEWLINE or EOF.
 
 	// credits
 	.ascii	"++++++++++++++++"
-	.ascii	"+..Arbitrary...+"
-	.ascii	"+.....code.....+"
-	.ascii	"+...execution..+"
+	.ascii	"+..Mod.Lumps...+"
+	.ascii	"+.....mods.....+"
+	.ascii	"+...Load.Lump..+"
 	.ascii	"+..............+"
 	.ascii	"+.....for......+"
 	.ascii	"+....DOOM.2....+"
@@ -70,7 +70,7 @@ _start:
 	// value of EBX
 	.4byte	0x00000000
 
-	// the exploit - address to jump at
+	// the loader - address to jump at
 	.4byte	0x000b805e
 
 	//

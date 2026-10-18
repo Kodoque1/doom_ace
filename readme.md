@@ -12,11 +12,11 @@ The same version is distributed with SHAREWARE.
 
 ## How to run this
 
-Compile `exploit` and `engine`.
+Compile `loader` and `engine`.
 Engine is the main thing. After compiling you get `code.lmp`.
-Exploit generates a WAD file with multiple entries. Replace `ACE_CODE` with generated `code.lmp` in any WAD editor.
+Loader generates a WAD file with multiple entries. Replace `ACE_CODE` with generated `code.lmp` in any WAD editor.
 
-Resulting WAD file is run just like any other WAD, using command `doom2 -file ace.wad`.
+Resulting WAD file is run just like any other WAD, using command `doom2 -file loader.wad`.
 
 ## Documentation
 
@@ -26,11 +26,11 @@ Resulting WAD file is run just like any other WAD, using command `doom2 -file ac
 
 Code is split into two distinct parts.
 
-### Exploit
+### Loader
 
-There are two bugs used. First is negative memory allocation in ZONE, second is out of bounds read from stack.
-This allows specially crafted WAD file to inject new code into already running game.
-TODO: explain the exploit chain
+Two engine quirks are used. First is negative-size lump allocation in ZONE, second is a read past the stack region.
+This lets a specially built WAD file load new code into the running game.
+TODO: explain the load chain
 
 ### Engine
 

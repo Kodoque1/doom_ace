@@ -717,7 +717,7 @@ static const hook_t hooks[] __attribute__((used,section(".hooks"),aligned(4))) =
 {
 	// save old zone size - passed by loader in 'drawsegs'
 	{0x0002D0A0, DATA_HOOK | HOOK_READ32, (uint32_t)&old_zone_size},
-	// data init stuff; 'R_InitData' was overwritten by the exploit
+	// data init stuff; 'R_InitData' was overwritten by the loader
 	{0x00035D83, CODE_HOOK | HOOK_CALL_ACE, (uint32_t)data_init},
 	// late init stuff
 	{0x0001E950, CODE_HOOK | HOOK_CALL_ACE, (uint32_t)late_init},

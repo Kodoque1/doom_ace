@@ -2,10 +2,10 @@
 
 ## Preparation
 
-ACE Engine uses these specialy crafted lumps to achieve code execution:
+ACE Engine uses these specially built lumps to load custom code:
 
 - `PNAMES` single link to `ACE_LDR0` fake patch
-- `TEXTURE1` specialy crafted list of fake textures and multiple negative size allocations
+- `TEXTURE1` specially built list of fake textures and multiple negative-size allocations
 - `ACE_LDR0` first stage of loader pretending to be doom graphics
 - `ACE_LDR1` seconds stage of loader
 - `ACE_CODE` the engine itself

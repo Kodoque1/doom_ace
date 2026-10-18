@@ -1,4 +1,4 @@
-program = nhax
+program = loader
 OBJ0 = ldr0.o
 OBJ1 = ldr1.o
 CC=gcc -m32 -nostdlib
@@ -18,5 +18,5 @@ ${program}.l1: ${OBJ1}
 ${program}.wad: ${program}.l0 ${program}.l1
 	objcopy -O binary --only-section=.text ${program}.l0 ${program}.b0
 	objcopy -O binary --only-section=.text ${program}.l1 ${program}.b1
-	./wadgen.py nhax.b0 nhax.b1 nhax.wad
+	./wadgen.py ${program}.b0 ${program}.b1 ${program}.wad
 
