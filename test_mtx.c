@@ -275,13 +275,13 @@ static int test7(void)
 	/* planner arithmetic, checked against hand figures:
 	   (a) 8 MiB arena, 256 KiB zone -> per_depth 464388 -> 18 fit -> capped 12
 	   (b) 1 MiB arena, 538 KiB snapshot -> per_depth 1000860 -> only 1 fits   */
-	b = mtx_plan(8u * 1024u * 1024u, 2048u + 4u, 262144u, 320u * 200u * 3u, 8192u);
-	ok &= (b.per_depth == 464388u);
-	ok &= (b.depths_fit == 18u);
+	b = mtx_plan(8u * 1024u * 1024u, 2048u + 4u, 262144u, 320u * 200u, 8192u);
+	ok &= (b.per_depth == 336388u);
+	ok &= (b.depths_fit == 24u);
 	ok &= (b.depth == (uint8_t)MTX_MAX_DEPTH);
 
-	b = mtx_plan(1u * 1024u * 1024u, 538524u, 262144u, 192000u, 8192u);
-	ok &= (b.per_depth == 1000860u);
+	b = mtx_plan(1u * 1024u * 1024u, 538524u, 262144u, 64000u, 8192u);
+	ok &= (b.per_depth == 872860u);
 	ok &= (b.depths_fit == 1u);
 	ok &= (b.depth == 1u);
 
@@ -318,6 +318,23 @@ static int test7(void)
 		ok &= (heaps7[i] && screens7[i] && heaps7[i] != screens7[i]);
 		for(j = 0; j < i; j++)
 			ok &= (heaps7[i] != heaps7[j] && screens7[i] != screens7[j]);
+	}
+
+	/* depth 0 may keep the caller's existing zone/screen (the root's live ones) */
+	{
+		static uint8_t root_z[16], root_s[16];
+		void *h2[MTX_MAX_DEPTH], *s2[MTX_MAX_DEPTH];
+		int k;
+
+		for(k = 0; k < MTX_MAX_DEPTH; k++) { h2[k] = 0; s2[k] = 0; }
+		h2[0] = root_z;
+		s2[0] = root_s;
+		if(mtx_dos_boot(arena7, T7_ARENA, MTX_ZONE_DEFAULT, wire7,
+		                h2, s2, &bt) != 0)
+			ok = 0;
+		ok &= (h2[0] == root_z && s2[0] == root_s);	/* kept, not replaced */
+		ok &= (h2[1] && h2[1] != (void *)root_z);
+		ok &= (s2[1] && s2[1] != (void *)root_s);
 	}
 	ok &= ((uint8_t *)bt.stack_base >= arena7);
 	ok &= ((uint8_t *)bt.stack_base + bt.stack_bytes <= arena7 + T7_ARENA);

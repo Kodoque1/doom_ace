@@ -16,7 +16,9 @@ static const mtx_host_ops_t *mtx_ops;
 static uint32_t             *mtx_pool;
 static uint32_t              mtx_slot_words;   /* words per live depth */
 
+#ifndef MTX_DOS_NO_STATIC_POOL
 static uint32_t mtx_static_pool[MTX_MAX_DEPTH * MTX_STACK_WORDS];
+#endif
 
 /* no-tree-loop-distribute-patterns: keep gcc from turning this into a memset()
    call - there is no libc inside ACE. */
@@ -49,11 +51,20 @@ void mtx_init(uint8_t max_depth, const mtx_host_ops_t *ops,
 		mtx_pool       = (uint32_t *)stack_base;
 		mtx_slot_words = (stack_bytes / 4u) / max_depth;
 	}
+#ifndef MTX_DOS_NO_STATIC_POOL
 	else
 	{
 		mtx_pool       = mtx_static_pool;
 		mtx_slot_words = MTX_STACK_WORDS;
 	}
+#else
+	else
+	{
+		/* no built-in pool: the caller must supply one. mtx_push fails closed. */
+		mtx_pool       = 0;
+		mtx_slot_words = 0;
+	}
+#endif
 }
 
 /* Lay out a brand-new depth's stack so the first mtx_switch_ctx on it pops the
@@ -99,6 +110,8 @@ int mtx_push(mtx_entry_t entry, void *arg)
 {
 	uint8_t d = (uint8_t)(mtx_cur + 1u);
 
+	if(!mtx_pool)
+		return MTX_EDEPTH;		/* no stack pool: fail closed */
 	if(d >= mtx_max)
 		return MTX_EDEPTH;
 

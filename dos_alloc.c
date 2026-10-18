@@ -69,12 +69,17 @@ int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
 		return -1;			/* two is the minimum that nests */
 
 	/* Phase 2: carve. Depths past b.depth stay NULL and are never reachable -
-	   mtx_push refuses beyond mtx_max_depth anyway. */
+	   mtx_push refuses beyond mtx_max_depth anyway.
+	   Depth 0 is special: if the caller pre-filled heaps[0]/screens[0] they are
+	   KEPT, because the root must go on using its own live zone and framebuffer.
+	   Only the children get freshly carved ones. */
 	mtx_arena_init(&a, arena_mem, arena_bytes);
 	for(i = 0; i < b.depth; i++)
 	{
-		heaps[i]   = mtx_arena_alloc(&a, zone_per_depth, 16);
-		screens[i] = mtx_arena_alloc(&a, MTX_SCREEN_BYTES, 16);
+		if(!(i == 0 && heaps[i]))
+			heaps[i] = mtx_arena_alloc(&a, zone_per_depth, 16);
+		if(!(i == 0 && screens[i]))
+			screens[i] = mtx_arena_alloc(&a, MTX_SCREEN_BYTES, 16);
 		if(!heaps[i] || !screens[i])
 			return -1;
 	}

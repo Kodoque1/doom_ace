@@ -32,9 +32,9 @@ uint32_t mtx_arena_used(const mtx_arena_t *a);
  * Per-depth costs. `screen` and `zone` are policy inputs: the engine's real
  * screen_buffer usage and a level's real working set both need measuring on
  * hardware, so they are pass-throughs, not constants baked in here.
- * 320*200*3 covers the framebuffer plus the loader's patch scratch.
+ * 320*200 is one 8-bit framebuffer - the minimum a depth needs to render into.
  */
-#define MTX_SCREEN_BYTES  (320u * 200u * 3u)
+#define MTX_SCREEN_BYTES  (320u * 200u)
 #define MTX_ZONE_DEFAULT  (1u * 1024u * 1024u)
 
 typedef struct {

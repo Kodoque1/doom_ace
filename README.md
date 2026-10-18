@@ -200,6 +200,53 @@ It is that small because nothing calls `mtx_init` yet: `--gc-sections` keeps onl
 (`nm` confirms). So the yield point is installed and inert until a host is booted
 — which is what makes it a safe first integration.
 
+### Booted live in DOOM2.EXE
+
+The host now boots for real inside DOOM2.EXE in DOSBox, and depth 1 exists as a
+running instance. `engine/mtx_boot.c` boots it once on the first frame with a
+reserved arena, creates depth 1 (a stub that logs and yields), and drives an
+auto-switch policy. Evidence goes to `MTX.LOG` because stdout capture stops once
+the engine takes over:
+
+    [MTX] first frame
+    [MTX] host up: depths 3 snap 536262 B/depth
+    [MTX] depth1 entered
+    [MTX] depth1 tick
+
+536,262 B/depth is exactly the measured figure (475,676 Doom data + 60,586 engine
+.bss), and depth 1 genuinely ran on its own stack with its own snapshotted state.
+
+Three things had to be right, each found the hard way:
+
+1. **The arena must be reserved BEFORE `Z_Init`.** ACE's `Z_Init` walks
+   `dpmi_get_ram()` down until `doom_malloc` succeeds — it consumes *everything*
+   except a 32 KiB reserve. An arena requested at frame time can never be
+   satisfied; the first attempts logged "no arena available" at every size down to
+   1 MiB. `mtx_engine_reserve()` therefore runs at the top of `Z_Init` and the
+   zone simply gets less memory — exactly the sizing trade the planner describes.
+
+2. **The yield point must be a site that actually runs.** `swap_buffers()` is only
+   hooked when VESA activates, and VESA is opt-in (`-vesa`) and did not activate
+   in DOSBox's S3 for a 320x200 mode. `hook_draw_stbar` only runs in GS_LEVEL —
+   the title screen is GS_DEMOSCREEN. The one site that runs in every gamestate is
+   ACE's `I_FinishUpdate` in `asm.S`, but calling C from there **crashes the game**
+   (`Illegal read ... CS:IP 170:b02c7d5c`, black screen): it is entered from a Doom
+   path where the C calling convention does not hold, unlike ACE's other asm
+   hooks. The working hook is `hook_draw_stbar`.
+
+3. **A pending request waits, it is not lost.** Because the hook is
+   gamestate-conditional, the request/consume pair is what makes it safe: a request
+   sits until the next frame that reaches the yield point.
+
+**Known issue.** Booting the host introduces three `Illegal read` warnings from
+DOSBox (addresses around 0xF0009236) that the untouched baseline does not have
+(baseline: 0 illegal reads, host inert — confirmed by building HEAD in a worktree
+and running the identical WAD). The game still reaches the title screen. Likely
+cause: each child's `mainzone` pin points at raw arena memory rather than a
+`Z_Init`ed zone, so the first Doom-side allocation in the child path walks an
+uninitialised `memblock_t`. Fix: give each depth a properly initialised zone
+before letting it touch Doom's allocator.
+
 `make doscheck` — all eight DOS-target sources (`mtx_core.c`, `mtx_switch.S`,
 `dos_state.c`, `dos_alloc.c`, `dos_wire.c`, `ldr1n.c`, `ldr1N.S`, `mtx_sched.c`)
 compile clean with the exact flags from `doom_ace/engine/makefile`
