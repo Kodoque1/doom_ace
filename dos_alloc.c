@@ -62,6 +62,8 @@ int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
 	/* Phase 1: register against no pool, purely to learn the snapshot size. */
 	mtx_dos_init(MTX_MAX_DEPTH, 0, 0);
 	snap = wire_register();
+	if(!snap)
+		return -1;			/* wiring refused (see dos_wire.c) */
 
 	b = mtx_plan(arena_bytes, snap, zone_per_depth, MTX_SCREEN_BYTES, MTX_STACK_SIZE);
 	out->budget = b;

@@ -11,6 +11,7 @@
 #include "context.h"
 #include "dos_state.h"
 #include "dos_wire.h"
+#include "mtx_host.h"
 
 /* Extent of Doom's mutable data, measured from engine/doom_vars.S:
    416 variables, lowest 0x00001A84 (finetangent), highest 0x00075CA0
@@ -27,16 +28,57 @@ extern uint8_t *screen_buffer;		/* engine/doom_vars.h */
 extern uint8_t _bss_start[];		/* engine/linker.ld   */
 extern uint8_t _bss_end[];
 
+/*
+ * Register the engine's writable .bss for per-depth snapshotting, minus the
+ * host's own control state.
+ *
+ * The exclusion is the whole point. A snapshot restore copies a slot over the
+ * live .bss, and mtx_hs lives in that .bss; if it were covered, the restore
+ * would overwrite mtx_cur / mtx_ctx[].esp / inited[] in the middle of
+ * mtx_switch - the scheduler would then resume on a stale (zero) ESP and jump
+ * into unmapped memory. See mtx_host.h.
+ *
+ * mtx_hs is a single object, so splitting the region at its bounds is exact:
+ * the linker may put other .bss data before or after it, never inside.
+ * Refuses (returns -1) rather than snapshot the scheduler if that ever stops
+ * holding - failing to nest beats corrupting the root instance.
+ */
+static int wire_engine_bss(void)
+{
+	uintptr_t b0 = (uintptr_t)(void *)_bss_start;
+	uintptr_t b1 = (uintptr_t)(void *)_bss_end;
+	uintptr_t h0 = (uintptr_t)(void *)&mtx_hs;
+	uintptr_t h1 = h0 + (uintptr_t)sizeof(mtx_hs);
+
+	if(h0 >= h1 || h0 < b0 || h1 > b1)
+		return -1;
+
+	/* .bss below the host block */
+	if(h0 > b0 && mtx_dos_add_region((void *)b0, (uint32_t)(h0 - b0)) != 0)
+		return -1;
+	/* .bss above it */
+	if(h1 < b1 && mtx_dos_add_region((void *)h1, (uint32_t)(b1 - h1)) != 0)
+		return -1;
+
+	return 0;
+}
+
 uint32_t mtx_dos_wire_register(void)
 {
 	/* 1. Doom's mutable data: everything doom_vars.S addresses. */
 	mtx_dos_add_region((void *)(doom_data_segment + DOOM_VAR_LO), DOOM_REGION);
 
-	/* 2. The engine's own writable state. .bss has linker symbols; .data does
-	   not, so it is deliberately left out here - it needs a
-	   PROVIDE(_data_start/_data_end) pair in engine/linker.ld to be included.
-	   Do not forget it: mod_config and friends live there. */
-	mtx_dos_add_region(_bss_start, (uint32_t)(_bss_end - _bss_start));
+	/* 2. The engine's own writable state, with mtx_hs carved out. .data has no
+	   linker symbols yet, so it is deliberately left out here - it needs a
+	   PROVIDE(_data_start/_data_end) pair in engine/linker.ld. When that
+	   happens it must be split around mtx_hs in exactly the same way, because
+	   the host state must never be snapshot. */
+	if(wire_engine_bss() != 0)
+	{
+		/* Fail closed: 0 means "no usable snapshot", and mtx_dos_boot turns
+		   that into a refusal to nest. */
+		return 0;
+	}
 
 	/* 3. The two pointer globals each depth must own. */
 	mtx_dos_set_pin(&mainzone, MTX_PIN_MAINZONE);

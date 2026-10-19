@@ -5,25 +5,25 @@
  * no engine dependency: the wiring layer registers whatever has to move.
  */
 #include "dos_state.h"
+#include "mtx_host.h"
 
 #ifndef MTX_DOS_STATIC_PER_DEPTH
 #define MTX_DOS_STATIC_PER_DEPTH (640u * 1024u)	/* host pool: 640 KiB/depth */
 #endif
 
-typedef struct { void *base; uint32_t size; uint32_t off; } mtx_dregion_t;
-typedef struct { void *addr; uint32_t len;  uint32_t off; } mtx_dhook_t;
-
-static mtx_dregion_t rgn[MTX_DOS_MAX_REGIONS];
-static mtx_dhook_t   hok[MTX_DOS_MAX_HOOKS];
-static int           nrgn, nhok;
-
-static void         *pin_addr[MTX_PIN_COUNT];
-static void         *pin_val[MTX_MAX_DEPTH][MTX_PIN_COUNT];
-
-static uint8_t      *pool;
-static uint32_t      per_depth;
-static uint8_t       inited[MTX_MAX_DEPTH];
-static uint8_t       maxd;
+/* The registry is control state, so it lives in mtx_hs and is excluded from the
+   very snapshots it describes (see mtx_host.h). mtx_dregion_t/mtx_dhook_t are
+   declared there too. */
+#define rgn       (mtx_hs.rgn)
+#define hok       (mtx_hs.hok)
+#define nrgn      (mtx_hs.nrgn)
+#define nhok      (mtx_hs.nhok)
+#define pin_addr  (mtx_hs.pin_addr)
+#define pin_val   (mtx_hs.pin_val)
+#define pool      (mtx_hs.snap_pool)
+#define per_depth (mtx_hs.snap_per_depth)
+#define inited    (mtx_hs.inited)
+#define maxd      (mtx_hs.maxd)
 
 #ifndef MTX_DOS_NO_STATIC_POOL
 static uint8_t static_pool[MTX_MAX_DEPTH * MTX_DOS_STATIC_PER_DEPTH];

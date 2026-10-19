@@ -6,15 +6,19 @@
  * dependency - so the same object builds into ACE and into the host test.
  */
 #include "context.h"
+#include "mtx_host.h"
 
 extern void mtx_trampoline(void);
 
-static mtx_context_t         mtx_ctx[MTX_MAX_DEPTH];
-static uint8_t               mtx_cur;
-static uint8_t               mtx_max;
-static const mtx_host_ops_t *mtx_ops;
-static uint32_t             *mtx_pool;
-static uint32_t              mtx_slot_words;   /* words per live depth */
+/* Control state lives in mtx_hs (mtx_host.h) so it can be excluded from every
+   guest snapshot - see the long comment there for why restoring it mid-switch
+   is fatal. These aliases keep the code below readable. */
+#define mtx_ctx        (mtx_hs.ctx)
+#define mtx_cur        (mtx_hs.cur)
+#define mtx_max        (mtx_hs.max)
+#define mtx_ops        (mtx_hs.ops)
+#define mtx_pool       (mtx_hs.stack_pool)
+#define mtx_slot_words (mtx_hs.slot_words)
 
 #ifndef MTX_DOS_NO_STATIC_POOL
 static uint32_t mtx_static_pool[MTX_MAX_DEPTH * MTX_STACK_WORDS];
@@ -39,7 +43,23 @@ void mtx_init(uint8_t max_depth, const mtx_host_ops_t *ops,
 		max_depth = 2;
 
 	mtx_max = max_depth;
-	mtx_ops = ops;
+
+	/* Copy the table rather than keeping the caller's pointer. mtx_init is
+	   normally called once, from an init path whose frame is long gone by the
+	   first real switch - and a dangling table means the switch calls through
+	   recycled stack memory. Owning a copy makes that impossible instead of
+	   merely documented. */
+	if(ops)
+	{
+		mtx_hs.host_ops = *ops;
+		mtx_ops = &mtx_hs.host_ops;
+	}
+	else
+	{
+		mtx_hs.host_ops.save_state = 0;
+		mtx_hs.host_ops.load_state = 0;
+		mtx_ops = 0;
+	}
 
 	mtx_zero(mtx_ctx, (uint32_t)sizeof(mtx_ctx));
 	mtx_cur = MTX_ROOT_DEPTH;
@@ -168,7 +188,24 @@ void mtx_run_entry(void *arg)
 	mtx_finish();
 }
 
-uint8_t mtx_depth(void)      { return mtx_cur; }
-uint8_t mtx_max_depth(void)  { return mtx_max; }
+uint8_t  mtx_depth(void)      { return mtx_cur; }
+uint8_t  mtx_max_depth(void)  { return mtx_max; }
 void   *mtx_arg(void)        { return mtx_ctx[mtx_cur].arg; }
 void   *mtx_state(void)      { return mtx_ctx[mtx_cur].state; }
+
+int mtx_alive(uint8_t depth)
+{
+	if(depth >= mtx_max || !mtx_ctx[depth].used)
+		return 0;
+	if(depth != MTX_ROOT_DEPTH && mtx_ctx[depth].finished)
+		return 0;
+	return 1;
+}
+
+/* Diagnostics only: lets an engine-side probe assert that a suspended depth's
+   saved stack pointer is still sane. Not used by the scheduler itself. */
+void   *mtx_debug_esp(uint8_t depth) { return (depth < mtx_max) ? mtx_ctx[depth].esp : 0; }
+
+/* Diagnostics only: the save/load table the scheduler will actually call.
+   Used by the regression test that mtx_init copies its argument. */
+const void *mtx_debug_ops(void) { return (const void *)mtx_ops; }

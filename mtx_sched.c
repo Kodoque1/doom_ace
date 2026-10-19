@@ -2,9 +2,12 @@
  * matryoshka/mtx_sched.c - request/consume, serviced at the frame boundary.
  */
 #include "mtx_sched.h"
+#include "mtx_host.h"
 
-static volatile uint8_t sched_kind;
-static volatile uint8_t sched_depth;
+/* Pending request. In mtx_hs so a guest snapshot restore cannot re-arm a
+   request that was already consumed at a frame boundary. */
+#define sched_kind  (mtx_hs.req_kind)
+#define sched_depth (mtx_hs.req_depth)
 
 void mtx_request_yield(void)
 {

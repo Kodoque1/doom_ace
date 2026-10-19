@@ -83,6 +83,15 @@ uint8_t  mtx_max_depth(void);
 void    *mtx_arg(void);
 void    *mtx_state(void);            /* current depth's opaque DOS payload */
 
+/* Is this slot a depth that can still be switched to? False for an unused or
+   already-finished slot, so a caller does not keep requesting a dead depth. */
+int      mtx_alive(uint8_t depth);
+
+/* Diagnostics: saved stack pointer of a suspended depth (NULL if none). */
+void    *mtx_debug_esp(uint8_t depth);
+/* Diagnostics: the save/load table the scheduler will actually call. */
+const void *mtx_debug_ops(void);
+
 /* Low level primitive, implemented in mtx_switch.S:
    stores the current ESP into *save_esp, loads load_esp, restores callee-saved
    registers and returns on the loaded stack. */

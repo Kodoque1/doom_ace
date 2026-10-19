@@ -131,8 +131,11 @@ continuation, `4(%esp)` = banner.
     context.h        interface: context, host ops, depth limits
     mtx_switch.S     context-switch primitive + fresh-stack trampoline
     mtx_core.c       scheduler: seeding, switch, depth limits, save/load hand-off
+    mtx_host.h/.c    the host's own control state, in ONE object (`mtx_hs`)
+                     so no guest snapshot can ever cover it
     dos_state.h/.c   engine-agnostic per-depth state: regions, hooks, pins
-    dos_wire.h/.c    concrete ACE wiring (regions, pins, hook registration)
+    dos_wire.h/.c    concrete ACE wiring (regions, pins, hook registration),
+                     including the `.bss` split that keeps `mtx_hs` out
     dos_alloc.h/.c   arena, budget planner, one-call boot
     mtx_sched.h/.c   yield point: request queue, serviced at the frame boundary
     ldr0N.S          reentrant first-stage loader
@@ -156,6 +159,7 @@ continuation, `4(%esp)` = banner.
       [7] arena + budget + boot .. PASS
       [8] reentrant 2nd stage .... PASS
       [9] yield point (frame tick) PASS
+      [10] ops table lifetime .... PASS
     ALL PASS
 
 [1] three depths nest and unwind in order (A C E D B).
@@ -179,6 +183,11 @@ continuation, `4(%esp)` = banner.
     (`1,1,0,1,1,0`) with each depth holding its own frame count, the request is
     consumed exactly once, and a request for a non-live depth is dropped rather
     than crashing.
+[10] the save/load table must not dangle. `mtx_init` is called from a `noinline`
+    helper whose frame is dead and then clobbered with `0x4D4D4D4D`; the test
+    asserts the scheduler is still holding *our* callbacks, that the table is
+    off-stack, and that a subsequent switch really calls them (save/load exactly
+    twice each, child ran once). Fails against the old retain-the-pointer code.
 
 ### Wired into the engine, and verified not to regress
 
@@ -209,12 +218,25 @@ auto-switch policy. Evidence goes to `MTX.LOG` because stdout capture stops once
 the engine takes over:
 
     [MTX] first frame
-    [MTX] host up: depths 3 snap 536262 B/depth
+    [MTX] host up: depths 3 snap 529468 B/depth
     [MTX] depth1 entered
     [MTX] depth1 tick
+    [MTX] frame 1 child=1
+    ...
+    [MTX] frame 30 child=1
+    [MTX] request switch -> 1        <- frame boundary, depth 0 -> 1
+    [MTX] depth1 resumed             <- the suspended instance came back
+    [MTX] depth1 tick
+    ...
+    [MTX] depth1 done                <- child finished after MTX_DEMO_TICKS
+    [MTX] frame 300 child=1          <- root keeps running on its own frame loop
 
-536,262 B/depth is exactly the measured figure (475,676 Doom data + 60,586 engine
-.bss), and depth 1 genuinely ran on its own stack with its own snapshotted state.
+529,468 B/depth is the measured figure (475,676 Doom data + ~53 KiB engine .bss,
+minus `mtx_hs` which is deliberately outside the snapshot). Depth 1 genuinely ran
+on its own stack with its own snapshotted state, was suspended and resumed six
+times across 300+ frames, and completed — with zero illegal reads and zero
+`DYNX86` faults. The same run with `MTX_DEMO_INTERVAL` lowered to 3 shows the full
+cycle back-to-back (see `### Live switching` below).
 
 Three things had to be right, each found the hard way:
 
@@ -238,20 +260,58 @@ Three things had to be right, each found the hard way:
    gamestate-conditional, the request/consume pair is what makes it safe: a request
    sits until the next frame that reaches the yield point.
 
-**Known issue.** Booting the host introduces three `Illegal read` warnings from
-DOSBox (addresses around 0xF0009236) that the untouched baseline does not have
-(baseline: 0 illegal reads, host inert — confirmed by building HEAD in a worktree
-and running the identical WAD). The game still reaches the title screen. Likely
-cause: each child's `mainzone` pin points at raw arena memory rather than a
-`Z_Init`ed zone, so the first Doom-side allocation in the child path walks an
-uninitialised `memblock_t`. Fix: give each depth a properly initialised zone
-before letting it touch Doom's allocator.
+### Live switching, and the illegal-read fix
 
-`make doscheck` — all eight DOS-target sources (`mtx_core.c`, `mtx_switch.S`,
-`dos_state.c`, `dos_alloc.c`, `dos_wire.c`, `ldr1n.c`, `ldr1N.S`, `mtx_sched.c`)
-compile clean with the exact flags from `doom_ace/engine/makefile`
-(`-m32 -march=i386 -mgeneral-regs-only …`), with the static pool compiled out as
-ACE would need.
+Booting stopped being the interesting part: the crash came on the *first real
+switch*. Two bugs, and they are the same bug twice — host state that was not
+actually under the host's control.
+
+**1. The host's control state sat inside the snapshot that was running.**
+Every switch restores the engine's whole writable `.bss` over the live copy, and
+the scheduler's own variables (`mtx_ctx`, `mtx_cur`, `inited[]`, `pool`) lived in
+that same `.bss`. So `load_state()` overwrote the state mid-switch: `mtx_ctx[prev].esp`
+was put back to the value captured *before* `mtx_switch_ctx` published the real
+one, and the next `mtx_switch_ctx` loaded `ESP = 0`. Measured as 2000 illegal
+reads/writes plus `DYNX86: Can't run code in this page` on the very first switch,
+where the HEAD baseline has zero.
+
+Fix: all host control state now lives in a single object, `mtx_hs` (`mtx_host.h`),
+and `dos_wire.c` splits the registered `.bss` region *around* it so no guest
+snapshot can cover it. The split is exact because `mtx_hs` is one object, and it
+refuses to nest at all if that ever stops holding. The boot log proves it: `mtx_hs`
+ends precisely at `_bss_end`, and the snapshot dropped from 536,262 to
+529,468 B/depth — exactly `sizeof(mtx_hs)`.
+
+**2. The save/load table was a dangling stack pointer.** `mtx_init()` kept the
+pointer it was handed, and the engine handed it the address of a *local* in
+`mtx_engine_boot` — a frame long dead by the first switch. The switch then called
+through recycled stack memory: `exception 06h (invalid opcode)` at a garbage EIP,
+with `ESP` still on the *root's* stack. That last detail was the tell — the bad
+call happens *before* the stack swap, so the fault could not be in the resumed
+depth.
+
+Fix: `mtx_init()` copies the table into `mtx_hs.host_ops` rather than retaining a
+pointer, so owning the copy makes the mistake impossible instead of merely
+documented. Regression-tested as host test [10]. Worth noting how the first
+version of that test lied: it compared the retained pointer against the dead
+frame's address, but returning a dead local's address is undefined, so gcc folded
+it to NULL and the test passed *against the buggy code*. The working test inspects
+the table the scheduler will actually call, and asserts it still holds our
+callbacks.
+
+**How the two were found**, in case this has to be done again: the frame-path log
+stopped at `tick in`, which localised the fault to the switch itself rather than
+the engine; the DOS/4GB register dump gave `ESP` in the root's stack, which ruled
+out the resumed depth; probing `_bss_start`/`&mtx_hs`/`esp1` and the *contents* of
+the suspended stack (callee-saved slots plus return address, checked against
+logged code addresses) then ruled out both a broken stack and the state restore.
+That left the call targets — and a function-pointer table pointing at a dead frame.
+
+`make doscheck` — all nine DOS-target sources (`mtx_core.c`, `mtx_switch.S`,
+`mtx_host.c`, `dos_state.c`, `dos_alloc.c`, `dos_wire.c`, `ldr1n.c`, `ldr1N.S`,
+`mtx_sched.c`) compile clean with the exact flags from
+`doom_ace/engine/makefile` (`-m32 -march=i386 -mgeneral-regs-only …`), with the
+static pool compiled out as ACE needs.
 
 `make ldr0n` — assembles to a 24-byte image, well inside the 256-byte ACE_LDR0
 patch budget.

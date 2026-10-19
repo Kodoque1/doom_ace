@@ -508,6 +508,64 @@ static int test9(void)
 	return ok;
 }
 
+/* ------------------------- test 10: the ops table must not dangle ---------- */
+/* mtx_init copies the table it is handed. Registering from a frame that then
+   dies must still give working save/load callbacks on later switches: keeping
+   the caller's pointer made the switch call through recycled stack memory,
+   which inside ACE is a wild jump (no MMU to catch it, unlike the host).
+   Checked by inspecting the table the scheduler will actually call - NOT by
+   comparing addresses, because returning a dead frame's address is undefined
+   and the optimiser is free to fold it to NULL. */
+static uint32_t lt_save, lt_load, lt_ran;
+
+static void lt_s_save(mtx_context_t *o) { (void)o; lt_save++; }
+static void lt_s_load(mtx_context_t *i) { (void)i; lt_load++; }
+static void lt_child(void *a) { (void)a; lt_ran++; }
+
+/* noinline: with the table inlined into the caller its storage stays live and
+   the dangling case would not reproduce. */
+static __attribute__((noinline)) void lt_register(void)
+{
+	mtx_host_ops_t ops;			/* deliberately short-lived */
+	ops.save_state = lt_s_save;
+	ops.load_state = lt_s_load;
+	mtx_init(MTX_MAX_DEPTH, &ops, 0, 0);
+}
+
+static __attribute__((noinline)) void lt_clobber(void)
+{
+	volatile uint32_t junk[128];
+	uint32_t i;
+	for(i = 0; i < 128; i++)
+		junk[i] = 0x4D4D4D4Du;		/* 'MMMM': what the DOS fault dumped */
+}
+
+static int test10(void)
+{
+	const mtx_host_ops_t *t;
+	uint32_t sp, addr;
+
+	lt_save = lt_load = lt_ran = 0;
+	lt_register();
+	lt_clobber();
+
+	t = (const mtx_host_ops_t *)mtx_debug_ops();
+
+	/* the scheduler must still be holding OUR table, not a clobbered frame */
+	if(!t || t->save_state != lt_s_save || t->load_state != lt_s_load)
+		return 0;
+
+	/* ... and it must live off-stack entirely */
+	sp   = esp_of();
+	addr = (uint32_t)(uintptr_t)t;
+	if(addr <= sp && addr > sp - 65536u)
+		return 0;
+
+	mtx_push(lt_child, 0);
+	/* down: save(0) load(1); child returns: save(1) load(0) */
+	return lt_ran == 1 && lt_save == 2 && lt_load == 2;
+}
+
 /* ------------------------------------------------------------------- main */
 void _start(void)
 {
@@ -527,6 +585,7 @@ void _start(void)
 	r = test7(); puts_("  [7] arena + budget + boot .. "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test8(); puts_("  [8] reentrant 2nd stage .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test9(); puts_("  [9] yield point (frame tick) "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
+	r = test10(); puts_("  [10] ops table lifetime .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 
 	puts_(ok ? "ALL PASS\n" : "SOME FAILED\n");
 	sys_exit(ok ? 0 : 1);
