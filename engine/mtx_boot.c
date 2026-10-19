@@ -25,22 +25,24 @@
 #include "dos_alloc.h"
 #include "dos_wire.h"
 #include "mtx_sched.h"
+#include "mtx_host.h"
 
 #define MTX_ZONE_PER_DEPTH  (256u * 1024u)
 #define MTX_DEMO_INTERVAL   30u
 #define MTX_DEMO_TICKS      6u
 
-static uint8_t  mtx_booted;
-static uint8_t  mtx_boot_failed;
-static uint8_t  mtx_child_live;
-static uint32_t mtx_frame_no;
-static int32_t  mtx_log_fd = -1;
-
-static void   *mtx_arena;
-static uint32_t mtx_arena_size;
-
-static void *mtx_heaps[MTX_MAX_DEPTH];
-static void *mtx_screens[MTX_MAX_DEPTH];
+/* Engine-side glue state. In mtx_hs so it is excluded from every guest
+   snapshot: a restored `booted`/`frame_no`/`log_fd` would re-boot the host or
+   truncate the log from inside a guest's frame. */
+#define mtx_booted      (mtx_hs.booted)
+#define mtx_boot_failed (mtx_hs.boot_failed)
+#define mtx_child_live  (mtx_hs.child_live)
+#define mtx_frame_no    (mtx_hs.frame_no)
+#define mtx_log_fd      (mtx_hs.log_fd)
+#define mtx_arena       (mtx_hs.arena)
+#define mtx_arena_size  (mtx_hs.arena_size)
+#define mtx_heaps       (mtx_hs.heaps)
+#define mtx_screens     (mtx_hs.screens)
 
 /*
  * Reserve the arena for the nested instances. MUST run before ACE's Z_Init takes
@@ -52,6 +54,11 @@ void MTX_FRAME_TICK_ABI mtx_engine_reserve(void)
 {
 	static const uint32_t sizes[] = {3u, 2u, 0u};	// MiB
 	uint32_t i;
+
+	/* mtx_hs is zero-filled, so the "log not open yet" sentinel - which used to
+	   come from a static initialiser - has to be set explicitly. Runs before any
+	   mtx_log() call. */
+	mtx_log_fd = -1;
 
 	for(i = 0; sizes[i]; i++)
 	{
@@ -97,6 +104,7 @@ static void mtx_demo_child(void *arg)
 	{
 		mtx_log("[MTX] depth1 tick\n");
 		mtx_yield();			// hand back to the root frame loop
+		mtx_log("[MTX] depth1 resumed\n");
 	}
 	mtx_log("[MTX] depth1 done\n");
 	mtx_finish();
@@ -105,7 +113,7 @@ static void mtx_demo_child(void *arg)
 static void mtx_engine_boot(void)
 {
 	mtx_boot_t bt;
-	mtx_host_ops_t ops;
+	mtx_host_ops_t ops;	// taken by value by mtx_init, so a local is fine
 	uint8_t buf[128];
 
 	mtx_booted = 1;
@@ -131,6 +139,8 @@ static void mtx_engine_boot(void)
 		return;
 	}
 
+	// mtx_init takes the table by value; see the note in mtx_host.h about why a
+	// retained pointer to a caller local would be a wild jump.
 	ops.save_state = mtx_dos_save_state;
 	ops.load_state = mtx_dos_load_state;
 	mtx_init(bt.depth, &ops, bt.stack_base, bt.stack_bytes);
@@ -147,18 +157,25 @@ static void mtx_engine_boot(void)
 
 static void mtx_engine_policy(void)
 {
-	uint8_t buf[64];
+	uint8_t buf[80];
+
+	mtx_frame_no++;
+
+	// instrumentation: prove the frame path keeps running after the first switch
+	if(mtx_frame_no <= 40u || (mtx_frame_no % 50u) == 0u)
+	{
+		doom_sprintf(buf, (const uint8_t *)"[MTX] frame %u child=%u\n",
+		             mtx_frame_no, (uint32_t)mtx_child_live);
+		mtx_log((const char *)buf);
+	}
 
 	if(!mtx_child_live)
 		return;
 
-	mtx_frame_no++;
-
-	if(mtx_frame_no && (mtx_frame_no % 100u) == 0u)
-	{
-		doom_sprintf(buf, (const uint8_t *)"[MTX] frame %u\n", mtx_frame_no);
-		mtx_log((const char *)buf);
-	}
+	/* the demo child finishes after MTX_DEMO_TICKS switches; once it is gone
+	   there is nothing left to switch to, so stop asking */
+	if(mtx_depth() == MTX_ROOT_DEPTH && !mtx_alive(1))
+		return;
 
 	if((mtx_frame_no % MTX_DEMO_INTERVAL) == 0u)
 	{
