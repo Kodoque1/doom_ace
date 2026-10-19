@@ -29,6 +29,13 @@ typedef struct {
 #define MTX_LDR1N_LUMPINFO_SIZE 20u
 #define MTX_LDR1N_FD_OFFSET      8u
 
+/*
+ * A code image is [4B .bss size][4B version][payload ...]. Both the engine's own
+ * ACE_CODE lump and the matryoshka guest use this header, so the entry point is
+ * always payload + 8 (see engine/asm.S, which does the same `sub $0x1008`).
+ */
+#define MTX_LDR1N_HEADER_SIZE 8u
+
 typedef struct {
 	int32_t  fd;		/* descriptor holding the code lump */
 	uint32_t lump_size;	/* size of that lump */

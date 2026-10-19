@@ -42,13 +42,14 @@ typedef struct {
 	uint32_t zone;
 	uint32_t screen;
 	uint32_t stack;
-	uint32_t per_depth;	/* sum of the four */
+	uint32_t image;		/* per-depth copy of the code image to run */
+	uint32_t per_depth;	/* sum of the five */
 	uint32_t depths_fit;	/* floor(arena / per_depth) */
 	uint8_t  depth;		/* min(MTX_MAX_DEPTH, depths_fit) usable depths */
 } mtx_budget_t;
 
 mtx_budget_t mtx_plan(uint32_t arena_bytes, uint32_t snapshot, uint32_t zone,
-                      uint32_t screen, uint32_t stack);
+                      uint32_t screen, uint32_t stack, uint32_t image);
 
 /*
  * Registration callback: registers whatever has to move for the CURRENT
@@ -68,12 +69,15 @@ typedef struct {
 } mtx_boot_t;
 
 /*
- * Carve the arena and wire the state layer. `heaps` and `screens` are
- * caller-owned arrays of MTX_MAX_DEPTH pointers, filled in. Returns 0, or -1 if
- * the arena cannot hold at least two depths (two is the minimum that nests).
+ * Carve the arena and wire the state layer. `heaps`, `screens` and `images` are
+ * caller-owned arrays of MTX_MAX_DEPTH pointers, filled in. `images` receives
+ * each depth's own code-image slot (NULL when image_per_depth is 0). Returns 0,
+ * or -1 if the arena cannot hold at least two depths (two is the minimum that
+ * nests).
  */
 int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
+                 uint32_t image_per_depth,
                  mtx_wire_fn wire_register,
-                 void **heaps, void **screens, mtx_boot_t *out);
+                 void **heaps, void **screens, void **images, mtx_boot_t *out);
 
 #endif /* MATRYOSHKA_DOS_ALLOC_H */

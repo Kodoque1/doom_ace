@@ -31,7 +31,7 @@ void *mtx_arena_alloc(mtx_arena_t *a, uint32_t size, uint32_t align)
 uint32_t mtx_arena_used(const mtx_arena_t *a) { return a->used; }
 
 mtx_budget_t mtx_plan(uint32_t arena_bytes, uint32_t snapshot, uint32_t zone,
-                      uint32_t screen, uint32_t stack)
+                      uint32_t screen, uint32_t stack, uint32_t image)
 {
 	mtx_budget_t b;
 
@@ -39,7 +39,8 @@ mtx_budget_t mtx_plan(uint32_t arena_bytes, uint32_t snapshot, uint32_t zone,
 	b.zone      = zone;
 	b.screen    = screen;
 	b.stack     = stack;
-	b.per_depth = snapshot + zone + screen + stack;
+	b.image     = image;
+	b.per_depth = snapshot + zone + screen + stack + image;
 	b.depths_fit = b.per_depth ? (arena_bytes / b.per_depth) : 0;
 
 	b.depth = (b.depths_fit > MTX_MAX_DEPTH) ? MTX_MAX_DEPTH : (uint8_t)b.depths_fit;
@@ -49,8 +50,9 @@ mtx_budget_t mtx_plan(uint32_t arena_bytes, uint32_t snapshot, uint32_t zone,
 }
 
 int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
+                 uint32_t image_per_depth,
                  mtx_wire_fn wire_register,
-                 void **heaps, void **screens, mtx_boot_t *out)
+                 void **heaps, void **screens, void **images, mtx_boot_t *out)
 {
 	mtx_arena_t a;
 	uint32_t snap, i;
@@ -65,7 +67,8 @@ int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
 	if(!snap)
 		return -1;			/* wiring refused (see dos_wire.c) */
 
-	b = mtx_plan(arena_bytes, snap, zone_per_depth, MTX_SCREEN_BYTES, MTX_STACK_SIZE);
+	b = mtx_plan(arena_bytes, snap, zone_per_depth, MTX_SCREEN_BYTES, MTX_STACK_SIZE,
+	             image_per_depth);
 	out->budget = b;
 	if(b.depth < 2)
 		return -1;			/* two is the minimum that nests */
@@ -74,7 +77,9 @@ int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
 	   mtx_push refuses beyond mtx_max_depth anyway.
 	   Depth 0 is special: if the caller pre-filled heaps[0]/screens[0] they are
 	   KEPT, because the root must go on using its own live zone and framebuffer.
-	   Only the children get freshly carved ones. */
+	   Only the children get freshly carved ones. Every depth, root included,
+	   gets an image slot: a depth that wants to run code of its own needs
+	   somewhere of its own to put it. */
 	mtx_arena_init(&a, arena_mem, arena_bytes);
 	for(i = 0; i < b.depth; i++)
 	{
@@ -82,6 +87,13 @@ int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
 			heaps[i] = mtx_arena_alloc(&a, zone_per_depth, 16);
 		if(!(i == 0 && screens[i]))
 			screens[i] = mtx_arena_alloc(&a, MTX_SCREEN_BYTES, 16);
+		if(images)
+		{
+			images[i] = image_per_depth
+			          ? mtx_arena_alloc(&a, image_per_depth, 32) : 0;
+			if(image_per_depth && !images[i])
+				return -1;
+		}
 		if(!heaps[i] || !screens[i])
 			return -1;
 	}

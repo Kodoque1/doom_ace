@@ -40,6 +40,8 @@
 #include <stdint.h>
 #include "context.h"
 #include "dos_state.h"
+#include "ldr0n.h"
+#include "ldr1n.h"
 
 /* A registered snapshot region: where it lives and (assigned by mtx_layout)
    where it sits inside a depth's snapshot slot. */
@@ -90,6 +92,22 @@ typedef struct mtx_host_state {
 	uint32_t              arena_size;
 	void                 *heaps[MTX_MAX_DEPTH];
 	void                 *screens[MTX_MAX_DEPTH];
+
+	/* --- mtx_ldr.c: loader state. Also host control state, for the same
+	       reason: a guest snapshot must never cover it. --- */
+	void                 *images[MTX_MAX_DEPTH];
+	uint32_t              image_bytes;
+	mtx_ldr1n_ops_t       ldr_ops;
+	mtx_ldr0n_desc_t      ldr0_desc;
+	uint32_t              ldr_svc[3];	/* the guest's service table */
+	uint32_t              ldr_report[2];	/* what the loaded image reported */
+	uint32_t              ldr_guest_entry;
+	uint32_t              ldr_guest_total;
+	uint32_t              ldr_ace_total;
+	uint32_t              ldr_ace_bss;
+	uint32_t              ldr_ace_ver;
+	uint8_t               ldr_guest_ok;
+	uint8_t               ldr_ace_ok;
 } mtx_host_state_t;
 
 extern mtx_host_state_t mtx_hs;

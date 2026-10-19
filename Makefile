@@ -2,7 +2,8 @@
 #
 #   make run        build + run the host proof (32-bit freestanding)
 #   make doscheck   compile every source with the ACE engine's exact flags
-#   make ldr0n      assemble the reentrant first-stage loader skeleton
+#   make ldr0n      assemble the reentrant first-stage loader (size budget check)
+#   make guest      assemble the loadable guest image and install it as a WAD lump
 #   make clean
 
 CC = gcc
@@ -10,7 +11,7 @@ CC = gcc
 # host proof: mtx_core/mtx_switch/dos_state/dos_alloc/ldr1n.
 # dos_wire.c is NOT here - it references engine symbols (doom_data_segment,
 # mainzone, screen_buffer, _bss_start) and only builds inside ACE.
-CORE = mtx_core.c mtx_switch.S mtx_host.c dos_state.c dos_alloc.c ldr1n.c mtx_sched.c
+CORE = mtx_core.c mtx_switch.S mtx_host.c dos_state.c dos_alloc.c ldr1n.c ldr0N.S mtx_sched.c
 
 # host proof: freestanding, no libc, raw syscalls.
 # -mgeneral-regs-only matches the engine (no x87/SSE), and is required for the
@@ -27,7 +28,7 @@ ENGFLAGS = -m32 -march=i386 -fno-pie -O2 -g0 -mgeneral-regs-only \
 
 all: mtx_test
 
-mtx_test: test_mtx.c $(CORE) context.h dos_state.h dos_alloc.h ldr1n.h mtx_host.h
+mtx_test: test_mtx.c $(CORE) context.h dos_state.h dos_alloc.h ldr1n.h ldr0n.h mtx_host.h
 	$(CC) $(HOSTFLAGS) -no-pie -o $@ test_mtx.c $(CORE)
 
 run: mtx_test
@@ -35,7 +36,7 @@ run: mtx_test
 
 # In ACE there is no static snapshot pool: the host passes zone memory, so the
 # 7.5 MiB static pool is compiled out.
-DOSSRC = mtx_core.c mtx_switch.S mtx_host.c dos_state.c dos_alloc.c dos_wire.c ldr1n.c ldr1N.S mtx_sched.c
+DOSSRC = mtx_core.c mtx_switch.S mtx_host.c dos_state.c dos_alloc.c dos_wire.c ldr1n.c ldr1N.S ldr0N.S mtx_sched.c
 
 doscheck:
 	@for f in $(DOSSRC); do \
@@ -51,7 +52,18 @@ ldr0n: ldr0N.S
 	objcopy -O binary --only-section=.text ldr0N ldr0N.bin
 	@stat -c 'ldr0N.bin %s bytes  (ACE_LDR0 patch limit: 256)' ldr0N.bin
 
-clean:
-	rm -f *.o mtx_test ldr0N ldr0N.bin
+# The guest image is a real WAD lump the engine loads at runtime, so it has to
+# land where loader/wadgen.py picks up extra lumps from. Built here because its
+# source is matryoshka-specific; installed there so a clean WAD build still works.
+GUEST_DEST = ../doom_ace/loader/lumps/mtxguest.bin
 
-.PHONY: all run doscheck ldr0n clean
+guest: guest.S
+	$(CC) -m32 -nostdlib -c -o guest.o guest.S
+	$(CC) -m32 -nostdlib guest.o -o guest -Wl,-Ttext=0 -Wl,--oformat=binary
+	cp guest $(GUEST_DEST)
+	@stat -c 'guest image %s bytes -> $(GUEST_DEST) (lump MTXGUEST)' $(GUEST_DEST)
+
+clean:
+	rm -f *.o mtx_test ldr0N ldr0N.bin guest guest.bin
+
+.PHONY: all run doscheck ldr0n guest clean

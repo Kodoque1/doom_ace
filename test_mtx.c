@@ -12,6 +12,7 @@
 #include "context.h"
 #include "dos_state.h"
 #include "dos_alloc.h"
+#include "ldr0n.h"
 #include "ldr1n.h"
 #include "mtx_sched.h"
 
@@ -250,9 +251,10 @@ static int test6(void)
 
 /* --------------------- test 7: arena + budget plan + one-call boot -------- */
 #define T7_ARENA (8u * 1024u * 1024u)
+#define T7_IMAGE (4u * 1024u)
 static uint8_t arena7[T7_ARENA];
 static uint8_t region7[2048];
-static void   *heaps7[MTX_MAX_DEPTH], *screens7[MTX_MAX_DEPTH];
+static void   *heaps7[MTX_MAX_DEPTH], *screens7[MTX_MAX_DEPTH], *images7[MTX_MAX_DEPTH];
 
 static uint32_t wire7(void)
 {
@@ -272,16 +274,18 @@ static int test7(void)
 	uint32_t     snap;
 	int          i, j, ok = 1;
 
-	/* planner arithmetic, checked against hand figures:
-	   (a) 8 MiB arena, 256 KiB zone -> per_depth 464388 -> 18 fit -> capped 12
-	   (b) 1 MiB arena, 538 KiB snapshot -> per_depth 1000860 -> only 1 fits   */
-	b = mtx_plan(8u * 1024u * 1024u, 2048u + 4u, 262144u, 320u * 200u, 8192u);
-	ok &= (b.per_depth == 336388u);
+	/* planner arithmetic, checked against hand figures. `image` is folded in:
+	   a depth that runs code of its own needs its own copy of that code.
+	   (a) 8 MiB arena, 256 KiB zone, 1000 B image -> per_depth 337388 -> 24 fit
+	   (b) 1 MiB arena, 538 KiB snapshot -> per_depth 873860 -> only 1 fits   */
+	b = mtx_plan(8u * 1024u * 1024u, 2048u + 4u, 262144u, 320u * 200u, 8192u, 1000u);
+	ok &= (b.per_depth == 337388u);
+	ok &= (b.image == 1000u);
 	ok &= (b.depths_fit == 24u);
 	ok &= (b.depth == (uint8_t)MTX_MAX_DEPTH);
 
-	b = mtx_plan(1u * 1024u * 1024u, 538524u, 262144u, 64000u, 8192u);
-	ok &= (b.per_depth == 872860u);
+	b = mtx_plan(1u * 1024u * 1024u, 538524u, 262144u, 64000u, 8192u, 1000u);
+	ok &= (b.per_depth == 873860u);
 	ok &= (b.depths_fit == 1u);
 	ok &= (b.depth == 1u);
 
@@ -298,16 +302,17 @@ static int test7(void)
 	ok &= (mtx_arena_used(&ar) <= 4096u);
 
 	/* an arena too small to hold two depths must be refused outright */
-	ok &= (mtx_dos_boot(arena7, 1u * 1024u * 1024u, MTX_ZONE_DEFAULT, wire7,
-	                    heaps7, screens7, &bt) == -1);
+	ok &= (mtx_dos_boot(arena7, 1u * 1024u * 1024u, MTX_ZONE_DEFAULT, T7_IMAGE, wire7,
+	                    heaps7, screens7, images7, &bt) == -1);
 
 	/* real boot: carve and wire, then check the layout */
 	mtx_dos_init(MTX_MAX_DEPTH, 0, 0);
 	snap = wire7();
-	exp = mtx_plan(T7_ARENA, snap, MTX_ZONE_DEFAULT, MTX_SCREEN_BYTES, MTX_STACK_SIZE);
+	exp = mtx_plan(T7_ARENA, snap, MTX_ZONE_DEFAULT, MTX_SCREEN_BYTES, MTX_STACK_SIZE,
+	               T7_IMAGE);
 
-	if(mtx_dos_boot(arena7, T7_ARENA, MTX_ZONE_DEFAULT, wire7,
-	                heaps7, screens7, &bt) != 0)
+	if(mtx_dos_boot(arena7, T7_ARENA, MTX_ZONE_DEFAULT, T7_IMAGE, wire7,
+	                heaps7, screens7, images7, &bt) != 0)
 		return 0;
 
 	ok &= (bt.depth == exp.depth);
@@ -316,25 +321,34 @@ static int test7(void)
 	for(i = 0; i < bt.depth; i++)
 	{
 		ok &= (heaps7[i] && screens7[i] && heaps7[i] != screens7[i]);
+		ok &= (images7[i] != 0);			/* every depth owns a code slot */
 		for(j = 0; j < i; j++)
-			ok &= (heaps7[i] != heaps7[j] && screens7[i] != screens7[j]);
+			ok &= (heaps7[i] != heaps7[j] && screens7[i] != screens7[j]
+			       && images7[i] != images7[j]);
+	}
+	/* an image slot must not overlap the region it is carved beside */
+	{
+		uintptr_t i0 = (uintptr_t)images7[1];
+		uintptr_t s0 = (uintptr_t)screens7[1];
+		ok &= (i0 >= s0 + MTX_SCREEN_BYTES || i0 + T7_IMAGE <= s0);
 	}
 
 	/* depth 0 may keep the caller's existing zone/screen (the root's live ones) */
 	{
 		static uint8_t root_z[16], root_s[16];
-		void *h2[MTX_MAX_DEPTH], *s2[MTX_MAX_DEPTH];
+		void *h2[MTX_MAX_DEPTH], *s2[MTX_MAX_DEPTH], *i2[MTX_MAX_DEPTH];
 		int k;
 
-		for(k = 0; k < MTX_MAX_DEPTH; k++) { h2[k] = 0; s2[k] = 0; }
+		for(k = 0; k < MTX_MAX_DEPTH; k++) { h2[k] = 0; s2[k] = 0; i2[k] = 0; }
 		h2[0] = root_z;
 		s2[0] = root_s;
-		if(mtx_dos_boot(arena7, T7_ARENA, MTX_ZONE_DEFAULT, wire7,
-		                h2, s2, &bt) != 0)
+		if(mtx_dos_boot(arena7, T7_ARENA, MTX_ZONE_DEFAULT, T7_IMAGE, wire7,
+		                h2, s2, i2, &bt) != 0)
 			ok = 0;
 		ok &= (h2[0] == root_z && s2[0] == root_s);	/* kept, not replaced */
 		ok &= (h2[1] && h2[1] != (void *)root_z);
 		ok &= (s2[1] && s2[1] != (void *)root_s);
+		ok &= (i2[0] && i2[0] != i2[1]);	/* the root gets one too */
 	}
 	ok &= ((uint8_t *)bt.stack_base >= arena7);
 	ok &= ((uint8_t *)bt.stack_base + bt.stack_bytes <= arena7 + T7_ARENA);
@@ -535,9 +549,13 @@ static __attribute__((noinline)) void lt_register(void)
 static __attribute__((noinline)) void lt_clobber(void)
 {
 	volatile uint32_t junk[128];
+	volatile uint32_t sink = 0;
 	uint32_t i;
+
 	for(i = 0; i < 128; i++)
 		junk[i] = 0x4D4D4D4Du;		/* 'MMMM': what the DOS fault dumped */
+	sink = junk[0];				/* keep the loop from being dropped */
+	(void)sink;
 }
 
 static int test10(void)
@@ -566,6 +584,96 @@ static int test10(void)
 	return lt_ran == 1 && lt_save == 2 && lt_load == 2;
 }
 
+/* ------------------- test 11: reentrant first stage (ldr0N) --------------- */
+/* The point of ldr0N is that it takes its bases as DATA instead of re-deriving
+   them from the startup stack, and hands off with them in registers. That is
+   testable without DOS: point code_base at a stand-in for Doom's printf (ldr0N
+   reaches it through code_base + 0x3FE40), let it jump to a small asm stage that
+   records the registers and comes back, and check both ends. */
+/* non-static on purpose: the asm stage below references these by name */
+uint32_t l0_esi, l0_edi, l0_ebx, l0_ecx, l0_printed;
+char     l0_banner[64];
+
+static void l0_printf(const char *s)
+{
+	uint32_t i;
+
+	l0_printed++;
+	for(i = 0; i < sizeof(l0_banner) - 1 && s[i]; i++)
+		l0_banner[i] = s[i];
+	l0_banner[i] = 0;
+}
+
+/* The stage ldr0N jumps to. It records the registers it was handed and then
+   `ret`s: ldr0N was reached by a call, so its return address is still on the
+   stack and the test's own code continues normally afterwards. */
+__asm__(
+	".text\n"
+	".globl l0_stage\n"
+	"l0_stage:\n"
+	"	mov %esi, l0_esi\n"
+	"	mov %edi, l0_edi\n"
+	"	mov %ebx, l0_ebx\n"
+	"	mov %ecx, l0_ecx\n"
+	"	ret\n"
+);
+extern void l0_stage(void);
+
+/*
+ * ldr0N hands off and never returns, and the registers it loads ARE the
+ * hand-off - so it clobbers ESI/EDI/EBX/ECX and does not put them back. Its
+ * normal caller (the engine's loader path) is abandoned and cannot care. A
+ * caller that DOES expect to continue has to contain that itself, which is what
+ * this wrapper is: it brackets the hand-off with the registers it must keep.
+ */
+__asm__(
+	".text\n"
+	".globl l0_call\n"
+	"l0_call:\n"
+	"	push %ebx\n"
+	"	push %esi\n"
+	"	push %edi\n"
+	"	push %ebp\n"
+	"	mov 20(%esp), %eax\n"		/* the desc, past the four saved registers */
+	"	push %eax\n"
+	"	call mtx_ldr0n_entry\n"	/* returns only because l0_stage rets */
+	"	add $4, %esp\n"
+	"	pop %ebp\n"
+	"	pop %edi\n"
+	"	pop %esi\n"
+	"	pop %ebx\n"
+	"	ret\n"
+);
+extern void l0_call(const mtx_ldr0n_desc_t *d);
+
+static int test11(void)
+{
+	mtx_ldr0n_desc_t d;
+	uint32_t code_base = (uint32_t)(uintptr_t)&l0_printf - 0x3FE40u;
+
+	l0_printed = 0;
+	l0_esi = l0_edi = l0_ebx = l0_ecx = 0;
+	l0_banner[0] = 0;
+
+	d.banner     = "banner";
+	d.code_base  = code_base;
+	d.data_base  = 0x1234u;
+	d.next_stage = (void *)&l0_stage;
+	d.arg        = 0x5678u;
+
+	l0_call(&d);
+
+	/* banner printed through the base it was given, and every base handed on.
+	   ECX matters particularly: loaded before the printf call it would arrive as
+	   garbage, because a C function is free to clobber eax/ecx/edx. */
+	return l0_printed == 1
+	    && l0_banner[0] == 'b' && l0_banner[5] == 'r' && l0_banner[6] == 0
+	    && l0_esi == code_base
+	    && l0_edi == 0x1234u
+	    && l0_ebx == (uint32_t)(uintptr_t)&l0_stage
+	    && l0_ecx == 0x5678u;
+}
+
 /* ------------------------------------------------------------------- main */
 void _start(void)
 {
@@ -586,6 +694,7 @@ void _start(void)
 	r = test8(); puts_("  [8] reentrant 2nd stage .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test9(); puts_("  [9] yield point (frame tick) "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test10(); puts_("  [10] ops table lifetime .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
+	r = test11(); puts_("  [11] reentrant 1st stage ... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 
 	puts_(ok ? "ALL PASS\n" : "SOME FAILED\n");
 	sys_exit(ok ? 0 : 1);
