@@ -1,5 +1,5 @@
 program = code
-OBJ = asm.o main.o utils.o bugfix.o vesa.o wadfile.o config.o controls.o ldr_texture.o ldr_flat.o ldr_sprite.o textpars.o filebuf.o think.o generic.o sound.o mobj.o player.o decorate.o action.o dehacked.o animate.o inventory.o weapon.o map.o hitscan.o special.o sight.o draw_c.o draw_a.o polyobj.o render.o terrain.o font.o extra3d.o stbar.o menu.o saveload.o cheat.o rng.o wipe.o demo.o mover.o net.o doom_vars.o mtx_boot.o
+OBJ = asm.o main.o utils.o bugfix.o vesa.o wadfile.o config.o controls.o ldr_texture.o ldr_flat.o ldr_sprite.o textpars.o filebuf.o think.o generic.o sound.o mobj.o player.o decorate.o action.o dehacked.o animate.o inventory.o weapon.o map.o hitscan.o special.o sight.o draw_c.o draw_a.o polyobj.o render.o terrain.o font.o extra3d.o stbar.o menu.o saveload.o cheat.o rng.o wipe.o demo.o mover.o net.o doom_vars.o mtx_boot.o mtx_ldr.o
 CC = gcc -m32 -march=i386
 OPT = -O2 -g0
 BOTH = -fno-pie
@@ -8,7 +8,7 @@ CFLAGS = ${BOTH} ${OPT} -mgeneral-regs-only -fdata-sections -ffunction-sections 
 # matryoshka nested-instance host (sibling working tree).
 # Override with `make MTX_DIR=/path/to/nested` if it lives elsewhere.
 MTX_DIR ?= ../../nested
-MTX_OBJ = ${MTX_DIR}/mtx_core.o ${MTX_DIR}/mtx_switch.o ${MTX_DIR}/mtx_host.o ${MTX_DIR}/dos_state.o ${MTX_DIR}/dos_alloc.o ${MTX_DIR}/dos_wire.o ${MTX_DIR}/ldr1n.o ${MTX_DIR}/mtx_sched.o
+MTX_OBJ = ${MTX_DIR}/mtx_core.o ${MTX_DIR}/mtx_switch.o ${MTX_DIR}/mtx_host.o ${MTX_DIR}/dos_state.o ${MTX_DIR}/dos_alloc.o ${MTX_DIR}/dos_wire.o ${MTX_DIR}/ldr1n.o ${MTX_DIR}/ldr0N.o ${MTX_DIR}/ldr1N.o ${MTX_DIR}/mtx_sched.o
 CFLAGS += -I${MTX_DIR} -DMTX_DOS_NO_STATIC_POOL
 OBJ += ${MTX_OBJ}
 

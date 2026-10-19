@@ -2,3 +2,4 @@ loader.*
 *.o
 lumps/*
 !lumps/ace_conf.cfg
+!lumps/mtxguest.bin
