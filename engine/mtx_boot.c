@@ -1417,8 +1417,15 @@ static void mtx_engine_policy(void)
  */
 void mtx_host_take_frame(void)
 {
+	/* TEMPORARY: how far a hand-back gets. The host function runs on the DEPTH's
+	   stack - that is the point of it - so if the switch it performs faults, these
+	   lines are the only record of which part was reached: the depth's own logging
+	   is the instance's copy of this engine, and it does not come back to say. */
+	mtx_log("[MTX] hand-back: entered the host service\n");
 	mtx_request_switch(MTX_ROOT_DEPTH);
+	mtx_log("[MTX] hand-back: request set, servicing\n");
 	mtx_frame_tick();
+	mtx_log("[MTX] hand-back: returned (the host handed the frame back)\n");
 }
 
 /*
