@@ -98,6 +98,10 @@ typedef struct mtx_host_state {
 	       like everything the screen policy depends on. --- */
 	uint8_t               inset_on;
 	uint8_t               key_down;
+	/* WHICH depth the inset shows; 0 = no inset. The key cycles this through the
+	   live depths instead of toggling a flag: with a ring of three, the innermost
+	   view is the one worth looking at, and a bool cannot say which one that is. */
+	uint8_t               inset_depth;
 	uint32_t              inset_frame;	/* frame the inset state last changed */
 	uint32_t              inset_logged;	/* frames composited, for the log */
 
@@ -107,7 +111,10 @@ typedef struct mtx_host_state {
 	   frame had its decrements undone every time the depth ran - measured, a
 	   30-frame dead time after a toggle lasted 10 frames. */
 	uint32_t              key_guard;	/* frames left in the dead time */
-	uint32_t              slice_seen;	/* depth slice stamp already acted on */
+	/* One stamp PER DEPTH. With two children the host has to notice WHICH depth
+	   just began a slice, and a single shared stamp let one child's slice start
+	   consume the other child's. */
+	uint32_t              slice_seen[MTX_MAX_DEPTH];
 
 	/* --- mtx_boot.c: hook-isolation probe. A patch site the engine registered,
 	       the byte that was there, and what depth 1 wrote. Host state, so a guest

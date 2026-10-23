@@ -128,10 +128,34 @@ static void mtx_switch(uint8_t d)
 
 int mtx_push(mtx_entry_t entry, void *arg)
 {
-	uint8_t d = (uint8_t)(mtx_cur + 1u);
+	uint8_t d;
 
 	if(!mtx_pool)
 		return MTX_EDEPTH;		/* no stack pool: fail closed */
+
+	/* THE FIRST SLOT THAT IS NOT LIVE, not `cur + 1`.
+	 *
+	 * `cur + 1` is right for depth-first nesting - a depth pushing its own child -
+	 * which is how this was written, and it is still what happens for that case.
+	 * It is wrong for SIBLINGS: a ring boots all of its levels from the root, so
+	 * the second push happens while `cur` is the ROOT again, `cur + 1` names the
+	 * slot the FIRST child already owns, and the second level silently re-boots
+	 * inside the first one's slot. Measured exactly that: two "depth1 entered"
+	 * lines with identical image, params, zone and screen addresses, and no depth 2
+	 * anywhere in the log.
+	 *
+	 * "Not live" and not merely "not used", because context.h's contract is that a
+	 * slot is REUSED when a depth returns: mtx_finish leaves `used` set, so a
+	 * finished slot is free again and the old code relied on that by overwriting
+	 * `cur + 1` anyway. Taking only `!used` broke exactly that and hung the host
+	 * test - the loop simply never found the slot the test expected - so the rule
+	 * has to say BOTH things.
+	 *
+	 * With slots allocated in order this is `cur + 1` in the nesting case, so
+	 * depth-first behaviour cannot change; the host tests assert it. */
+	for(d = 1; d < mtx_max; d++)
+		if(!mtx_ctx[d].used || mtx_ctx[d].finished)
+			break;
 	if(d >= mtx_max)
 		return MTX_EDEPTH;
 
