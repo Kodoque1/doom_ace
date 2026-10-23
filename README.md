@@ -629,66 +629,134 @@ identical to perfect isolation, which is why both halves are logged.
 The snapshot figure is an independent check on the arithmetic: 529,468 + 9,056 + 1,517
 = 540,041 exactly.
 
-## Entering the real engine image: how far it gets, and what stops it
+## Entering the real engine image: a depth boots an instance, and what it renders
 
 `MTX_CHILD_ENGINE_IMAGE` in `engine/mtx_boot.c` switches depth 1 from the purpose-built
-guest to the real ACE image. It is off in the shipped build because the attempt stops
-partway — but it stops at a *known place*, for a *measured* reason. To reproduce:
-set it to `1`, `make -C nested guest && make -C doom_ace/engine`, then
-`verify/trial.sh <label> 30` and look at the capture — `verify/trial-entry2/` is kept as
-the record.
+guest to the real ACE image, and it is **on** in the shipped build: a depth now boots a
+second engine instance, builds its own heap, draws into its own framebuffer and reaches
+the screen. Reproduce with `verify/trial.sh <label> 30` and look at the capture.
 
-What had to be right first, and now is:
+Four things had to be right, and each was found by measurement rather than reasoning:
 
   - **The entry contract.** ACE's `_start` needs `%ecx` = the entry address, not the
     guest's service table: it does `sub $0x1008,%ecx` to recover its base and relocates
-    everything relative to that. Handing it the service table would make it relocate
-    itself around a garbage base. Hence two functions —
-    `mtx_ldr_enter` (ECX = service table) and `mtx_ldr_enter_engine` (ECX = entry).
+    everything relative to that. Hence two functions — `mtx_ldr_enter` (ECX = service
+    table) and `mtx_ldr_enter_engine` (ECX = entry).
   - **Per-depth isolation**, above: 405 patches and `.data`, without which a second
     instance's `ace_main` re-patching Doom's shared code would corrupt the root.
+  - **A depth's raw (non-zone) memory.** `nested/mtx_raw.*` is the pool; the router in
+    `engine/mtx_boot.c` (`mtx_engine_alloc` / `_realloc` / `_free`) sends the engine's
+    loader allocations to it, and the root's behaviour is unchanged.
+  - **A way for an instance to know what it is.** `nested/mtx_params.h`: a block the
+    host fills and hands over in `%ebp` at the entry.
+
+### Giving a depth its own raw memory
+
+The zone was half the job. A depth could build its own heap, and Doom's allocator worked
+in it — but `ace_main` also asks the *raw* allocator for memory, and that one is
+machine-global. Measured: the root's `Z_Init` walks `dpmi_get_ram()` down until an
+allocation succeeds, so it consumes everything except a 32 KiB reserve, and the instance
+then died in `init_render()` asking for 209,184 B with `free DPMI after root Z_Init:
+61440 B` left. Raising the arena does not help — the root consumes the remainder either
+way.
+
+So the engine's own allocation entry points go through a depth-aware router, and a depth
+gets a pool carved out of the arena (`MTX_RAW_PER_DEPTH`, 2 MiB). The pool is a bump
+allocator with a per-block header, and its semantics are deliberately honest:
+
+  - **A free only returns memory when the block is the newest one.** Loaders allocate a
+    buffer, fill it, hand it on and free it, so that case is the common one and it does
+    reclaim. A free of anything older is *counted* (`leaked` / `leaked_bytes`), so "the
+    pool is big enough" is a number rather than an assumption.
+  - **A zero-byte request is served**, like Doom's own `malloc(0)` — and it occupies a
+    minimum. Refusing it turned a working call into `Texture memory allocation failed!
+    (0B)` and a bluescreen, measured.
+  - **The tip test compares OCCUPANCY, not the requested size.** A 1-byte request
+    occupies 8 bytes; comparing against 1 meant such a block was never the tip, so the
+    engine's lump-table pattern (`lumpinfo = ldr_malloc(1)` grown into tens of kB) moved
+    the block, leaked the original, and the instance's lump table silently stopped
+    growing — which is what the "PLAYFAL"/`W_CacheLumpNum` failures below really were.
+  - **The pool aligns the base it is handed, and so does the arena.** `mtx_arena_alloc`
+    aligns offsets *relative* to its base, and the base comes from Doom's allocator, which
+    is happy to return 4-byte alignment. Measured: the pool landed 4 bytes off 8, its own
+    ownership test rejected all of its own memory, and `free`/`realloc` fell through to
+    the DPMI heap — where Doom's `realloc` read the block magic as a size, decided the
+    block was already big enough, and returned the pointer untouched.
+
+### Telling an instance what it is
+
+An instance is a relocated COPY of the engine with its own `.bss`, so its `mtx_hs` is a
+different, empty object: it cannot read the host's control state, and the host cannot
+assume anything about the instance's. Measured consequence: the instance's `ldr_malloc`
+consulted an empty `mtx_hs`, decided it was the root, and asked DPMI for 209,184 B while
+its own pool sat unused.
+
+`nested/mtx_params.h` is the answer: the host fills one block per depth (inside `mtx_hs`,
+so it is stable across switches and readable by the host's own reporting) and hands its
+address over in `%ebp`, which `ldr0N` loads and the engine's entry stores. Two traps,
+both measured:
+
+  - **The store cannot be done in `asm.S`.** `mov %eax,mtx_params(%ecx)` is the idiom the
+    rest of the entry uses, but the assembler records that displacement as a relocation,
+    so the entry's own relocator adds the image base to it a *second* time and the store
+    lands elsewhere. The pointer stayed null through a whole nested boot. Keeping the
+    entry free of new `%ecx`-relative global accesses and doing the store from C (a
+    normally-relocated absolute reference) fixes it.
+  - **The value must not be recognised by address.** The blocks live in the HOST's
+    `mtx_hs` while an instance's own `&mtx_hs` is somewhere else entirely, so a range test
+    would reject the very block being handed over. The check is on the block's contents:
+    a magic word, and the block's own address inside it.
+
+The result is verifiable from both ends, because the instance logs through the host's
+descriptor (DOS descriptors are process-wide, so its `log_fd` writes into the same
+MTX.LOG): the host logs the block it filled, and the instance logs the block it received.
 
 How far it gets, from the log:
 
-    [MTX] depth1: engine image 355772 B at 4551752 entry 4551760 bss 22156
-    [MTX] depth1: entering, ECX=4551760 ESI=1802240 EDI=2093056, free DPMI 61440 B
-    ...then the bluescreen:
+    [MTX] depth1 params at 3039412: depth 1 zone 11432720 screen 11694864 raw 3038896 log 7
+    [MTX] depth1: entering, ECX=11992360 ESI=1802240 EDI=2093056 EBP=3039412, free DPMI 61440 B
+    [MTX] instance: depth 1 zone 11432720 screen 11694864 raw 3038896 log 7
+    [MTX] depth1 zone 262144 B at 11432720 build 0 alloc 11432776 probe 0 (instance)
 
-    ACE Engine
-    An error has occurred. There is not much you can do now.
-    Module that caused this error is LOADER
-    Render memory allocation failed! (209184B)
+The block the host filled and the block the instance read agree, line for line. The
+`(instance)` line is the instance's own: `build 0` / `probe 0` are Doom's own zone
+invariants passing, and `alloc 11432776` is a real `Z_Malloc` inside the instance's heap.
+The instance's pool served its whole boot out of its own 2 MiB (peak ≈ 591 KB measured).
 
-So the image loads, is entered correctly, `_start` relocates itself and clears its own
-`.bss`, and `ace_main` runs at depth 1 through config, WAD and the texture/flat/sprite
-loads — reaching `init_render()` (render.c:2495) — where the first large allocation
-fails. Note there is no crash: 0 illegal reads, 0 `DYNX86`. It is an orderly refusal.
+Then it draws. `verify/trial-confirm/` shows the instance in mode 13h with Doom's imagery
+tiled across the screen: wrong content, but its own frames, produced by a second engine
+instance — the rendering path end to end (load → zone → pool → init → draw → VGA).
 
-**Why, measured rather than guessed.** The line above the failure is the reason:
+**What is still wrong: the instance's lump data.** When it takes a lump-caching path it
+fails in a way that is unmistakably the pool's bytes read as data:
 
-    [MTX] free DPMI after root Z_Init: 61440 B
+    Module that caused this error is WAD
+    Lump PLAYFAL read failed!                      (name mangled: PLAYPAL)
+    W_CacheLumpNum: 19796 >= numlumps              (19796 = 0x4D54 = "MT", the top half
+                                                    of the pool's 'MTXR' block magic)
+    raw pool: request for 1525682085 B refused      (1.5 GB, same corruption, other end)
 
-The root's `Z_Init` walks `dpmi_get_ram()` down until an allocation succeeds, so it
-consumes everything except a 32 KiB reserve — 60 KiB left, measured. A depth's engine
-init needs 209,184 bytes in one `doom_malloc`. The zone is per-depth (that is what
-`mtx_engine_zone_init` solved); the engine's *raw* allocations are not, and after the
-root's `Z_Init` there is nothing left to give.
+So something hands Doom a pointer into pool metadata. It is not the zero-size/minimum
+problem above (that was fixed and the failure survived it), and it is not ACE's own
+lump-cache call sites: probes were added to all four (`ldr_flat`, `ldr_sprite`,
+`ldr_texture`, `font.c`) and none fired, so the suspect is Doom's own code. It is also not
+reproducible on every run — the instance only takes that path when a key press reaches its
+menu, which happens in roughly two runs out of six.
 
-So the next piece is: **give a depth a source for its own raw allocations.** The
-contained version is to route the engine's own allocation wrappers (`ldr_malloc` /
-`ldr_realloc` in `main.c`, plus the handful of direct `doom_malloc` sites in
-`wadfile.c`, `utils.c`, `dehacked.c`) through a depth-aware allocator backed by arena
-space reserved for it — when the depth is the root, behaviour is unchanged. That needs
-a decision on free/realloc semantics for the depth pool, which is why it is a piece of
-work rather than a patch.
+The instruments for it are left in place, each marked `TEMPORARY`, each writing its own
+file next to `MTX.LOG` (dump them with `python3 nested/dump_probe.py <file>`):
 
-Two things follow from this that are worth knowing before that work:
+  - `MTXN.LOG` — what an instance's own copy of the engine believes about itself
+  - `MTXW.LOG` — a failing lump read: the table entry, the fd, the offset, the destination
+  - `MTXL.LOG` — an invalid lump index at ACE's own cache sites, with the table it came from
+  - `MTXA.LOG` — an absurd allocation request, with the caller's return address (its offset
+    from a known symbol resolves against the root's ELF, because both copies are the same
+    image at different bases)
 
-  - The child's stack is `MTX_STACK_SIZE` (8 KiB) and `ace_main` ran on it without
-    dying, but 8 KiB is far below what Doom's boot uses. Expect it to need raising too.
-  - A fatal error *inside a depth* currently terminates the whole program (the
-    bluescreen above is `dos_exit`). One instance must not be able to kill the others;
-    that is a policy the host does not have yet.
+Also still open: a fatal error *inside a depth* terminates the whole program (the
+bluescreen is `dos_exit`). One instance must not be able to kill the others, and the host
+has no policy for that yet. The depth stack is no longer a suspicion — it was raised from
+8 KiB to 64 KiB (`MTX_STACK_SIZE`), since an instance runs its whole boot on it.
 
 ## State footprint and the zone-sizing decision (measured)
 
@@ -729,13 +797,15 @@ than guessed — see the video section — and it is the third largest item per 
 
 ## Not done yet (the honest remainder)
 
-* **Entering the real engine image: the wall is now identified and measured.** The
-  depth half of `Z_Init` and the isolation both exist, the entry contract is right, and
-  `ace_main` runs at depth 1 up to `init_render()` — where its first large *raw*
-  allocation fails, because the root's `Z_Init` leaves only 60 KiB of DPMI (measured)
-  and the allocation wants 209,184 B. The zone is per-depth; the engine's `doom_malloc`
-  is not. Giving a depth a source for its own raw allocations is the next piece — see
-  the section above for what it involves.
+* **Entering the real engine image: it boots, and then it renders wrong.** A depth now
+  loads the engine image, enters it, reads its parameter block, builds its own heap and
+  serves its whole boot out of its own raw pool (peak ≈ 591 KB of 2 MiB), and draws into
+  its own framebuffer — see the section above, which ends with the one thing still
+  broken: something hands Doom a pointer into the pool's own metadata, which shows up as
+  a mangled lump name, a lump index of `0x4D54` ('MT') and a 1.5 GB allocation request.
+  The four probe files (`MTXN`/`MTXW`/`MTXL`/`MTXA`, all marked `TEMPORARY` in the source)
+  are the instruments for it, and none of ACE's own lump-cache sites fired — so the
+  suspect is Doom's own code.
 * **Video: the remaining gap is VESA and mode set.** Both screen pointers now follow
   the depth (ACE's `screen_buffer` and Doom's `screens[0]`), each depth's screen
   region is sized for the engine's real appetite, and the presentation source is the

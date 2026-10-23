@@ -23,18 +23,25 @@ typedef struct {
 	const char *banner;	/* printed on entry, via Doom's printf */
 	uint32_t    code_base;	/* Doom code segment (where printf lives)    */
 	uint32_t    data_base;	/* Doom data segment                          */
-	void       *next_stage;	/* jumped to, with ESI/EDI/EBX/ECX set; no return */
+	void       *next_stage;	/* jumped to, with ESI/EDI/EBX/ECX/EBP set; no return */
 	uint32_t    arg;	/* passed to next_stage in ECX                */
+	uint32_t    params;	/* passed to next_stage in EBP                */
 } mtx_ldr0n_desc_t;
 
 /* Prints the banner, then jmp *next_stage with ESI = code_base, EDI = data_base,
-   EBX = next_stage, ECX = arg. Touches no zone state, frees nothing, closes
-   nothing. The argument goes in a register rather than on the stack because this
-   is a jump, not a call: there is no return frame for a cdecl argument to sit
-   below.
+   EBX = next_stage, ECX = arg, EBP = params. Touches no zone state, frees
+   nothing, closes nothing. The argument goes in a register rather than on the
+   stack because this is a jump, not a call: there is no return frame for a
+   cdecl argument to sit below.
 
-   Note the register contract: setting ESI/EDI/EBX/ECX for the next stage IS the
-   hand-off, so this function does not restore them for its caller - which is
+   EBP carries the nested-instance parameter block (see mtx_params.h). It is the
+   one register the next stage's own entry does not consume, and the engine's
+   `_start` stores it into a global right after clearing `.bss` - which is why a
+   block handed over here survives to be read, while anything written into that
+   `.bss` beforehand would not. Pass 0 for a stage that does not want one.
+
+   Note the register contract: setting ESI/EDI/EBX/ECX/EBP for the next stage IS
+   the hand-off, so this function does not restore them for its caller - which is
    fine only because it never returns to it. Its caller's frame is abandoned. */
 void mtx_ldr0n_entry(const mtx_ldr0n_desc_t *desc);
 

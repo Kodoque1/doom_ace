@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include "context.h"
 #include "dos_state.h"
+#include "mtx_raw.h"
 
 /* ---- arena: bump allocator over caller-owned memory ---------------------- */
 typedef struct {
@@ -55,19 +56,33 @@ uint32_t mtx_arena_used(const mtx_arena_t *a);
 
 #define MTX_ZONE_DEFAULT  (1u * 1024u * 1024u)
 
+/*
+ * A depth's RAW pool: the engine's non-zone allocations (see mtx_raw.h).
+ *
+ * Sized from the measured appetite, not from taste. The engine's own boot asks
+ * for 209,184 B in ONE allocation at init_render(), and that is only the first
+ * of a long run - the WAD cache, the texture/flat/sprite loaders and the string
+ * helpers all draw on it. 2 MiB is the starting figure; the pool reports its
+ * peak, its leaks and the size of every refusal, so the number gets confirmed
+ * or corrected from a live run rather than left as a guess.
+ */
+#define MTX_RAW_DEFAULT   (2u * 1024u * 1024u)
+
 typedef struct {
 	uint32_t snapshot;	/* mtx_dos_snapshot_bytes() */
 	uint32_t zone;
 	uint32_t screen;
 	uint32_t stack;
 	uint32_t image;		/* per-depth copy of the code image to run */
-	uint32_t per_depth;	/* sum of the five */
+	uint32_t raw;		/* per-depth pool for the engine's non-zone asks */
+	uint32_t per_depth;	/* sum of the six */
 	uint32_t depths_fit;	/* floor(arena / per_depth) */
 	uint8_t  depth;		/* min(MTX_MAX_DEPTH, depths_fit) usable depths */
 } mtx_budget_t;
 
 mtx_budget_t mtx_plan(uint32_t arena_bytes, uint32_t snapshot, uint32_t zone,
-                      uint32_t screen, uint32_t stack, uint32_t image);
+                      uint32_t screen, uint32_t stack, uint32_t image,
+                      uint32_t raw);
 
 /*
  * Registration callback: registers whatever has to move for the CURRENT
@@ -87,15 +102,22 @@ typedef struct {
 } mtx_boot_t;
 
 /*
- * Carve the arena and wire the state layer. `heaps`, `screens` and `images` are
- * caller-owned arrays of MTX_MAX_DEPTH pointers, filled in. `images` receives
- * each depth's own code-image slot (NULL when image_per_depth is 0). Returns 0,
- * or -1 if the arena cannot hold at least two depths (two is the minimum that
- * nests).
+ * Carve the arena and wire the state layer. `heaps`, `screens`, `images` and
+ * `raws` are caller-owned arrays of MTX_MAX_DEPTH entries, filled in. `images`
+ * receives each depth's own code-image slot (NULL when image_per_depth is 0);
+ * `raws` receives each CHILD's raw pool (see below). Returns 0, or -1 if the
+ * arena cannot hold at least two depths (two is the minimum that nests).
+ *
+ * Only children get a raw pool: the root's raw allocations are the DPMI heap it
+ * already owns, and handing the root a pool would take that memory away from the
+ * zone it booted on. The budget still counts `raw` for every depth, so
+ * depths_fit understates what the root needs rather than overstating it - a
+ * sizing error in the safe direction.
  */
 int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
-                 uint32_t image_per_depth,
+                 uint32_t image_per_depth, uint32_t raw_per_depth,
                  mtx_wire_fn wire_register,
-                 void **heaps, void **screens, void **images, mtx_boot_t *out);
+                 void **heaps, void **screens, void **images, mtx_raw_t *raws,
+                 mtx_boot_t *out);
 
 #endif /* MATRYOSHKA_DOS_ALLOC_H */

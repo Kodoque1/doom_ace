@@ -4,10 +4,28 @@
  */
 #include "dos_alloc.h"
 
+/*
+ * The arena's base is aligned ABSOLUTELY, not relative to what the caller
+ * handed in.
+ *
+ * Both matter and only one is obvious. `mtx_arena_alloc` aligns each offset
+ * relative to the base, so it only produces aligned pointers if the BASE is
+ * aligned - and it is not: the arena comes from Doom's own allocator, which is
+ * happy to return an address that is 4-byte aligned but not 8. Measured: the
+ * raw pool carved out of such an arena had a base 4 bytes off, every payload
+ * inheriting that, and the pool's own ownership test (which requires aligned
+ * payloads) then rejected all of its own memory - so an instance's realloc and
+ * free fell through to the DPMI heap, which knew nothing about those pointers.
+ * Rounding the base up costs at most 31 bytes.
+ */
 void mtx_arena_init(mtx_arena_t *a, void *mem, uint32_t size)
 {
-	a->base = (uint8_t *)mem;
-	a->size = size;
+	uintptr_t b = (uintptr_t)mem;
+	uintptr_t aligned = (b + 31u) & ~(uintptr_t)31u;
+	uint32_t skip = (uint32_t)(aligned - b);
+
+	a->base = mem ? (uint8_t *)aligned : 0;
+	a->size = (mem && size > skip) ? (size - skip) : 0;
 	a->used = 0;
 }
 
@@ -31,7 +49,8 @@ void *mtx_arena_alloc(mtx_arena_t *a, uint32_t size, uint32_t align)
 uint32_t mtx_arena_used(const mtx_arena_t *a) { return a->used; }
 
 mtx_budget_t mtx_plan(uint32_t arena_bytes, uint32_t snapshot, uint32_t zone,
-                      uint32_t screen, uint32_t stack, uint32_t image)
+                      uint32_t screen, uint32_t stack, uint32_t image,
+                      uint32_t raw)
 {
 	mtx_budget_t b;
 
@@ -40,7 +59,8 @@ mtx_budget_t mtx_plan(uint32_t arena_bytes, uint32_t snapshot, uint32_t zone,
 	b.screen    = screen;
 	b.stack     = stack;
 	b.image     = image;
-	b.per_depth = snapshot + zone + screen + stack + image;
+	b.raw       = raw;
+	b.per_depth = snapshot + zone + screen + stack + image + raw;
 	b.depths_fit = b.per_depth ? (arena_bytes / b.per_depth) : 0;
 
 	b.depth = (b.depths_fit > MTX_MAX_DEPTH) ? MTX_MAX_DEPTH : (uint8_t)b.depths_fit;
@@ -50,9 +70,10 @@ mtx_budget_t mtx_plan(uint32_t arena_bytes, uint32_t snapshot, uint32_t zone,
 }
 
 int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
-                 uint32_t image_per_depth,
+                 uint32_t image_per_depth, uint32_t raw_per_depth,
                  mtx_wire_fn wire_register,
-                 void **heaps, void **screens, void **images, mtx_boot_t *out)
+                 void **heaps, void **screens, void **images, mtx_raw_t *raws,
+                 mtx_boot_t *out)
 {
 	mtx_arena_t a;
 	uint32_t snap, i;
@@ -68,7 +89,7 @@ int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
 		return -1;			/* wiring refused (see dos_wire.c) */
 
 	b = mtx_plan(arena_bytes, snap, zone_per_depth, MTX_SCREEN_BYTES, MTX_STACK_SIZE,
-	             image_per_depth);
+	             image_per_depth, raw_per_depth);
 	out->budget = b;
 	if(b.depth < 2)
 		return -1;			/* two is the minimum that nests */
@@ -79,8 +100,15 @@ int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
 	   KEPT, because the root must go on using its own live zone and framebuffer.
 	   Only the children get freshly carved ones. Every depth, root included,
 	   gets an image slot: a depth that wants to run code of its own needs
-	   somewhere of its own to put it. */
+	   somewhere of its own to put it.
+	   Raw pools are CHILDREN ONLY (the root allocates from the DPMI heap it
+	   already owns), and every slot is cleared first so a pool from an earlier
+	   boot cannot be mistaken for one of this boot's. */
 	mtx_arena_init(&a, arena_mem, arena_bytes);
+	for(i = 0; i < MTX_MAX_DEPTH; i++)
+		if(raws)
+			mtx_raw_init(&raws[i], 0, 0);
+
 	for(i = 0; i < b.depth; i++)
 	{
 		if(!(i == 0 && heaps[i]))
@@ -94,8 +122,13 @@ int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
 			if(image_per_depth && !images[i])
 				return -1;
 		}
+		if(raws && raw_per_depth && i != 0)
+			mtx_raw_init(&raws[i], mtx_arena_alloc(&a, raw_per_depth, 32),
+			             raw_per_depth);
 		if(!heaps[i] || !screens[i])
 			return -1;
+		if(raws && raw_per_depth && i != 0 && !raws[i].base)
+			return -1;		/* a child MUST have its raw pool */
 	}
 	out->stack_base    = mtx_arena_alloc(&a, (uint32_t)b.depth * MTX_STACK_SIZE, 32);
 	out->snapshot_base = mtx_arena_alloc(&a, (uint32_t)b.depth * snap, 32);

@@ -24,7 +24,13 @@
 #include <stdint.h>
 
 #define MTX_MAX_DEPTH   12u                                 /* live-depth ceiling */
-#define MTX_STACK_SIZE  8192u                               /* per-depth stack, bytes */
+/*
+ * Per-depth stack. Raised from 8 KiB: that was enough for the purpose-built
+ * guest, but a nested ENGINE runs its whole boot on this stack, and Doom's own
+ * boot stack is far larger than 8 KiB. The cost is one block of
+ * depth * MTX_STACK_SIZE in the arena, so it is cheap next to a depth's zone.
+ */
+#define MTX_STACK_SIZE  65536u                              /* per-depth stack, bytes */
 #define MTX_STACK_WORDS (MTX_STACK_SIZE / 4u)
 
 #define MTX_ROOT_DEPTH  0u

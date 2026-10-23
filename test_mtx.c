@@ -268,6 +268,7 @@ static int test6(void)
 static uint8_t arena7[T7_ARENA];
 static uint8_t region7[2048];
 static void   *heaps7[MTX_MAX_DEPTH], *screens7[MTX_MAX_DEPTH], *images7[MTX_MAX_DEPTH];
+static mtx_raw_t raws7[MTX_MAX_DEPTH];
 
 static uint32_t wire7(void)
 {
@@ -287,17 +288,21 @@ static int test7(void)
 	uint32_t     snap;
 	int          i, j, ok = 1;
 
-	/* planner arithmetic, checked against hand figures. `image` is folded in:
-	   a depth that runs code of its own needs its own copy of that code.
-	   (a) 8 MiB arena, 256 KiB zone, 1000 B image -> per_depth 337388 -> 24 fit
-	   (b) 1 MiB arena, 538 KiB snapshot -> per_depth 873860 -> only 1 fits   */
-	b = mtx_plan(8u * 1024u * 1024u, 2048u + 4u, 262144u, 320u * 200u, 8192u, 1000u);
-	ok &= (b.per_depth == 337388u);
+	/* planner arithmetic, checked against hand figures. `image` and `raw` are
+	   both folded in: a depth that runs code of its own needs its own copy of
+	   that code AND its own source of non-zone memory.
+	   (a) 8 MiB arena, 256 KiB zone, 1000 B image, 256 KiB raw
+	       -> per_depth 599532 -> 13 fit
+	   (b) 1 MiB arena, 538 KiB snapshot, no raw -> per_depth 873860 -> 1 fits */
+	b = mtx_plan(8u * 1024u * 1024u, 2048u + 4u, 262144u, 320u * 200u, 8192u,
+	             1000u, 262144u);
+	ok &= (b.per_depth == 599532u);
 	ok &= (b.image == 1000u);
-	ok &= (b.depths_fit == 24u);
+	ok &= (b.raw == 262144u);
+	ok &= (b.depths_fit == 13u);
 	ok &= (b.depth == (uint8_t)MTX_MAX_DEPTH);
 
-	b = mtx_plan(1u * 1024u * 1024u, 538524u, 262144u, 64000u, 8192u, 1000u);
+	b = mtx_plan(1u * 1024u * 1024u, 538524u, 262144u, 64000u, 8192u, 1000u, 0u);
 	ok &= (b.per_depth == 873860u);
 	ok &= (b.depths_fit == 1u);
 	ok &= (b.depth == 1u);
@@ -315,21 +320,23 @@ static int test7(void)
 	ok &= (mtx_arena_used(&ar) <= 4096u);
 
 	/* an arena too small to hold two depths must be refused outright */
-	ok &= (mtx_dos_boot(arena7, 1u * 1024u * 1024u, MTX_ZONE_DEFAULT, T7_IMAGE, wire7,
-	                    heaps7, screens7, images7, &bt) == -1);
+	ok &= (mtx_dos_boot(arena7, 1u * 1024u * 1024u, MTX_ZONE_DEFAULT, T7_IMAGE,
+	                    MTX_RAW_DEFAULT, wire7,
+	                    heaps7, screens7, images7, raws7, &bt) == -1);
 
 	/* real boot: carve and wire, then check the layout */
 	mtx_dos_init(MTX_MAX_DEPTH, 0, 0);
 	snap = wire7();
 	exp = mtx_plan(T7_ARENA, snap, MTX_ZONE_DEFAULT, MTX_SCREEN_BYTES, MTX_STACK_SIZE,
-	               T7_IMAGE);
+	               T7_IMAGE, MTX_RAW_DEFAULT);
 
-	if(mtx_dos_boot(arena7, T7_ARENA, MTX_ZONE_DEFAULT, T7_IMAGE, wire7,
-	                heaps7, screens7, images7, &bt) != 0)
+	if(mtx_dos_boot(arena7, T7_ARENA, MTX_ZONE_DEFAULT, T7_IMAGE, MTX_RAW_DEFAULT,
+	                wire7, heaps7, screens7, images7, raws7, &bt) != 0)
 		return 0;
 
 	ok &= (bt.depth == exp.depth);
 	ok &= (bt.budget.per_depth == exp.per_depth);
+	ok &= (bt.budget.raw == MTX_RAW_DEFAULT);
 	ok &= (bt.budget.snapshot == snap);
 	for(i = 0; i < bt.depth; i++)
 	{
@@ -338,6 +345,21 @@ static int test7(void)
 		for(j = 0; j < i; j++)
 			ok &= (heaps7[i] != heaps7[j] && screens7[i] != screens7[j]
 			       && images7[i] != images7[j]);
+	}
+	/* raw pools: the ROOT has none (it allocates from DPMI) and every CHILD
+	   has one of exactly the budgeted size, carved out of the arena rather
+	   than overlapping anything else. */
+	ok &= (raws7[0].base == 0 && raws7[0].size == 0u);
+	for(i = 1; i < bt.depth; i++)
+	{
+		ok &= (raws7[i].base != 0 && raws7[i].size == MTX_RAW_DEFAULT);
+		ok &= (raws7[i].used == 0u);
+		ok &= ((uint8_t *)raws7[i].base >= arena7);
+		ok &= ((uint8_t *)raws7[i].base + raws7[i].size <= arena7 + T7_ARENA);
+		for(j = 0; j < i; j++)
+			ok &= (raws7[i].base != raws7[j].base);
+		ok &= (raws7[i].base != heaps7[i] && raws7[i].base != screens7[i]
+		       && raws7[i].base != images7[i]);
 	}
 	/* an image slot must not overlap the region it is carved beside */
 	{
@@ -350,18 +372,21 @@ static int test7(void)
 	{
 		static uint8_t root_z[16], root_s[16];
 		void *h2[MTX_MAX_DEPTH], *s2[MTX_MAX_DEPTH], *i2[MTX_MAX_DEPTH];
+		mtx_raw_t r2[MTX_MAX_DEPTH];
 		int k;
 
 		for(k = 0; k < MTX_MAX_DEPTH; k++) { h2[k] = 0; s2[k] = 0; i2[k] = 0; }
 		h2[0] = root_z;
 		s2[0] = root_s;
-		if(mtx_dos_boot(arena7, T7_ARENA, MTX_ZONE_DEFAULT, T7_IMAGE, wire7,
-		                h2, s2, i2, &bt) != 0)
+		if(mtx_dos_boot(arena7, T7_ARENA, MTX_ZONE_DEFAULT, T7_IMAGE, MTX_RAW_DEFAULT,
+		                wire7, h2, s2, i2, r2, &bt) != 0)
 			ok = 0;
 		ok &= (h2[0] == root_z && s2[0] == root_s);	/* kept, not replaced */
 		ok &= (h2[1] && h2[1] != (void *)root_z);
 		ok &= (s2[1] && s2[1] != (void *)root_s);
 		ok &= (i2[0] && i2[0] != i2[1]);	/* the root gets one too */
+		ok &= (r2[0].base == 0);		/* and no raw pool */
+		ok &= (r2[1].base != 0 && r2[1].size == MTX_RAW_DEFAULT);
 	}
 	ok &= ((uint8_t *)bt.stack_base >= arena7);
 	ok &= ((uint8_t *)bt.stack_base + bt.stack_bytes <= arena7 + T7_ARENA);
@@ -604,7 +629,7 @@ static int test10(void)
    reaches it through code_base + 0x3FE40), let it jump to a small asm stage that
    records the registers and comes back, and check both ends. */
 /* non-static on purpose: the asm stage below references these by name */
-uint32_t l0_esi, l0_edi, l0_ebx, l0_ecx, l0_printed;
+uint32_t l0_esi, l0_edi, l0_ebx, l0_ecx, l0_ebp, l0_printed;
 char     l0_banner[64];
 
 static void l0_printf(const char *s)
@@ -628,6 +653,7 @@ __asm__(
 	"	mov %edi, l0_edi\n"
 	"	mov %ebx, l0_ebx\n"
 	"	mov %ecx, l0_ecx\n"
+	"	mov %ebp, l0_ebp\n"
 	"	ret\n"
 );
 extern void l0_stage(void);
@@ -665,7 +691,7 @@ static int test11(void)
 	uint32_t code_base = (uint32_t)(uintptr_t)&l0_printf - 0x3FE40u;
 
 	l0_printed = 0;
-	l0_esi = l0_edi = l0_ebx = l0_ecx = 0;
+	l0_esi = l0_edi = l0_ebx = l0_ecx = l0_ebp = 0;
 	l0_banner[0] = 0;
 
 	d.banner     = "banner";
@@ -673,18 +699,24 @@ static int test11(void)
 	d.data_base  = 0x1234u;
 	d.next_stage = (void *)&l0_stage;
 	d.arg        = 0x5678u;
+	/* the parameter block for the next stage; 0x9ABC is not a real block, it
+	   is a value that could not survive by accident */
+	d.params     = 0x9ABCu;
 
 	l0_call(&d);
 
 	/* banner printed through the base it was given, and every base handed on.
 	   ECX matters particularly: loaded before the printf call it would arrive as
-	   garbage, because a C function is free to clobber eax/ecx/edx. */
+	   garbage, because a C function is free to clobber eax/ecx/edx. EBP matters
+	   for the nested engine image, whose entry is the only reader and cannot
+	   learn its depth any other way. */
 	return l0_printed == 1
 	    && l0_banner[0] == 'b' && l0_banner[5] == 'r' && l0_banner[6] == 0
 	    && l0_esi == code_base
 	    && l0_edi == 0x1234u
 	    && l0_ebx == (uint32_t)(uintptr_t)&l0_stage
-	    && l0_ecx == 0x5678u;
+	    && l0_ecx == 0x5678u
+	    && l0_ebp == 0x9ABCu;
 }
 
 /* ---------------------------------------------------------------- test 12 */
@@ -930,6 +962,224 @@ static int test14(void)
 	return 1;
 }
 
+/* ---------------------------------- test 15: a depth's raw pool ----------- *
+ *
+ * The pool is what a nested engine instance allocates its non-zone memory from,
+ * so its semantics have to be right rather than merely working once. The two
+ * that matter: free() only returns memory for the NEWEST block (and says so in
+ * its counters when it cannot - an honest leak counter beats a lie), and a
+ * pointer this pool did not hand out is never walked as a block.
+ */
+#define T15_BYTES 4096
+static uint8_t t15_mem[T15_BYTES] __attribute__((aligned(16)));
+static uint8_t t15_foreign[64];
+
+static int test15(void)
+{
+	mtx_raw_t p;
+	uint8_t *a, *b, *c, *z;
+	void *moved;
+	uint32_t u1;
+	int i, ok = 1;
+
+	mtx_raw_init(&p, t15_mem, T15_BYTES);
+	ok &= (p.base == t15_mem && p.size == T15_BYTES && p.used == 0u);
+
+	/* nothing is owned before anything is handed out */
+	ok &= (!mtx_raw_owns(&p, t15_mem));
+	ok &= (!mtx_raw_owns(&p, 0));
+
+	a = (uint8_t *)mtx_raw_alloc(&p, 100u);
+	ok &= (a != 0);
+	ok &= (((uintptr_t)a & (MTX_RAW_ALIGN - 1u)) == 0u);	/* 8-aligned */
+	ok &= (mtx_raw_owns(&p, a));
+	ok &= (p.used == MTX_RAW_HDR + 104u);			/* align8(100) */
+	ok &= (p.served == 1u && p.refusals == 0u);
+	ok &= (mtx_raw_avail(&p) == T15_BYTES - p.used);
+
+	/* a ZERO-size request is served, like Doom's own malloc(0): the engine's
+	   loaders really do ask for zero, and refusing it made a working call
+	   fatal (measured live: "Texture memory allocation failed! (0B)"). The
+	   block is its header and nothing else - and the pool's own accounting
+	   must say so, so the following allocation still gets fresh bytes. */
+	u1 = p.used;
+	z = (uint8_t *)mtx_raw_alloc(&p, 0u);
+	ok &= (z != 0 && mtx_raw_owns(&p, z));
+	ok &= (p.used == u1 + MTX_RAW_HDR + MTX_RAW_ALIGN);	/* a minimum, not 0 */
+	ok &= (p.refusals == 0u);
+	mtx_raw_free(&p, z);
+	ok &= (p.reclaimed == 1u && p.used == u1);
+
+	/* The engine's own lump-table pattern, and the one that broke it: a 1-byte
+	   request grown into tens of kilobytes. The tip test compares against the
+	   block's OCCUPANCY (8 for a 1-byte request), not the requested size - with
+	   the size, this was never the tip, so the grow moved the block, leaked the
+	   original, and the instance's lump table silently stopped growing. */
+	{
+		static uint8_t rmem[65536] __attribute__((aligned(16)));
+		mtx_raw_t r;
+		uint8_t *one, *big;
+
+		mtx_raw_init(&r, rmem, sizeof(rmem));
+		one = (uint8_t *)mtx_raw_alloc(&r, 1u);
+		ok &= (one != 0 && r.used == MTX_RAW_HDR + MTX_RAW_ALIGN);
+		big = (uint8_t *)mtx_raw_realloc(&r, one, 58380u);
+		ok &= (big == one);			/* grown in place */
+		ok &= (r.used == MTX_RAW_HDR + 58384u);
+		ok &= (r.served == 1u);			/* no second allocation */
+		ok &= (r.leaked == 0u);
+		mtx_raw_free(&r, big);
+		ok &= (r.reclaimed == 1u && r.used == 0u);
+	}
+
+	b = (uint8_t *)mtx_raw_alloc(&p, 100u);
+	ok &= (b != 0 && b != a && b >= a + 100u);
+	ok &= (mtx_raw_owns(&p, a) && mtx_raw_owns(&p, b));
+
+	/* PROVENANCE. Four different ways to be wrong, all of which must be
+	   refused: outside the pool on either side, misaligned, and a pointer
+	   whose block magic was overwritten (a buffer overrun on a neighbouring
+	   block looks exactly like this, and walking it as a block would take the
+	   size from whatever bytes happen to be there). The out-of-range ones go
+	   through an integer so this stays a runtime test rather than a
+	   compile-time array-bounds warning. */
+	{
+		uintptr_t base = (uintptr_t)t15_mem;
+
+		ok &= (!mtx_raw_owns(&p, t15_foreign));
+		ok &= (!mtx_raw_owns(&p, (void *)(base - 8u)));
+		ok &= (!mtx_raw_owns(&p, (void *)(base + T15_BYTES + 8u)));
+		ok &= (!mtx_raw_owns(&p, a + 1u));
+	}
+
+	/* A pool handed a MISALIGNED base still hands out aligned blocks: the base
+	   is what everything is measured from, and the ownership test requires
+	   aligned payloads (that is what makes free() safe against a foreign
+	   pointer). Measured in DOSBox, where Doom's allocator returned a base 4
+	   bytes off 8 and the pool then disowned its own memory: realloc fell
+	   through to the DPMI heap, which returned the pointer untouched. */
+	{
+		static uint8_t off_mem[T15_BYTES + 8];
+		mtx_raw_t q;
+		uint8_t *x, *y;
+
+		mtx_raw_init(&q, off_mem + 4, T15_BYTES);	/* 4-aligned, not 8 */
+		ok &= (((uintptr_t)q.base & (MTX_RAW_ALIGN - 1u)) == 0u);
+		x = (uint8_t *)mtx_raw_alloc(&q, 24u);
+		y = (uint8_t *)mtx_raw_alloc(&q, 8u);
+		ok &= (x && y);
+		ok &= (((uintptr_t)x & (MTX_RAW_ALIGN - 1u)) == 0u);
+		ok &= (((uintptr_t)y & (MTX_RAW_ALIGN - 1u)) == 0u);
+		ok &= (mtx_raw_owns(&q, x) && mtx_raw_owns(&q, y));
+		ok &= (mtx_raw_realloc(&q, y, 64u) == y);	/* tip, in place */
+		mtx_raw_free(&q, y);
+		ok &= (q.reclaimed == 1u && q.invalid == 0u);
+	}
+
+	/* The arena has the same duty, one level up: its base comes from Doom's
+	   allocator, which does not promise more than 4-byte alignment, and
+	   `mtx_arena_alloc` aligns offsets RELATIVE to that base - so a misaligned
+	   base silently produced misaligned blocks, which is how the raw pool ended
+	   up 4 bytes off. Handed a misaligned base, it must still carve aligned
+	   blocks. */
+	{
+		static uint8_t odd[512];
+		mtx_arena_t ar;
+		void *p1, *p2;
+
+		mtx_arena_init(&ar, odd + 4, 256u);
+		p1 = mtx_arena_alloc(&ar, 100u, 8);
+		p2 = mtx_arena_alloc(&ar, 100u, 32);
+		ok &= (p1 && p2);
+		ok &= (((uintptr_t)p1 & 7u) == 0u);
+		ok &= (((uintptr_t)p2 & 31u) == 0u);
+		ok &= ((uint8_t *)p1 >= odd && (uint8_t *)p2 + 100u <= odd + sizeof(odd));
+		ok &= (ar.size <= 256u && ar.size >= 200u);	/* only the padding is lost */
+	}
+
+	u1 = p.used;
+	mtx_raw_free(&p, t15_foreign);
+	ok &= (p.invalid == 1u && p.used == u1);	/* counted, and inert */
+
+	c = (uint8_t *)mtx_raw_alloc(&p, 16u);
+	ok &= (c != 0 && mtx_raw_owns(&p, c));
+	*((uint32_t *)c - 1) = 0xDEADBEEFu;		/* clobber the block magic */
+	ok &= (!mtx_raw_owns(&p, c));
+	mtx_raw_free(&p, c);
+	ok &= (p.invalid == 2u && p.used == u1 + MTX_RAW_HDR + 16u);
+	*((uint32_t *)c - 1) = MTX_RAW_MAGIC;		/* put it back */
+	ok &= (mtx_raw_owns(&p, c));
+
+	/* freeing the TIP really does return memory - and the reclaimed bytes are
+	   no longer handed out. Counted as a DELTA: the pool has already reclaimed
+	   once (the zero-size block above), so an absolute count here would be
+	   asserting the test's own history rather than the behaviour. */
+	u1 = p.used;
+	{
+		uint32_t rc = p.reclaimed;
+
+		mtx_raw_free(&p, c);
+		ok &= (p.reclaimed == rc + 1u && p.leaked == 0u);
+	}
+	ok &= (p.used == u1 - (MTX_RAW_HDR + 16u));
+	ok &= (!mtx_raw_owns(&p, c));
+
+	/* realloc at the tip: grown in place, contents intact */
+	c = (uint8_t *)mtx_raw_alloc(&p, 32u);
+	ok &= (c != 0);
+	for(i = 0; i < 32; i++)
+		c[i] = (uint8_t)(i + 1);
+	u1 = p.used;
+	moved = mtx_raw_realloc(&p, c, 64u);
+	ok &= (moved == c);				/* in place, not a move */
+	ok &= (p.used == u1 - (MTX_RAW_HDR + 32u) + MTX_RAW_HDR + 64u);
+	for(i = 0; i < 32; i++)
+		ok &= (c[i] == (uint8_t)(i + 1));
+
+	/* realloc at the tip, shrunk: gives the excess back */
+	u1 = p.used;
+	moved = mtx_raw_realloc(&p, c, 16u);
+	ok &= (moved == c);
+	ok &= (p.used == u1 - (MTX_RAW_HDR + 64u) + MTX_RAW_HDR + 16u);
+	for(i = 0; i < 16; i++)
+		ok &= (c[i] == (uint8_t)(i + 1));
+
+	/* realloc of a block that is NOT the tip has to move it, must copy what
+	   the two sizes have in common, and must count the old block as leaked
+	   rather than pretend it came back */
+	for(i = 0; i < 100; i++)
+		b[i] = (uint8_t)(0xA0 + (i & 15));
+	moved = mtx_raw_realloc(&p, b, 200u);
+	ok &= (moved != 0 && moved != (void *)b);
+	for(i = 0; i < 100; i++)
+		ok &= (((uint8_t *)moved)[i] == (uint8_t)(0xA0 + (i & 15)));
+	ok &= (p.leaked == 1u && p.leaked_bytes == 100u);
+	ok &= (p.invalid == 2u);	/* a move is not a foreign free */
+
+	/* exhaustion: refused, and the SIZE is recorded - that number is what
+	   says whether the pool is too small or the code asked for something
+	   absurd */
+	u1 = p.used;
+	ok &= (mtx_raw_realloc(&p, 0, T15_BYTES * 4u) == 0);
+	ok &= (p.want_bytes == T15_BYTES * 4u);
+	ok &= (p.used == u1);
+
+	/* the accounting stays self-consistent through all of it */
+	ok &= (p.used <= p.size);
+	ok &= (mtx_raw_used(&p) == p.used);
+	ok &= (mtx_raw_avail(&p) == p.size - p.used);
+	ok &= (mtx_raw_owns(&p, moved));	/* the moved block is still live */
+
+	/* a pool with no memory refuses everything and owns nothing: the engine
+	   calls these on the ROOT's behalf too, where there is no pool */
+	mtx_raw_init(&p, 0, 0);
+	ok &= (mtx_raw_alloc(&p, 16u) == 0);
+	ok &= (!mtx_raw_owns(&p, moved));
+	mtx_raw_free(&p, moved);			/* inert, not a crash */
+
+	return ok;
+}
+
 /* ------------------------------------------------------------------- main */
 void _start(void)
 {
@@ -954,6 +1204,7 @@ void _start(void)
 	r = test12(); puts_("  [12] nested depth zone ...... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test13(); puts_("  [13] depth screen budget .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test14(); puts_("  [14] engine patch isolation . "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
+	r = test15(); puts_("  [15] depth raw pool ......... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 
 	puts_(ok ? "ALL PASS\n" : "SOME FAILED\n");
 	sys_exit(ok ? 0 : 1);

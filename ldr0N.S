@@ -19,7 +19,7 @@
  * Contract: void mtx_ldr0n_entry(const mtx_ldr0n_desc_t *desc)
  *   -> printf(desc->banner)
  *   -> ESI = desc->code_base, EDI = desc->data_base, EBX = desc->next_stage,
- *      ECX = desc->arg
+ *      ECX = desc->arg, EBP = desc->params
  *   -> jmp *%ebx            (never returns)
  */
 
@@ -51,9 +51,16 @@ mtx_ldr0n_entry:
 	mov	8(%esi), %edi		/* data base */
 	mov	12(%esi), %ebx		/* next stage */
 	mov	16(%esi), %ecx		/* argument */
-	mov	%eax, %esi		/* ESI = code base (last: it held desc) */
 
-	pop	%ebp
+	pop	%ebp			/* caller's frame pointer back */
+	/* and then EBP belongs to the next stage: the nested-instance parameter
+	   block (see mtx_params.h). The next stage's entry is the only reader, and
+	   it is the one register that entry does not consume, so this is where a
+	   block survives the .bss clear the entry performs. Loaded from the
+	   descriptor while %esi still holds it. */
+	mov	20(%esi), %ebp		/* parameter block */
+
+	mov	%eax, %esi		/* ESI = code base (last: it held desc) */
 	jmp	*%ebx			/* the depth's continuation, never returns */
 	.size	mtx_ldr0n_entry, .-mtx_ldr0n_entry
 

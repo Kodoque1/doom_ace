@@ -11,7 +11,7 @@ CC = gcc
 # host proof: mtx_core/mtx_switch/dos_state/dos_alloc/ldr1n.
 # dos_wire.c is NOT here - it references engine symbols (doom_data_segment,
 # mainzone, screen_buffer, _bss_start) and only builds inside ACE.
-CORE = mtx_core.c mtx_switch.S mtx_host.c dos_state.c dos_alloc.c ldr1n.c ldr0N.S mtx_sched.c mtx_zone.c mtx_hooks.c
+CORE = mtx_core.c mtx_switch.S mtx_host.c dos_state.c dos_alloc.c ldr1n.c ldr0N.S mtx_sched.c mtx_zone.c mtx_hooks.c mtx_raw.c
 
 # host proof: freestanding, no libc, raw syscalls.
 # -mgeneral-regs-only matches the engine (no x87/SSE), and is required for the
@@ -28,7 +28,7 @@ ENGFLAGS = -m32 -march=i386 -fno-pie -O2 -g0 -mgeneral-regs-only \
 
 all: mtx_test
 
-mtx_test: test_mtx.c $(CORE) context.h dos_state.h dos_alloc.h ldr1n.h ldr0n.h mtx_host.h mtx_zone.h mtx_hooks.h
+mtx_test: test_mtx.c $(CORE) context.h dos_state.h dos_alloc.h ldr1n.h ldr0n.h mtx_host.h mtx_zone.h mtx_hooks.h mtx_raw.h
 	$(CC) $(HOSTFLAGS) -no-pie -o $@ test_mtx.c $(CORE)
 
 run: mtx_test
@@ -36,7 +36,7 @@ run: mtx_test
 
 # In ACE there is no static snapshot pool: the host passes zone memory, so the
 # 7.5 MiB static pool is compiled out.
-DOSSRC = mtx_core.c mtx_switch.S mtx_host.c dos_state.c dos_alloc.c dos_wire.c ldr1n.c ldr1N.S ldr0N.S mtx_sched.c mtx_zone.c mtx_hooks.c
+DOSSRC = mtx_core.c mtx_switch.S mtx_host.c dos_state.c dos_alloc.c dos_wire.c ldr1n.c ldr1N.S ldr0N.S mtx_sched.c mtx_zone.c mtx_hooks.c mtx_raw.c
 
 doscheck:
 	@for f in $(DOSSRC); do \

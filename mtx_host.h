@@ -42,6 +42,8 @@
 #include "dos_state.h"
 #include "ldr0n.h"
 #include "ldr1n.h"
+#include "mtx_raw.h"
+#include "mtx_params.h"
 
 /* A registered snapshot region: where it lives and (assigned by mtx_layout)
    where it sits inside a depth's snapshot slot. */
@@ -104,6 +106,18 @@ typedef struct mtx_host_state {
 	uint32_t              arena_size;
 	void                 *heaps[MTX_MAX_DEPTH];
 	void                 *screens[MTX_MAX_DEPTH];
+
+	/* --- mtx_boot.c: each child's raw allocation pool. Control state, and
+	       therefore here: a restored `used` would hand the same bytes out
+	       twice, and a restored `base` would point a depth at nothing. --- */
+	mtx_raw_t             raw[MTX_MAX_DEPTH];
+
+	/* --- mtx_boot.c: the parameter block handed to a nested INSTANCE. Here for
+	       the same reason, and one more: an instance holds a pointer to this
+	       block and reads it whenever it likes, so a snapshot restore that
+	       moved a field under it would be a live instance reading a stale
+	       depth or a stale pool. --- */
+	mtx_depth_params_t    params[MTX_MAX_DEPTH];
 
 	/* --- mtx_ldr.c: loader state. Also host control state, for the same
 	       reason: a guest snapshot must never cover it. --- */
