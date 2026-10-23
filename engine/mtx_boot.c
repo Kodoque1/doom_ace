@@ -32,6 +32,7 @@
 #include "mtx_sched.h"
 #include "mtx_host.h"
 #include "mtx_ldr.h"
+#include "mtx_zone.h"
 
 #define MTX_ZONE_PER_DEPTH  (256u * 1024u)
 #define MTX_DEMO_INTERVAL   30u
@@ -65,6 +66,14 @@ void MTX_FRAME_TICK_ABI mtx_engine_reserve(void)
 {
 	static const uint32_t sizes[] = {3u, 2u, 0u};	// MiB
 	uint32_t i;
+
+	/* A nested depth reaches this too: its ACE image runs ace_main, which calls
+	   Z_Init. The arena belongs to the MACHINE, not to a depth - the root has
+	   already claimed it, so a second claim must be a no-op. Re-claiming would
+	   fail (the memory is gone) and a depth would silently get a smaller arena
+	   than the one the planner budgeted against. */
+	if(mtx_hs.arena)
+		return;
 
 	/* mtx_hs is zero-filled, so the "log not open yet" sentinel - which used to
 	   come from a static initialiser - has to be set explicitly. Runs before any
@@ -102,6 +111,73 @@ static void mtx_log(const char *s)
 	doom_write(mtx_log_fd, (void *)s, n);
 }
 
+/* The zone layout the nested side builds must be byte-for-byte the one Doom's
+   Z_Malloc walks. mtx_zone.h mirrors engine.h (the same way ldr1n.h mirrors
+   lumpinfo_t) because it also has to build on the host, where engine.h does not
+   exist. So assert the mirror rather than trust it: a drift in engine.h becomes a
+   compile error instead of a corrupted heap at runtime. */
+typedef char mtx_zone_layout_must_match[
+	(sizeof(mtx_memzone_t)  == sizeof(memzone_t)
+	 && sizeof(mtx_memblock_t) == sizeof(memblock_t)) ? 1 : -1];
+
+/*
+ * Give the CALLING depth a zone of its own, inside the arena slot reserved for it.
+ *
+ * This is the nested half of Z_Init. The root walks DPMI RAM because it is first
+ * and the memory is still free; a child cannot, since the root's Z_Init already
+ * took it - and a depth taking memory away from the root would defeat the point.
+ * Same layout, different memory, which is the only difference Doom's allocator
+ * can see.
+ *
+ * Called from two places on purpose: Z_Init's nested branch, and the loaded guest
+ * through its service table. So the heap a guest gets here is produced by exactly
+ * the path a real nested instance uses - not a test-only shortcut.
+ *
+ * It also proves the zone is USABLE, not merely well-formed: a real Z_Malloc/Z_Free
+ * round trip with mainzone pointed at this depth's zone, then mainzone put back so
+ * the caller's own heap is untouched. Z_Malloc is Doom's, so a failure is the
+ * engine's verdict on the zone rather than this file's opinion of its own work.
+ */
+void *mtx_engine_zone_init(void)
+{
+	uint8_t d = mtx_depth();
+	memzone_t *save;
+	void *mem, *p = 0, *q = 0;
+	int bad, after;
+	uint8_t buf[176];
+
+	if(d >= MTX_MAX_DEPTH)
+		return 0;
+	mem = mtx_hs.heaps[d];
+	if(!mem)
+		return 0;
+
+	mtx_zone_build(mem, MTX_ZONE_PER_DEPTH);
+	bad = mtx_zone_check(mem);
+
+	save = mainzone;
+	mainzone = (memzone_t *)mem;
+	p = Z_Malloc(1024, PU_STATIC, NULL);
+	q = Z_Malloc(64, PU_STATIC, NULL);
+	if(p)
+		Z_Free(p);
+	if(q)
+		Z_Free(q);
+	mainzone = save;
+
+	after = mtx_zone_check(mem);
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth%u zone %u B at %u build %d alloc %u probe %d\n",
+	             (uint32_t)d, MTX_ZONE_PER_DEPTH, (uint32_t)(uintptr_t)mem,
+	             bad, (uint32_t)(uintptr_t)p, after);
+	mtx_log((const char *)buf);
+
+	if(bad || after || !p || !q)
+		return 0;
+	return mem;
+}
+
 // Depth 1's entry. It loads a code image of its own out of the WAD and runs it.
 //
 // The image is a real WAD lump, read through the engine's WAD layer, and it lands
@@ -131,13 +207,18 @@ static void mtx_demo_child(void *arg)
 	mtx_hs.ldr_guest_total = total;
 	mtx_hs.ldr_report[0] = 0;
 	mtx_hs.ldr_report[1] = 0;
+	mtx_hs.ldr_report[3] = 0;
 
 	/* The whole authority the loaded image has over the machine: leave evidence,
-	   yield, finish. No free, no close, no way to allocate - the same reasoning
-	   as ldr1n's service table, so a guest cannot damage the parent. */
+	   ask for a zone of its own, yield, finish. No free, no close, no arbitrary
+	   allocation - the same reasoning as ldr1n's service table, so a guest cannot
+	   damage the parent. The zone call is the engine's nested Z_Init path, so it
+	   is not an extra privilege: a real nested instance gets the same heap by
+	   running ace_main. */
 	mtx_hs.ldr_svc[0] = (uint32_t)(uintptr_t)mtx_hs.ldr_report;
 	mtx_hs.ldr_svc[1] = (uint32_t)(uintptr_t)mtx_yield;
 	mtx_hs.ldr_svc[2] = (uint32_t)(uintptr_t)mtx_finish;
+	mtx_hs.ldr_svc[3] = (uint32_t)(uintptr_t)mtx_engine_zone_init;
 
 	mtx_ldr_enter(entry);		// hands off through ldr0N; never returns
 
@@ -223,7 +304,7 @@ static void mtx_engine_boot(void)
 
 static void mtx_engine_policy(void)
 {
-	uint8_t buf[80];
+	uint8_t buf[144];
 
 	mtx_frame_no++;
 
@@ -245,10 +326,11 @@ static void mtx_engine_policy(void)
 	{
 		uint32_t ok = (mtx_hs.ldr_report[0] == MTX_LDR_GUEST_VERSION
 		            && mtx_hs.ldr_report[1] == mtx_hs.ldr_guest_entry);
-		doom_sprintf(buf, (const uint8_t *)"[MTX] guest %s: magic %u addr %u loaded %u\n",
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] guest %s: magic %u addr %u loaded %u zone %u\n",
 		             ok ? "OK" : "MISMATCH",
 		             mtx_hs.ldr_report[0], mtx_hs.ldr_report[1],
-		             mtx_hs.ldr_guest_entry);
+		             mtx_hs.ldr_guest_entry, mtx_hs.ldr_report[3]);
 		mtx_log((const char *)buf);
 		mtx_hs.ldr_guest_ok = 1;
 	}

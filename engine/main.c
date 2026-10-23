@@ -514,6 +514,22 @@ void *zone_alloc(uint32_t *psz)
 static __attribute((regparm(2),no_caller_saved_registers))
 void Z_Init()
 {
+	// A nested depth reaches Z_Init too: its ACE image runs ace_main, which calls
+	// this. But a depth must NOT walk DPMI RAM - the root's Z_Init already took
+	// it, and taking memory from the root would defeat the point of nesting. A
+	// depth's zone lives in the arena slot reserved for it, laid out by the same
+	// construction used below (see mtx_engine_zone_init). Without this branch the
+	// first Doom-side allocation in a child walks an uninitialised memblock_t.
+	if(mtx_depth() != MTX_ROOT_DEPTH)
+	{
+		mainzone = mtx_engine_zone_init();
+		if(!mainzone)
+			engine_error("ZONE", "Nested depth has no zone!");
+
+		doom_printf("[ZONE] 0x%08X at 0x%08X (nested)\n", mainzone->size, mainzone);
+		return;
+	}
+
 	// matryoshka: claim the nested-instance arena BEFORE the zone takes the rest
 	// of RAM. Z_Init below walks dpmi_get_ram() down until malloc succeeds, so
 	// anything requested after this point cannot be satisfied.
