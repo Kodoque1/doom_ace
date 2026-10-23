@@ -101,6 +101,14 @@ typedef struct mtx_host_state {
 	uint32_t              inset_frame;	/* frame the inset state last changed */
 	uint32_t              inset_logged;	/* frames composited, for the log */
 
+	/* The key guard's counters. They are HERE, in the host object that no snapshot
+	   covers, and not statics in the engine's .bss: the root is a depth too, so its
+	   .bss is saved and restored on every switch, and a counter that decrements per
+	   frame had its decrements undone every time the depth ran - measured, a
+	   30-frame dead time after a toggle lasted 10 frames. */
+	uint32_t              key_guard;	/* frames left in the dead time */
+	uint32_t              slice_seen;	/* depth slice stamp already acted on */
+
 	/* --- mtx_boot.c: hook-isolation probe. A patch site the engine registered,
 	       the byte that was there, and what depth 1 wrote. Host state, so a guest
 	       snapshot cannot cover the evidence of its own test. --- */
