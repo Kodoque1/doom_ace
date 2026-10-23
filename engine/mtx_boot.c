@@ -1726,7 +1726,8 @@ static void MTX_FRAME_TICK_ABI mtx_engine_self_check(mtx_depth_params_t *me)
 	doom_sprintf(buf, (const uint8_t *)
 	             "[MTX] depth %u frame %u: screen region %u, engine screen_buffer %u, "
 	             "doom screens[0] %u; the host's inset shows THIS depth's frame in "
-	             "%u/%u pixels\n",
+	             "%u/%u pixels (exact while neither view moves; this depth's own "
+	             "buffer has moved on by the time it is read back)\n",
 	             (uint32_t)me->depth, me->frames,
 	             (uint32_t)(uintptr_t)mine, (uint32_t)(uintptr_t)sb,
 	             (uint32_t)(uintptr_t)*dv, same, iw * ih);
