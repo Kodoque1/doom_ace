@@ -128,6 +128,16 @@
 __attribute__((section(".data"))) void *mtx_params;
 __attribute__((section(".data"))) uint32_t mtx_starts;
 
+/* The ESP this image was FIRST entered on, captured before anything can move it.
+   For a nested instance that is the stack the scheduler seeded for it (its own
+   arena slot), and `mtx_engine_stack` hands it back to the entry so the boot
+   continues on the depth's stack instead of on the root's. In .data for the same
+   reason as `mtx_params` above: a later .bss clear must not lose it. */
+__attribute__((section(".data"))) uint32_t mtx_entry_esp;
+
+static mtx_depth_params_t *mtx_self(void);
+static void mtx_log(const char *s);
+
 /*
  * Called from the engine's entry (asm.S) with the value it was handed in %ebp,
  * before ace_main runs. See mtx_params.h for what the block is and asm.S for why
@@ -163,6 +173,79 @@ void mtx_params_adopt(uint32_t candidate)
 	/* Only ever overwrite with something verified: this runs again on every
 	   re-entry, and a stale %ebp must not wipe a good block. */
 	mtx_params = p;
+
+	/* The stack this image was entered on, taken HERE - before ace_main, before
+	   the jump back into Doom's startup, i.e. before anything in this image can
+	   move ESP - and only on the first entry, so a later re-entry (which the
+	   .bss note above says really happens) cannot replace the seeded stack with
+	   whatever ESP is by then. Only a validated block sets it, so the root -
+	   whose %ebp is whatever the ACE loader left there - never claims one. */
+	if(!mtx_entry_esp)
+	{
+		uint32_t sp;
+		uint8_t msg[96];
+
+		__asm__ __volatile__("mov %%esp, %0" : "=r"(sp));
+		mtx_entry_esp = sp;
+		doom_sprintf(msg, (const uint8_t *)
+		             "[MTX] d%u entered on stack %u (first entry, kept)\n",
+		             (uint32_t)p->depth, sp);
+		mtx_log((const char *)msg);
+	}
+}
+
+
+/*
+ * TEMPORARY: which memory is this copy running its stack on?
+ *
+ * Measured: the two depths END UP on the same stack memory (Doom's stack region),
+ * which is what lets the running depth's frames overwrite the suspended depth's
+ * frames and turns a resume into a wild jump. The planner already reserves 64 KiB
+ * per depth in the arena, and the FIRST entry into a depth really does run there,
+ * so something during the boot moves ESP. This prints ESP from inside the depth at
+ * named stages: the first stage whose ESP is no longer in the depth's own arena
+ * slot (`[MTX] stack pool ...` in the boot log gives the slot's bounds) is the
+ * stage that moved it.
+ */
+void mtx_esp_probe(const uint8_t *tag)
+{
+	uint32_t sp;
+	uint8_t buf[128];
+	mtx_depth_params_t *p = mtx_self();
+
+	__asm__ __volatile__("mov %%esp, %0" : "=r"(sp));
+	doom_sprintf(buf, (const uint8_t *)"[MTX] d%u esp at %s: %u\n",
+	             p ? (uint32_t)p->depth : (uint32_t)mtx_depth(), tag, sp);
+	mtx_log((const char *)buf);
+}
+
+
+/*
+ * The stack the continued boot must run on.
+ *
+ * ACE's entry ends by setting ESP to `doom_data_segment + 0x85BF4` (Doom's own
+ * stack, inside Doom's data segment) before jumping back into Doom's startup -
+ * which is right for the ROOT: ACE was entered from inside Doom's startup, on
+ * that very stack. It is wrong for a nested instance. Its ACE image is entered on
+ * the stack the scheduler seeded for it (the arena slot reserved per depth), and
+ * that line then throws the depth's stack away and puts the depth on the ROOT's
+ * stack. Both depths then execute on the same memory, each one's frames
+ * overwriting the other's suspended frames - measured: the suspended depth's
+ * saved frame held Doom-ish words with no return address into the engine, while
+ * its own live frame held its arena pointers, and the resume jumped to nothing.
+ *
+ * So an instance keeps the stack it was entered on (captured once, at its first
+ * entry, in .data so a later .bss clear cannot lose it) and the root keeps the
+ * arithmetic it has always used.
+ */
+uint32_t mtx_engine_stack(void)
+{
+	mtx_depth_params_t *p = mtx_self();
+
+	if(p && mtx_entry_esp)
+		return mtx_entry_esp;
+
+	return doom_data_segment + 0x00085BF4u;
 }
 
 static mtx_depth_params_t *mtx_self(void)
@@ -541,6 +624,10 @@ typedef char mtx_hook_constants_must_match[
  */
 void *mtx_engine_zone_init(void)
 {
+	/* TEMPORARY: the FIRST Doom-side code this depth runs (Z_Init is called from
+	   Doom's own startup, right after the engine's entry jumps back into it), so
+	   this is the probe that says whether the stack already moved by then. */
+	mtx_esp_probe((const uint8_t *)"Z_Init, first Doom-side code");
 	mtx_depth_params_t *sp = mtx_self();
 	uint8_t d = mtx_glue_depth();
 	memzone_t *save;
@@ -1198,6 +1285,13 @@ static void mtx_engine_boot(void)
 	mtx_log((const char *)buf);
 
 	doom_sprintf(buf, (const uint8_t *)\
+	             "[MTX] stack pool %u B at %u, %u B per depth (depth 1 at %u)\n",
+	             bt.stack_bytes, (uint32_t)(uintptr_t)bt.stack_base,
+	             MTX_STACK_SIZE,
+	             (uint32_t)(uintptr_t)bt.stack_base + MTX_STACK_SIZE);
+	mtx_log((const char *)buf);
+
+	doom_sprintf(buf, (const uint8_t *)\
 	             "[MTX] screen region %u B/depth (frame %u + loader %u + parse %u)\n",
 	             MTX_SCREEN_BYTES, MTX_SCREEN_FRAME_BYTES,
 	             MTX_SCREEN_LOADER_BYTES, MTX_SCREEN_PARSE_BYTES);
@@ -1644,6 +1738,13 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 			             me->present_src, (uint32_t)(uintptr_t)me->host_yield);
 			mtx_log((const char *)msg);
 		}
+
+		/* TEMPORARY: ESP at the frame boundary, and where the depth's own stack
+		   slot is. The boot trace shows ESP staying in the arena from the entry
+		   through init_map, so whatever moves it does so between the engine's
+		   entry and this line - and this line says which side of that it is. */
+		if(me->frames <= 2u)
+			mtx_esp_probe((const uint8_t *)"frame_hook");
 
 		mtx_engine_self_check(me);
 

@@ -32,6 +32,12 @@ void  mtx_engine_free(void *ptr);
 // root/child branch, because that block is what decides the branch. A no-op when
 // this copy of the engine IS the host.
 void mtx_engine_apply_params(void);
+void mtx_esp_probe(const uint8_t *tag);	/* TEMPORARY: stack trace through a boot */
+
+// The stack the continued boot must run on: an instance keeps the stack it was
+// entered on, the root gets Doom's own. Called from the engine's entry (asm.S),
+// which is why it cannot be a macro over `doom_data_segment` any more.
+uint32_t mtx_engine_stack(void);
 
 // Which depth this copy of the engine is running as: a nested instance's own
 // (from its parameter block), or the scheduler's when this is the host. The

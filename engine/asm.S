@@ -142,8 +142,13 @@ bss_end:
 	call	ace_main
 
 	// continue from after 'M_LoadDefaults'
-	mov	doom_data_segment,%eax
-	add	$0x00085BF4,%eax
+	//
+	// matryoshka: the stack to continue Doom's startup on is the ENGINE's
+	// decision, not a constant. A nested instance must keep the stack it was
+	// entered on (its own arena slot) - otherwise every depth would run Doom's
+	// startup on the ROOT's stack, and the depths would overwrite each other's
+	// suspended frames. The root's value is the one this line has always used.
+	call	mtx_engine_stack
 	mov	%eax,%esp
 	mov	doom_code_segment,%eax
 	add	$0x0001E4B1,%eax

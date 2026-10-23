@@ -240,14 +240,18 @@ uint32_t ace_main()
 {
 	uint32_t arg;
 
+	mtx_esp_probe((const uint8_t *)"entry");
+
 	// title
 	doom_printf("-= ACE Engine by kgsws =-\nCODE: 0x%08X DATA: 0x%08X ACE: 0x%08X+0x1004\n", doom_code_segment, doom_data_segment, ace_segment);
 
 	// install hooks
 	utils_init();
+	mtx_esp_probe((const uint8_t *)"after_utils");
 
 	// load WAD files
 	wad_init();
+	mtx_esp_probe((const uint8_t *)"after_wad");
 
 	// disable 'printf'
 	if(M_CheckParm("-dev"))
@@ -257,21 +261,27 @@ uint32_t ace_main()
 
 	// palette first
 	load_palette();
+	mtx_esp_probe((const uint8_t *)"after_palette");
 
 	// config
 	init_config();
+	mtx_esp_probe((const uint8_t *)"after_config");
 
 	// check video
 	vesa_check();
+	mtx_esp_probe((const uint8_t *)"after_vesa_check");
 
 	// new video code
 	init_draw();
+	mtx_esp_probe((const uint8_t *)"after_draw");
 
 	// load graphics
 	init_gfx();
+	mtx_esp_probe((const uint8_t *)"after_gfx");
 
 	// init graphics mode
 	vesa_init();
+	mtx_esp_probe((const uint8_t *)"after_vesa_init");
 
 	// start loading
 	gfx_progress(0);
@@ -281,9 +291,11 @@ uint32_t ace_main()
 
 	// dehacked
 	init_dehacked();
+	mtx_esp_probe((const uint8_t *)"after_dehacked");
 
 	// savedir
 	init_saveload();
+	mtx_esp_probe((const uint8_t *)"after_saveload");
 
 	//
 	// count EVERYTHING
@@ -338,41 +350,52 @@ uint32_t ace_main()
 
 	// random
 	init_rng();
+	mtx_esp_probe((const uint8_t *)"after_rng");
 
 	// render
 	init_render();
+	mtx_esp_probe((const uint8_t *)"after_render");
 
 	// sound
 	init_sound();
+	mtx_esp_probe((const uint8_t *)"after_sound");
 	gfx_progress(-1);
 
 	// decorate
 	init_decorate();
+	mtx_esp_probe((const uint8_t *)"after_decorate");
 	gfx_progress(-1);
 
 	// textures
 	init_textures(loading->count_texture);
+	mtx_esp_probe((const uint8_t *)"after_textures");
 	gfx_progress(-1);
 
 	// flats
 	init_flats();
+	mtx_esp_probe((const uint8_t *)"after_flats");
 	gfx_progress(-1);
 
 	// sprites
 	init_sprites(loading->count_sprite);
+	mtx_esp_probe((const uint8_t *)"after_sprites");
 	gfx_progress(-1);
 
 	// terrain
 	init_terrain();
+	mtx_esp_probe((const uint8_t *)"after_terrain");
 
 	// animations
 	init_animations();
+	mtx_esp_probe((const uint8_t *)"after_animations");
 
 	// menu
 	init_menu();
+	mtx_esp_probe((const uint8_t *)"after_menu");
 
 	// map
 	init_map();
+	mtx_esp_probe((const uint8_t *)"after_map");
 
 	//
 	config_postinit();
