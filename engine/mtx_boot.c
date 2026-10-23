@@ -1217,6 +1217,49 @@ static void mtx_engine_boot(void)
 	             bt.snapshot_per_depth);
 	mtx_log((const char *)buf);
 
+	/* TEMPORARY: what the .bss split actually registered, and what the snapshot
+	   total adds up to. The split exists so the scheduler's own state object is
+	   never restored over itself; the totals below say whether it is in effect at
+	   runtime, which is a different question from whether the code looks right. */
+	{
+		extern uint8_t _bss_start[], _bss_end[];
+		uint32_t b0 = (uint32_t)(uintptr_t)_bss_start;
+		uint32_t b1 = (uint32_t)(uintptr_t)_bss_end;
+		uint32_t h0 = (uint32_t)(uintptr_t)&mtx_hs;
+		uint32_t h1 = h0 + (uint32_t)sizeof(mtx_hs);
+
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] bss [%u, %u) size %u | mtx_hs [%u, %u) size %u | "
+		             "halves %u + %u | snapshot %u\n",
+		             b0, b1, b1 - b0, h0, h1, h1 - h0,
+		             (h0 > b0) ? h0 - b0 : 0u,
+		             (h1 < b1) ? b1 - h1 : 0u,
+		             bt.snapshot_per_depth);
+		mtx_log((const char *)buf);
+	}
+
+	/* TEMPORARY: does any registered region cover the LIVE stack? Measured
+	   NO (regions end at 274B60, the stack sits at 284B40), so the resume is not
+	   being clobbered by a snapshot restore. Kept because it is the check that
+	   answered it, and cheap. */
+	{
+		uint32_t sp = (uint32_t)(uintptr_t)&sp;
+		uint32_t k;
+
+		for(k = 0; k < (uint32_t)mtx_hs.nrgn; k++)
+		{
+			uint32_t b = (uint32_t)(uintptr_t)mtx_hs.rgn[k].base;
+			uint32_t e = b + mtx_hs.rgn[k].size;
+
+			doom_sprintf(buf, (const uint8_t *)
+			             "[MTX] region %u: [%u, %u) size %u | esp %u -> %s\n",
+			             k, b, e, mtx_hs.rgn[k].size, sp,
+			             (sp >= b && sp < e) ? "STACK INSIDE THIS REGION"
+			                                 : "outside");
+			mtx_log((const char *)buf);
+		}
+	}
+
 	/* What is left of DPMI after the root's own Z_Init. The root's Z_Init walks
 	   dpmi_get_ram() down until an allocation succeeds - it consumes everything but a
 	   32 KiB reserve - so this number is the budget a depth's engine init has to work
@@ -1344,8 +1387,10 @@ static void mtx_engine_depth_check(void)
 }
 
 static void mtx_engine_switch(void);	/* the key and the inset, further down */
+static void mtx_dump_words(const uint8_t *what, uint32_t addr);	/* TEMPORARY */
 
 static void mtx_engine_switch(void);	/* the key and the inset, further down */
+static void mtx_dump_words(const uint8_t *what, uint32_t addr);	/* TEMPORARY */
 
 static void mtx_engine_policy(void)
 {
@@ -1396,8 +1441,27 @@ static void mtx_engine_policy(void)
 	if(mtx_depth() != MTX_ROOT_DEPTH || !mtx_alive(1))
 		return;
 
+	if((mtx_frame_no % 10u) == 0u)
+		mtx_dump_words("depth stack (ctx[1].esp) from the root",
+		               (uint32_t)(uintptr_t)mtx_hs.ctx[1].esp);
+
 	if((mtx_frame_no % MTX_DEMO_INTERVAL) == 0u)
+	{
 		mtx_request_switch(1);
+	}
+}
+
+/* TEMPORARY: dump a few words at an address, for comparing a depth's stack before
+   the switch that saves it with the same stack at the switch that restores it. */
+static void mtx_dump_words(const uint8_t *what, uint32_t addr)
+{
+	uint8_t buf[176];
+	const uint32_t *p = (const uint32_t *)(uintptr_t)addr;
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] %s at %u: %08X %08X %08X %08X %08X %08X\n",
+	             what, addr, p[0], p[1], p[2], p[3], p[4], p[5]);
+	mtx_log((const char *)buf);
 }
 
 /*
@@ -1615,9 +1679,19 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 			   reached its frame path" from "the depth reached it and the hand-back
 			   did nothing" - and the screen looks the same either way. */
 			uint8_t msg[96];
+			uint32_t sp;
+
 			doom_sprintf(msg, (const uint8_t *)
 			             "[MTX] instance hand-back at frame %u\n", me->frames);
 			mtx_log((const char *)msg);
+
+			/* TEMPORARY: the LIVE stack of the depth, taken here so it can be
+			   compared with ctx[1].esp as the root sees it a moment later. If the
+			   saved frame is intact, these agree; the root's own frames grow down
+			   from a nearby address, so this is the check that says whether the two
+			   depths are sharing stack memory. */
+			__asm__ __volatile__("mov %%esp, %0" : "=r"(sp));
+			mtx_dump_words("instance live esp", sp);
 
 			me->host_yield();
 
