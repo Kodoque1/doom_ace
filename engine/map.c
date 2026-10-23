@@ -30,6 +30,7 @@
 #include "terrain.h"
 #include "ldr_flat.h"
 #include "ldr_texture.h"
+#include "mtx_boot.h"	// matryoshka: per-level screen texture and the map report
 #include "textpars.h"
 
 #include "map_info.h"
@@ -1197,6 +1198,11 @@ uint32_t map_load_setup(uint32_t new_game)
 	Z_FreeTags(PU_LEVEL, PU_PURGELEVEL-1);
 	zone_info();
 
+	/* matryoshka: this depth's own screen surface. The level WAD planted it and
+	   named it in this level's marker; resolving it here means the renderer
+	   compares against a texture that really exists in THIS map. */
+	mtx_level_marker_read(map_lump.name);
+
 	// find map lump
 	map_lump_idx = W_CheckNumForName(map_lump.name);
 	map_format = map_check_lump(map_lump_idx);
@@ -1348,6 +1354,10 @@ uint32_t map_load_setup(uint32_t new_game)
 
 	// in the level
 	gamestate = GS_LEVEL;
+
+	/* matryoshka: the per-depth map evidence. Logged from inside the depth, so a
+	   nested instance reports ITS map rather than the host's. */
+	mtx_level_report();
 	usergame = !is_title_map && !demoplayback;
 	return 0;
 

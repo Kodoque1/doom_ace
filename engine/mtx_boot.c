@@ -25,6 +25,12 @@
 #include "doom_vars.h"
 #include "utils.h"
 
+/* The level's own identity: `map_lump` (this depth's map), and the WAD layer's
+   lump lookup, for the per-level marker below. Included rather than redeclared:
+   a `map_lump_name_t` that drifts from map.h is a silent miscompile. */
+#include "map.h"
+#include "wadfile.h"
+
 #include "context.h"
 #include "dos_state.h"
 #include "dos_alloc.h"
@@ -345,12 +351,168 @@ void mtx_screen_paint(void)
 			doom_sprintf(buf, (const uint8_t *)
 			             "[MTX] diegetic: depth %u painted texture %u over screen x %u..%u "
 			             "(%u pixels) src %s [frame %u]\n",
-			             mtx_glue_depth(), MTX_SCREEN_TEX,
+			             mtx_glue_depth(), mtx_screen_tex,
 			             x0 == 0xFFFFFFFFu ? 0u : x0, x1, done,
 			             src ? "yes" : "NONE", frames);
 			mtx_log((const char *)buf);
 		}
 	}
+}
+
+/* ---------------------------------------------------------------------------
+ * WHICH SURFACE IS A SCREEN, per level
+ *
+ * The number used to be the constant MTX_SCREEN_TEX (189 = PIPE4), measured as
+ * the largest surface in the view the demo used to open on. That measurement is
+ * still true and it is still the DEFAULT - but it is a property of ONE MAP, and
+ * the ring's levels are different maps now: each level WAD plants its own screen
+ * surface (verify/mkwadlevels.py) and records its name in a marker lump. A
+ * hardcoded 189 in a map that does not contain PIPE4 paints nothing at all, and
+ * the failure is invisible from outside: the log still says "diegetic: ... 0
+ * pixels" for a level that simply has no such texture in view.
+ *
+ * So each depth resolves ITS OWN marker at level load and stores the resulting
+ * texture index. The marker name is per level - MTXLEV00, MTXLEV01, ... - and
+ * that is not decoration: with every level's WAD loaded, `wad_check_lump` searches
+ * BACKWARD, so a single shared name would resolve to the LAST WAD loaded at every
+ * depth, i.e. every level would read the deepest level's marker.
+ *
+ * A name that resolves to nothing keeps the default and SAYS SO in the log: the
+ * one outcome that must not happen silently is a level that quietly stops being a
+ * screen. Note the deliberate difference from ACE's own texture_num_check, which
+ * reports "unknown texture" (numtextures - 1) rather than -1 - returning that
+ * here would make every wall of a missing texture a screen.
+ */
+uint32_t mtx_screen_tex = MTX_SCREEN_TEX;
+
+static int32_t mtx_tex_by_name(const uint8_t *name)
+{
+	uint64_t wame;
+	uint32_t i;
+
+	if(!numtextures || !textures || name[0] == 0 || name[0] == '-')
+		return -1;
+
+	wame = wad_name64(name);
+
+	for(i = numtextures - 1; i > 0; i--)
+		if(textures[i] && textures[i]->wame == wame)
+			return (int32_t)i;
+
+	return -1;
+}
+
+/* One `key=value` line out of the marker, without a printf-style parser: the
+   marker is written by mkwadlevels.py, is plain ASCII, one field per line. */
+static uint32_t mtx_marker_field(const uint8_t *txt, uint32_t len,
+                                 const uint8_t *key, uint8_t *out, uint32_t cap)
+{
+	uint32_t i, k;
+
+	for(i = 0; i < len; i++)
+	{
+		if(i && txt[i - 1] != '\n')
+			continue;			/* only at the start of a line */
+		for(k = 0; key[k] && i + k < len; k++)
+			if(txt[i + k] != key[k])
+				break;
+		if(key[k])
+			continue;			/* not this key */
+		i += k;
+		for(k = 0; k + 1u < cap && i < len && txt[i] && txt[i] != '\n'; k++)
+			out[k] = txt[i++];
+		out[k] = 0;
+		return 1;
+	}
+	return 0;
+}
+
+/*
+ * Read this depth's level marker for the map being loaded. Called from the
+ * level-load path (map.c), the only place that knows a level is being loaded at
+ * all - and it runs in the DEPTH'S OWN copy of the engine, so a nested instance
+ * resolves its own marker against its own texture list.
+ */
+void mtx_level_marker_read(const uint8_t *map_name)
+{
+	uint8_t name[9];
+	uint8_t txt[192];
+	uint8_t want[9], got[9];
+	uint8_t buf[224];
+	uint32_t d = mtx_engine_depth();
+	uint32_t n;
+	int32_t idx, tex;
+
+	name[0] = 'M'; name[1] = 'T'; name[2] = 'X'; name[3] = 'L';
+	name[4] = 'E'; name[5] = 'V';
+	name[6] = (uint8_t)('0' + (d / 10u) % 10u);
+	name[7] = (uint8_t)('0' + (d % 10u));
+	name[8] = 0;
+
+	want[0] = 0;
+	got[0] = 0;
+
+	idx = wad_check_lump(name);
+	if(idx < 0)
+	{
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] depth %u level: no %s marker; screen texture stays %u\n",
+		             d, name, mtx_screen_tex);
+		mtx_log((const char *)buf);
+		return;
+	}
+
+	n = wad_read_lump(txt, idx, sizeof(txt) - 1u);
+	txt[n] = 0;
+
+	mtx_marker_field(txt, n, (const uint8_t *)"map=", want, sizeof(want));
+	mtx_marker_field(txt, n, (const uint8_t *)"screen=", got, sizeof(got));
+
+	tex = mtx_tex_by_name(got);
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth %u level: marker %s: map=%s screen=%s; loading %s%s\n",
+	             d, name, want, got, map_name,
+	             (want[0] && map_name[0] && wad_name64(want) != wad_name64(map_name))
+	                 ? "  <-- MARKER AND MAP DISAGREE" : "");
+	mtx_log((const char *)buf);
+
+	if(tex < 0)
+	{
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] depth %u level: screen texture %s NOT FOUND; keeping %u\n",
+		             d, got, mtx_screen_tex);
+		mtx_log((const char *)buf);
+		return;
+	}
+
+	mtx_screen_tex = (uint32_t)tex;
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth %u level: screen texture %u (%s), default %u\n",
+	             d, mtx_screen_tex, got, MTX_SCREEN_TEX);
+	mtx_log((const char *)buf);
+}
+
+/*
+ * The level is UP, at this depth, on THIS map. Called at the end of the level
+ * setup, where `gamestate` becomes GS_LEVEL.
+ *
+ * This line is the per-depth map evidence: it has to come from INSIDE the depth.
+ * A nested instance's `map_lump` lives in its own copy of the engine's .bss (its
+ * image slot), which the host cannot read - while the ROOT's map_lump is the
+ * host's, and reading that would say "every depth is on MAP01" no matter what the
+ * instances are doing.
+ */
+void mtx_level_report(void)
+{
+	uint8_t buf[192];
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth %u level UP: map %s (index %i) gamemap %u screen tex %u\n",
+	             mtx_engine_depth(), map_lump.name, map_lump_idx,
+	             gamemap, mtx_screen_tex);
+	mtx_log((const char *)buf);
 }
 
 /*
@@ -1370,6 +1532,32 @@ static void mtx_demo_child(void *arg)
 
 	(void)arg;
 	doom_sprintf(buf, (const uint8_t *)"[MTX] depth%u entered\n", (uint32_t)d);
+	mtx_log((const char *)buf);
+
+	/*
+	 * THIS DEPTH'S OWN LEVEL.
+	 *
+	 * Every level's WAD is loaded once, by the root, with a repeated `-file`; the
+	 * maps are under DIFFERENT names (MAP02 in level1.wad, MAP03 in level2.wad),
+	 * so nothing overrides anything else and each depth can choose. What chooses
+	 * is Doom's own `-warp` state, which is a plain variable in Doom's data:
+	 * `do_autostart_game()` (map.c) builds the map name from `startmap` when no
+	 * `-map` was given - "MAP%02u" for Doom 2 - and this instance's own
+	 * `map_lump` is empty, because its .bss was cleared at its entry and the
+	 * command line has no `-map`.
+	 *
+	 * So setting startmap HERE, while this depth is the running one, is the whole
+	 * mechanism: Doom's data is per-depth state through the snapshot, and this
+	 * write belongs to depth d's copy of it. Measured before this: all three
+	 * levels opened MAP01, i.e. `-warp 1` outranked nothing because nothing else
+	 * set it. This is also why the root keeps startmap 1 and stays on MAP01.
+	 */
+	startmap = (uint32_t)d + 1u;
+	autostart = 1;
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth%u level: startmap set to %u (map MAP%02u), autostart %u\n",
+	             (uint32_t)d, startmap, startmap, autostart);
 	mtx_log((const char *)buf);
 
 #if MTX_CHILD_ENGINE_IMAGE

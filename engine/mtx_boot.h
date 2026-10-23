@@ -59,6 +59,20 @@ uint32_t mtx_engine_stack(void);
 // block.
 uint8_t *mtx_world_screen(void);
 
+// WHICH TEXTURE IS A SCREEN, in the level this depth is on.
+//
+// The planted surface is a per-MAP choice (verify/mkwadlevels.py plants it and
+// records its name in the level's own MTXLEV0d marker), so the number cannot be
+// a compile-time constant any more: the ring's levels are different maps, and a
+// texture index that only exists in one of them paints nothing in the others -
+// silently. Resolved at level load, in the depth's own copy of the engine.
+//
+// The variable is read per textured column by the renderer, which is why it is a
+// variable and not an accessor; MTX_SCREEN_TEX above stays the measured default.
+extern uint32_t mtx_screen_tex;
+void mtx_level_marker_read(const uint8_t *map_name);
+void mtx_level_report(void);
+
 // The seg loop RECORDS the screen rectangle of a screen-textured wall; the frame
 // hook PAINTS it from the other instance's framebuffer. Two halves so that every
 // bound lives in one place instead of inside Doom's clipping arithmetic.

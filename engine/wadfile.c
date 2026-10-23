@@ -10,6 +10,13 @@
 
 static num64_t range_defs[4];
 
+/* How many lumps the IWAD contributed, and how many PWAD copies of a lump
+   directory have been hidden. Both exist for `wad_hide_lump` below: the hide has
+   to remove every PWAD's copy of TEXTURE1/PNAMES and keep the IWAD's, because
+   the exploit is delivered as a crafted TEXTURE1+PNAMES in a PWAD. */
+uint32_t wad_iwad_lumps;
+uint32_t wad_dir_hidden;
+
 //
 // funcs
 
@@ -154,7 +161,14 @@ void wad_init()
 	numlumps = 0;
 
 	for(uint32_t i = 0; i < MAXWADFILES && wadfiles[i]; i++)
+	{
 		wad_add(wadfiles[i]);
+		/* wadfiles[0] is the IWAD (Doom's own argument handling puts it there,
+		   and `-iwad` can only replace index 0), so what the first file added is
+		   exactly the IWAD's lump range. Everything after it is a PWAD. */
+		if(i == 0)
+			wad_iwad_lumps = numlumps;
+	}
 
 	if(!numlumps)
 		engine_error("WAD", "Umm. WADs are empty ...");
@@ -339,16 +353,55 @@ void *wad_cache_optional(const uint8_t *name, uint32_t *size)
 	return data;
 }
 
+/*
+ * Hide a lump NAME from the lookups.
+ *
+ * This used to hide the single lump wad_check_lump found - the LAST one, because
+ * the search is backward. That is the same lump whenever there is exactly one
+ * PWAD, which is why it went unnoticed; with several PWADs the reveal is nasty:
+ * the exploit ships a CRAFTED `TEXTURE1`/`PNAMES`, the texture loader hides ONE
+ * copy after reading its own directory, the next copy of the same name then wins
+ * the lookup - and the engine reads the exploit's fake directory as if it were
+ * the real one. Measured exactly that with three level WADs loaded:
+ *
+ *     ACE Engine / An error has occurred...
+ *     Module that caused this error is TEXTURE
+ *     Texture OVERADDR is missing patch!
+ *
+ * OVERADDR is the first fake entry in the crafted TEXTURE1, so the failure was
+ * the engine trusting the exploit's own decoy table.
+ *
+ * So hide EVERY copy that lives in a PWAD, and never the IWAD's. The boundary is
+ * not a guess: wadfiles[0] is the IWAD and the lumps are appended in file order,
+ * so `wad_iwad_lumps` is where the IWAD's range ends. If that is unknown (a file
+ * failed to open), fall back to hiding the single winning copy, which is what
+ * this always did.
+ */
 void wad_hide_lump(const uint8_t *name)
 {
-	int32_t lump;
-	lumpinfo_t *li;
+	uint64_t wame = wad_name64(name);
+	uint32_t i;
 
-	lump = wad_check_lump(name);
-	if(lump < 0)
+	if(!numlumps)
 		return;
 
-	lumpinfo[lump].wame = 0;
+	if(!wad_iwad_lumps || wad_iwad_lumps > numlumps)
+	{
+		int32_t lump = wad_check_lump(name);
+
+		if(lump >= 0)
+			lumpinfo[lump].wame = 0;
+		wad_dir_hidden++;
+		return;
+	}
+
+	/* backward, i.e. newest PWAD first - the same order the lookup uses */
+	for(i = numlumps; i-- > wad_iwad_lumps; )
+		if(lumpinfo[i].wame == wame)
+		{
+			lumpinfo[i].wame = 0;
+			wad_dir_hidden++;
+		}
 }
 
 void wad_handle_range(uint16_t ident, void (*cb)(lumpinfo_t*))

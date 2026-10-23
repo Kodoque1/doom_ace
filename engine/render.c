@@ -814,7 +814,7 @@ static void R_RenderSegLoop()
 				   that did that wrote 112 times to an address outside video memory and
 				   left a black screen. Recording costs one comparison per column and
 				   puts every bound in code we control. */
-				if(midtexture == MTX_SCREEN_TEX)
+				if(midtexture == mtx_screen_tex)
 					mtx_screen_seg_note(x, yl, yh);
 				else
 				{

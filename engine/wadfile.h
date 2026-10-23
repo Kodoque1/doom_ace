@@ -14,6 +14,11 @@ void *wad_cache_lump(int32_t idx, uint32_t *size);
 void *wad_cache_optional(const uint8_t *name, uint32_t *size);
 void wad_hide_lump(const uint8_t *name);
 
+// Evidence for the hide above: how many lumps the IWAD contributed, and how many
+// PWAD copies of a lump directory were hidden. Reported at the first frame.
+extern uint32_t wad_iwad_lumps;
+extern uint32_t wad_dir_hidden;
+
 void wad_handle_range(uint16_t ident, void (*cb)(lumpinfo_t*));
 void wad_handle_lump(const uint8_t *name, void (*cb)(lumpinfo_t*));
 
