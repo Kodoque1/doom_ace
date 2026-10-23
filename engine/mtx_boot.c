@@ -1726,7 +1726,13 @@ static void mtx_engine_switch(void)
 	if(mtx_hs.slice_seen != mtx_hs.params[1].slice_gen)
 	{
 		mtx_hs.slice_seen = mtx_hs.params[1].slice_gen;
-		mtx_hs.key_guard  = MTX_KEY_GUARD_FRAMES;
+
+		/* The slice-start window, but never LOWERING the dead time left by a
+		   toggle: assigning it outright is what let a 30-frame dead time become 1
+		   frame the moment a slice began, and one held key toggled again 8 frames
+		   later (measured: ON 439, OFF 447). */
+		if(mtx_hs.key_guard < MTX_KEY_GUARD_FRAMES)
+			mtx_hs.key_guard = MTX_KEY_GUARD_FRAMES;
 
 		/* Doom's key array is snapshot state, so what is restored here is what THIS
 		   side last saw - and the events that changed it since were consumed by the
@@ -1738,6 +1744,12 @@ static void mtx_engine_switch(void)
 		   depth's own key processing, and the shared tracker (which is NOT reset) is
 		   what stops that from counting as a second press. */
 		gamekeydown[MTX_SWITCH_KEY] = 0;
+		mtx_hs.params[1].key_down = 0;
+
+		/* State and tracker have to be cleared TOGETHER: clearing only the state
+		   left the tracker saying "already down", so the held key re-asserting
+		   itself could never produce an edge again and the switch stopped working
+		   altogether (measured: zero switches for a whole run). */
 	}
 
 	if(mtx_hs.key_guard)
@@ -1980,6 +1992,7 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		{
 			me->slice_gen++;
 			gamekeydown[MTX_SWITCH_KEY] = 0;
+			me->key_down = 0;	/* clear with the state, not instead of it */
 		}
 
 		/* Hand the frame back, every MTX_DEMO_INTERVAL frames, through the HOST's
