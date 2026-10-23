@@ -33,6 +33,7 @@
 #include "mtx_host.h"
 #include "mtx_ldr.h"
 #include "mtx_zone.h"
+#include "mtx_hooks.h"
 
 #define MTX_ZONE_PER_DEPTH  (256u * 1024u)
 #define MTX_DEMO_INTERVAL   30u
@@ -119,6 +120,22 @@ static void mtx_log(const char *s)
 typedef char mtx_zone_layout_must_match[
 	(sizeof(mtx_memzone_t)  == sizeof(memzone_t)
 	 && sizeof(mtx_memblock_t) == sizeof(memblock_t)) ? 1 : -1];
+
+/* The hook classification mirrors engine/utils.h's HOOK_ enum and its 12-byte table
+   (mtx_hooks.h has to build on the host too). Assert the mirror: a drift would make a
+   depth save and restore the wrong number of bytes at a patch site, which is memory
+   corruption rather than a warning. */
+typedef char mtx_hook_constants_must_match[
+	(MTX_HOOK_JMP_ACE  == HOOK_JMP_ACE
+	 && MTX_HOOK_CALL_DOOM == HOOK_CALL_DOOM
+	 && MTX_HOOK_UINT16 == HOOK_UINT16
+	 && MTX_HOOK_ABSADDR_DATA == HOOK_ABSADDR_DATA
+	 && MTX_HOOK_SET_NOPS == HOOK_SET_NOPS
+	 && MTX_HOOK_MEM_COPY == HOOK_MEM_COPY
+	 && MTX_HOOK_READ32 == HOOK_READ32
+	 && MTX_HOOK_CODE == CODE_HOOK
+	 && MTX_HOOK_DATA == DATA_HOOK
+	 && sizeof(mtx_hook_t) == sizeof(hook_t)) ? 1 : -1];
 
 /*
  * Give the CALLING depth a zone of its own, inside the arena slot reserved for it.
@@ -339,6 +356,84 @@ static void mtx_engine_doom_screen_check(void)
 	mtx_log((const char *)buf);
 }
 
+/*
+ * Hook isolation probe.
+ *
+ * The registry being populated is not the same as it working: 405 addresses and a
+ * save/restore routine that never runs on the right bytes would look identical from
+ * outside. So take the first patch site the engine registered, record what is there
+ * at the root, and have a depth write over it. Then read it again at the root: it must
+ * be back to the original. A write that survives would mean a nested instance can
+ * change Doom's code for everyone - which is precisely what entering a real engine
+ * image at a depth will start doing.
+ */
+extern uint8_t _hooks_start[];		/* engine/linker.ld */
+extern uint8_t _hooks_end[];
+
+static int probe_find(void *ctx, void *addr, uint32_t len)
+{
+	(void)ctx; (void)len;
+	mtx_hs.probe_addr = (uint32_t)(uintptr_t)addr;
+	mtx_hs.probe_orig = *(uint8_t *)addr;
+	return 1;			/* stop: only the first site is wanted */
+}
+
+static void mtx_engine_probe_setup(void)
+{
+	uint32_t n = (uint32_t)(_hooks_end - _hooks_start) / (uint32_t)sizeof(mtx_hook_t);
+
+	/* the scan reports "refused" because the callback stopped it - that is the
+	   point, and the return value is not used here */
+	mtx_hooks_scan(_hooks_start, n, doom_code_segment, doom_data_segment,
+	               probe_find, 0);
+}
+
+/*
+ * Called by the guest through its service table: overwrite the probe site and read it
+ * back, from inside the depth. Returns the address it wrote to.
+ */
+static void *mtx_engine_probe_patch(void)
+{
+	uint8_t *p = (uint8_t *)(uintptr_t)mtx_hs.probe_addr;
+
+	if(!mtx_hs.probe_addr)
+		return 0;
+
+	mtx_hs.probe_wrote = 0xCCu;
+	*p = (uint8_t)mtx_hs.probe_wrote;
+	mtx_hs.probe_read = *p;		/* prove the write landed, at this depth */
+
+	return p;
+}
+
+/*
+ * Back at the root: the byte must be the one that was there before the depth wrote.
+ * `probe_read` proves the write happened at depth 1; this proves it did not survive the
+ * switch back. Both halves are needed - a write that never happened would otherwise
+ * look exactly like isolation.
+ */
+static void mtx_engine_probe_check(void)
+{
+	uint8_t buf[176];
+	uint32_t now;
+
+	if(!mtx_hs.probe_addr || mtx_hs.probe_logged)
+		return;
+	if(!mtx_hs.probe_read)		/* the depth has not run its write yet */
+		return;
+
+	mtx_hs.probe_logged = 1;
+	now = *(uint8_t *)(uintptr_t)mtx_hs.probe_addr;
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] hook isolation: depth1 wrote %u at %u (read back %u); "
+	             "root now %u, was %u => %s\n",
+	             mtx_hs.probe_wrote, mtx_hs.probe_addr, mtx_hs.probe_read,
+	             now, mtx_hs.probe_orig,
+	             (now == mtx_hs.probe_orig) ? "ISOLATED" : "LEAKED");
+	mtx_log((const char *)buf);
+}
+
 // Depth 1's entry. It loads a code image of its own out of the WAD and runs it.
 //
 // The image is a real WAD lump, read through the engine's WAD layer, and it lands
@@ -389,6 +484,7 @@ static void mtx_demo_child(void *arg)
 	mtx_hs.ldr_svc[3] = (uint32_t)(uintptr_t)mtx_engine_zone_init;
 	mtx_hs.ldr_svc[4] = (uint32_t)(uintptr_t)mtx_engine_screen_fill;
 	mtx_hs.ldr_svc[5] = (uint32_t)(uintptr_t)mtx_engine_doom_screen;
+	mtx_hs.ldr_svc[6] = (uint32_t)(uintptr_t)mtx_engine_probe_patch;
 
 	mtx_ldr_enter(entry);		// hands off through ldr0N; never returns
 
@@ -449,6 +545,20 @@ static void mtx_engine_boot(void)
 	             "[MTX] screen region %u B/depth (frame %u + loader %u + parse %u)\n",
 	             MTX_SCREEN_BYTES, MTX_SCREEN_FRAME_BYTES,
 	             MTX_SCREEN_LOADER_BYTES, MTX_SCREEN_PARSE_BYTES);
+	mtx_log((const char *)buf);
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] isolation: %u regions, %u patches, snapshot %u B\n",
+	             mtx_dos_region_count(), mtx_dos_hook_count(),
+	             bt.snapshot_per_depth);
+	mtx_log((const char *)buf);
+
+	/* Record a patch site and what is there BEFORE any depth runs, so the probe has
+	   a "what it was" to compare against afterwards. */
+	mtx_engine_probe_setup();
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] probe site %u, byte there now %u\n",
+	             mtx_hs.probe_addr, mtx_hs.probe_orig);
 	mtx_log((const char *)buf);
 
 	/* Measure, before pinning: Doom's own screen pointer and the copy ACE took of
@@ -533,6 +643,7 @@ static void mtx_engine_policy(void)
 	mtx_engine_video();
 	mtx_present_confirm();
 	mtx_engine_doom_screen_check();
+	mtx_engine_probe_check();
 
 	// instrumentation: prove the frame path keeps running after the first switch
 	if(mtx_frame_no <= 40u || (mtx_frame_no % 50u) == 0u)

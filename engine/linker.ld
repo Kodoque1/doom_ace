@@ -42,11 +42,13 @@ SECTIONS
 	}
 	. = ALIGN(32);
 
+	_data_start = .;
 	.data           :
 	{
 		*(.data .data.* .gnu.linkonce.d.*)
 		SORT(CONSTRUCTORS)
 	}
+	_data_end = .;
 	. = ALIGN(32);
 
 	_bss_start = .;

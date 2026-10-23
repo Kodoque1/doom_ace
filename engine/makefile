@@ -8,7 +8,7 @@ CFLAGS = ${BOTH} ${OPT} -mgeneral-regs-only -fdata-sections -ffunction-sections 
 # matryoshka nested-instance host (sibling working tree).
 # Override with `make MTX_DIR=/path/to/nested` if it lives elsewhere.
 MTX_DIR ?= ../../nested
-MTX_OBJ = ${MTX_DIR}/mtx_core.o ${MTX_DIR}/mtx_switch.o ${MTX_DIR}/mtx_host.o ${MTX_DIR}/dos_state.o ${MTX_DIR}/dos_alloc.o ${MTX_DIR}/dos_wire.o ${MTX_DIR}/ldr1n.o ${MTX_DIR}/ldr0N.o ${MTX_DIR}/ldr1N.o ${MTX_DIR}/mtx_sched.o ${MTX_DIR}/mtx_zone.o
+MTX_OBJ = ${MTX_DIR}/mtx_core.o ${MTX_DIR}/mtx_switch.o ${MTX_DIR}/mtx_host.o ${MTX_DIR}/dos_state.o ${MTX_DIR}/dos_alloc.o ${MTX_DIR}/dos_wire.o ${MTX_DIR}/ldr1n.o ${MTX_DIR}/ldr0N.o ${MTX_DIR}/ldr1N.o ${MTX_DIR}/mtx_sched.o ${MTX_DIR}/mtx_zone.o ${MTX_DIR}/mtx_hooks.o
 CFLAGS += -I${MTX_DIR} -DMTX_DOS_NO_STATIC_POOL
 OBJ += ${MTX_OBJ}
 
