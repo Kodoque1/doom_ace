@@ -19,6 +19,19 @@ ${MTX_DIR}/%.o: ${MTX_DIR}/%.S
 
 build: ${program}.lmp
 
+# Header dependencies. Without these, editing a header leaves stale objects behind:
+# the nested objects compile `mtx_hs` field offsets out of mtx_host.h, so a header
+# change that is not rebuilt silently mismatches mtx_boot.o against mtx_ldr.o.
+# Measured symptom of exactly that: "ace image: load FAILED (-1)" - the image
+# slots read back at the wrong offset - with a perfectly good WAD and a clean boot.
+# Blunt on purpose: every object depends on every header. This tree is small, and a
+# silent miscompile costs far more than a rebuild.
+#
+# NOTE: keep this AFTER `build:`, or make takes the first target of this rule
+# (asm.o) as the default goal and a bare `make -C engine` stops building the lump.
+HDRS = $(wildcard *.h) $(wildcard ${MTX_DIR}/*.h)
+${OBJ}: ${HDRS}
+
 clean:
 	rm -f *.o ${program} ${program}.rel ${program}.bin ${program}.lmp ${MTX_OBJ}
 

@@ -178,6 +178,110 @@ void *mtx_engine_zone_init(void)
 	return mem;
 }
 
+/*
+ * ---- video: which depth the screen shows ----------------------------------
+ *
+ * In this engine a frame reaches the screen through ONE asm routine,
+ * `I_FinishUpdate` (engine/asm.S): it copies 64000 bytes to 0xA0000. Its copy
+ * SOURCE is a dword baked into its own code by `init_draw()` - the value of
+ * `screen_buffer` at init, i.e. the ROOT's buffer. Nothing about that is
+ * per-depth, so without the code below every depth would present the root's
+ * buffer: a nested instance's frames could never reach the screen, and there
+ * would be no way to choose between depths.
+ *
+ * So the host owns that dword from here on. The offset is verified against the
+ * built code rather than assumed: the routine starts with three 1-byte pushes,
+ * so the `mov $imm32,%esi` immediate begins exactly at I_FinishUpdate+4 - which
+ * is the offset `init_draw()` already patches.
+ */
+#define MTX_PRESENT_SRC ((uint32_t *)((uint8_t *)(void *)I_FinishUpdate + 4))
+
+/* Present depth 1 for a window, then the root, so a capture can catch both. The
+   window is long on purpose: the captures happen at fixed wall-clock times, so a
+   short window is a coin flip on which depth a given capture catches. */
+#define MTX_PRESENT_FROM   10u
+#define MTX_PRESENT_UNTIL  200u
+
+/*
+ * Point the presentation at `depth`. Returns whether the screen ALREADY agrees.
+ *
+ * Setting the source is not evidence on its own - the blit has not run yet, and
+ * may copy from somewhere else entirely - so this reads the first dword of VGA
+ * memory back and compares it with the depth's own buffer. On the frame the
+ * source changes the answer is expected to be "not yet": the blit happens later
+ * in the frame. The answer is checked again on the next frame, which is what
+ * makes "the visible screen is this depth's" a measurement instead of a claim.
+ * (The engine itself reads 0xA0000 in net.c, so this is an ordinary access here.)
+ */
+static uint32_t mtx_present(uint8_t depth)
+{
+	uint8_t *buf;
+
+	if(depth >= MTX_MAX_DEPTH || !mtx_hs.screens[depth])
+		return 0;
+
+	buf = (uint8_t *)mtx_hs.screens[depth];
+	*MTX_PRESENT_SRC = (uint32_t)(uintptr_t)buf;
+	mtx_hs.present_depth = depth;
+	mtx_hs.present_frame = mtx_hs.frame_no;
+
+	return (*(uint32_t *)(uintptr_t)0xA0000 == *(uint32_t *)buf) ? 1u : 0u;
+}
+
+/*
+ * Second half of the check above, one frame later. Same-frame would be useless:
+ * the blit for this frame has not run yet when the policy does, so the screen
+ * still holds the previous depth's pixels - measured, and exactly what a
+ * same-frame check reported. A frame later the blit has happened, and the answer
+ * is about the screen rather than about the order of the code.
+ */
+static void mtx_present_confirm(void)
+{
+	uint8_t buf[144];
+	uint8_t d = mtx_hs.present_depth;
+	uint32_t vga, mine;
+
+	if(!mtx_hs.present_frame || mtx_frame_no <= mtx_hs.present_frame)
+		return;
+
+	mtx_hs.present_frame = 0;
+	vga  = *(uint32_t *)(uintptr_t)0xA0000;
+	mine = *(uint32_t *)mtx_hs.screens[d];
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] screen check: depth %u %s (vga %u vs buffer %u)\n",
+	             (uint32_t)d, (vga == mine) ? "CONFIRMED" : "MISMATCH", vga, mine);
+	mtx_log((const char *)buf);
+}
+
+/*
+ * Fill the CALLING depth's own screen region with vertical colour bars.
+ *
+ * Runs at whichever depth calls it, so it writes THAT depth's buffer: at depth 1,
+ * `screen_buffer` is the depth's own region (pinned on switch-in). Two things
+ * follow, and both are the point of the exercise: the pattern is unmistakable on
+ * screen, so a capture says which depth is being presented; and it must NOT appear
+ * in the root's buffer, which is what makes the two screens genuinely separate.
+ */
+static void *mtx_engine_screen_fill(void)
+{
+	uint8_t *buf = screen_buffer;
+	uint32_t i;
+
+	if(!buf)
+		return 0;
+
+	for(i = 0; i < MTX_SCREEN_FRAME_BYTES; i++)
+		buf[i] = (uint8_t)(((i % 320u) / 20u) * 16u + 1u);	/* 16 bars, first
+		                                                       index 1 so offset 0
+		                                                       is non-zero: "not
+		                                                       drawn" and "drawn"
+		                                                       must be distinguishable
+		                                                       from zeroed memory */
+
+	return buf;
+}
+
 // Depth 1's entry. It loads a code image of its own out of the WAD and runs it.
 //
 // The image is a real WAD lump, read through the engine's WAD layer, and it lands
@@ -189,13 +293,17 @@ static void mtx_demo_child(void *arg)
 	uint8_t buf[128];
 	uint32_t entry = 0, total = 0;
 
+	int32_t r;
+
 	(void)arg;
 	mtx_log("[MTX] depth1 entered\n");
 
-	if(mtx_ldr_load(MTX_GUEST_LUMP, 1, MTX_LDR_GUEST_VERSION,
-	                &entry, &total) != 0)
+	r = mtx_ldr_load(MTX_GUEST_LUMP, 1, MTX_LDR_GUEST_VERSION, &entry, &total);
+	if(r != 0)
 	{
-		mtx_log("[MTX] depth1: guest image load FAILED\n");
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] depth1: guest image load FAILED (%d)\n", r);
+		mtx_log((const char *)buf);
 		mtx_finish();
 	}
 
@@ -207,18 +315,21 @@ static void mtx_demo_child(void *arg)
 	mtx_hs.ldr_guest_total = total;
 	mtx_hs.ldr_report[0] = 0;
 	mtx_hs.ldr_report[1] = 0;
+	mtx_hs.ldr_report[2] = 0;
 	mtx_hs.ldr_report[3] = 0;
 
 	/* The whole authority the loaded image has over the machine: leave evidence,
-	   ask for a zone of its own, yield, finish. No free, no close, no arbitrary
-	   allocation - the same reasoning as ldr1n's service table, so a guest cannot
-	   damage the parent. The zone call is the engine's nested Z_Init path, so it
-	   is not an extra privilege: a real nested instance gets the same heap by
-	   running ace_main. */
+	   ask for a zone of its own, draw on its OWN screen, yield, finish. No free,
+	   no close, no arbitrary allocation - the same reasoning as ldr1n's service
+	   table, so a guest cannot damage the parent. Both of the middle two are the
+	   engine's own nested paths, not extra privilege: a real nested instance gets
+	   the same heap by running ace_main and the same screen pointer by the
+	   per-depth pin. */
 	mtx_hs.ldr_svc[0] = (uint32_t)(uintptr_t)mtx_hs.ldr_report;
 	mtx_hs.ldr_svc[1] = (uint32_t)(uintptr_t)mtx_yield;
 	mtx_hs.ldr_svc[2] = (uint32_t)(uintptr_t)mtx_finish;
 	mtx_hs.ldr_svc[3] = (uint32_t)(uintptr_t)mtx_engine_zone_init;
+	mtx_hs.ldr_svc[4] = (uint32_t)(uintptr_t)mtx_engine_screen_fill;
 
 	mtx_ldr_enter(entry);		// hands off through ldr0N; never returns
 
@@ -230,7 +341,7 @@ static void mtx_engine_boot(void)
 {
 	mtx_boot_t bt;
 	mtx_host_ops_t ops;	// taken by value by mtx_init, so a local is fine
-	uint8_t buf[128];
+	uint8_t buf[176];
 	uint32_t entry = 0, total = 0;
 
 	mtx_booted = 1;
@@ -275,6 +386,12 @@ static void mtx_engine_boot(void)
 	             (uint32_t)bt.depth, bt.snapshot_per_depth, mtx_hs.image_bytes);
 	mtx_log((const char *)buf);
 
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] screen region %u B/depth (frame %u + loader %u + parse %u)\n",
+	             MTX_SCREEN_BYTES, MTX_SCREEN_FRAME_BYTES,
+	             MTX_SCREEN_LOADER_BYTES, MTX_SCREEN_PARSE_BYTES);
+	mtx_log((const char *)buf);
+
 	/* The same loader path, against the REAL engine image. A depth can fetch,
 	   allocate for and prepare its own copy of ACE - verified by the version
 	   dword, which is what tells a real image from an unrelated lump.
@@ -284,17 +401,23 @@ static void mtx_engine_boot(void)
 	   allocates the whole of remaining RAM as its zone and re-initialises video.
 	   Both are per-depth work that does not exist yet - see the README. So this is
 	   load-and-verify, not run. */
-	if(mtx_ldr_load(MTX_ACE_LUMP, 0, ace_git_version, &entry, &total) == 0)
+	mtx_hs.ldr_ace_ok = 0;
 	{
-		doom_sprintf(buf, (const uint8_t *)
-		             "[MTX] ace image: %u B at %u entry %u bss %u\n",
-		             total, (uint32_t)(uintptr_t)mtx_hs.images[0], entry,
-		             ((uint32_t *)mtx_hs.images[0])[0]);
+		int32_t r = mtx_ldr_load(MTX_ACE_LUMP, 0, ace_git_version, &entry, &total);
+		if(r == 0)
+		{
+			doom_sprintf(buf, (const uint8_t *)
+			             "[MTX] ace image: %u B at %u entry %u bss %u\n",
+			             total, (uint32_t)(uintptr_t)mtx_hs.images[0], entry,
+			             ((uint32_t *)mtx_hs.images[0])[0]);
+			mtx_hs.ldr_ace_ok = 1;
+		}
+		else
+			doom_sprintf(buf, (const uint8_t *)
+			             "[MTX] ace image: load FAILED (%d) want %u slot %u\n",
+			             r, ace_git_version, mtx_hs.image_bytes);
 		mtx_log((const char *)buf);
-		mtx_hs.ldr_ace_ok = 1;
 	}
-	else
-		mtx_log("[MTX] ace image: load FAILED\n");
 
 	if(mtx_push(mtx_demo_child, 0) == MTX_OK)
 		mtx_child_live = 1;
@@ -302,11 +425,41 @@ static void mtx_engine_boot(void)
 		mtx_log("[MTX] could not create depth 1\n");
 }
 
+/*
+ * Video policy: choose which depth the screen shows, and say whether the screen
+ * agreed. Runs at a frame boundary (like everything else here), so the source
+ * dword is never changed mid-blit.
+ */
+static void mtx_engine_video(void)
+{
+	uint8_t want;
+	uint8_t buf[144];
+
+	/* nothing to show until the guest has drawn on its own screen */
+	if(!mtx_hs.ldr_report[2])
+		return;
+
+	want = (mtx_frame_no >= MTX_PRESENT_FROM && mtx_frame_no < MTX_PRESENT_UNTIL)
+	     ? 1u : 0u;
+	if(want == mtx_hs.present_depth)
+		return;
+
+	mtx_present(want);
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] present -> depth %u, buffer %u (blit runs this frame; "
+	             "checked next frame)\n",
+	             (uint32_t)want, (uint32_t)(uintptr_t)mtx_hs.screens[want]);
+	mtx_log((const char *)buf);
+}
+
 static void mtx_engine_policy(void)
 {
 	uint8_t buf[144];
 
 	mtx_frame_no++;
+
+	mtx_engine_video();
+	mtx_present_confirm();
 
 	// instrumentation: prove the frame path keeps running after the first switch
 	if(mtx_frame_no <= 40u || (mtx_frame_no % 50u) == 0u)
