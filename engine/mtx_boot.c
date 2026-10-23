@@ -51,7 +51,7 @@
    half. 2 MiB against a measured 209,184 B single request - the pool logs its
    peak and the size of any refusal, so the figure is checked by a live run. */
 #define MTX_RAW_PER_DEPTH   (2u * 1024u * 1024u)
-#define MTX_DEMO_INTERVAL   30u
+#define MTX_DEMO_INTERVAL   4u
 
 /* Frames at the start of a slice during which the switch key is ignored, on both
    sides. Doom's key array lives in Doom's data, so it is snapshot state: a
@@ -59,7 +59,20 @@
    restored value reads as a press on the first frame of every slice (measured:
    one held key toggling the inset once per slice). 3 frames is a fraction of the
    shortest human press and a small fraction of a slice. */
-#define MTX_KEY_GUARD_FRAMES 3u
+/* The guard scales with the slice: it exists to ignore the frames a slice starts on,
+   so a fixed 3 frames would swallow a 3-frame slice whole and no press would ever
+   be seen. A quarter of the slice, never less than one frame. */
+#define MTX_KEY_GUARD_FRAMES ((MTX_DEMO_INTERVAL / 4u) ? (MTX_DEMO_INTERVAL / 4u) : 1u)
+
+/* Dead time after a toggle, in host frames, during which no new edge is honoured.
+   This is what makes ONE press one switch once the key state is being distrusted
+   across slices: a key that is still physically held RE-ASSERTS itself through a
+   depth's own key processing a few frames into the slice (DOS typematic repeats),
+   and without a dead time that re-assertion reads as a fresh press - measured as
+   ON at 469 and OFF at 484 from a single 1 s press. ~1.7 s at the rates seen here,
+   which is longer than a typematic re-assertion and shorter than a deliberate
+   second press would be. */
+#define MTX_KEY_DEBOUNCE_FRAMES 30u
 
 /* TEMPORARY (measurement): stack painting, to size MTX_STACK_SIZE from a number.
    See the code that paints and the code that scans it, further down. */
@@ -1686,6 +1699,15 @@ void mtx_host_take_frame(void)
  * depth's buffer and before the status bar is drawn at the bottom - so the inset
  * lands in the frame that gets blitted and nothing paints over it.
  */
+/* The inset box in the depth whose frame is on screen: 320x200 space, with its
+   border. Named here rather than repeated, because two functions now have to agree
+   about exactly which rectangle is the host's. */
+#define MTX_INSET_X  8u
+#define MTX_INSET_Y  8u
+#define MTX_INSET_W  160u
+#define MTX_INSET_H  100u
+#define MTX_INSET_BORDER 2u
+
 /* Host-side state of the key guard: how many frames of the current slice are
    still ignored, and the depth's slice stamp this host has already acted on. */
 static uint32_t mtx_key_guard;
@@ -1710,14 +1732,35 @@ static void mtx_engine_switch(void)
 	{
 		mtx_slice_seen = mtx_hs.params[1].slice_gen;
 		mtx_key_guard  = MTX_KEY_GUARD_FRAMES;
+
+		/* Doom's key array is snapshot state, so what is restored here is what THIS
+		   side last saw - and the events that changed it since were consumed by the
+		   OTHER side. Measured, and it is why a held key toggled once per slice: the
+		   keyup was processed by whichever depth ran then, so the other copied state
+		   kept saying "down" forever and re-fired an edge at the start of every one
+		   of its slices. Clearing the entry the slice starts on throws that stale
+		   "down" away; a key that really is held re-asserts itself through the
+		   depth's own key processing, and the shared tracker (which is NOT reset) is
+		   what stops that from counting as a second press. */
+		gamekeydown[MTX_SWITCH_KEY] = 0;
 	}
 
 	if(mtx_key_guard)
+	{
+		/* Inside the window the key state is what this depth's snapshot restored,
+		   not what this side last saw: writing the shared tracker from it is what
+		   produced a phantom second press (measured: ON at 381 and OFF at 394 from
+		   one held key). Leave the tracker alone, and drop any request that arrived
+		   in the window - a key still held re-asserts itself here, and that is not a
+		   press. */
 		mtx_key_guard--;
+		mtx_hs.params[1].switch_req = 0;
+	}
 	else if((gamekeydown[MTX_SWITCH_KEY] && !mtx_hs.params[1].key_down)
 	        || mtx_hs.params[1].switch_req)
 	{
 		mtx_hs.params[1].switch_req = 0;
+		mtx_key_guard = MTX_KEY_DEBOUNCE_FRAMES;
 		mtx_hs.inset_on = mtx_hs.inset_on ? 0u : 1u;
 		mtx_hs.inset_frame = mtx_frame_no;
 		{
@@ -1728,8 +1771,18 @@ static void mtx_engine_switch(void)
 			             mtx_hs.inset_on ? "ON" : "OFF", mtx_frame_no);
 			mtx_log((const char *)buf);
 		}
+		mtx_hs.params[1].key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
 	}
-	mtx_hs.params[1].key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+	else
+		mtx_hs.params[1].key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+
+	/* Tell a running depth what the picture is: which buffer is the canvas, and
+	   whether the inset is on (mtx_params.h). Host memory the instance already
+	   reads, so this is only the host keeping the shared description current -
+	   without it a depth cannot know that its own view is supposed to be on
+	   screen, and leaves the canvas showing the suspended root's last frame. */
+	mtx_hs.params[1].canvas   = (uint32_t)(uintptr_t)mtx_hs.screens[0];
+	mtx_hs.params[1].inset_on = mtx_hs.inset_on;
 
 	if(!mtx_hs.inset_on || !src || !dst || !mtx_hs.params[1].frames)
 		return;
@@ -1756,6 +1809,39 @@ static void mtx_engine_switch(void)
 	}
 
 	mtx_hs.inset_logged++;
+}
+
+/*
+ * Paint a RUNNING depth's own live view into the canvas.
+ *
+ * Both depths present the root's framebuffer, so whichever one is running is the one
+ * that has to keep the screen up to date - and while a depth runs, the root is
+ * suspended and its buffer holds the frame it left behind. Measured before this:
+ * the picture froze for 3.90 s at a time and the nested view changed 1.1 times a
+ * second, because the screen showed the root's still frame for the whole of every
+ * depth slice.
+ *
+ * The inset rectangle (and its border) is deliberately SKIPPED: it belongs to the
+ * host's composite, and it is the one part of the canvas a depth must not paint over,
+ * or the inset would blink out for the duration of every one of its own slices.
+ */
+static void mtx_paint_view(uint8_t *canvas, const uint8_t *mine)
+{
+	uint32_t y, x;
+
+	if(!canvas || !mine || canvas == mine)
+		return;
+
+	for(y = 0; y < 200u; y++)
+		for(x = 0; x < 320u; x++)
+		{
+			if(y >= MTX_INSET_Y - MTX_INSET_BORDER
+			   && y < MTX_INSET_Y + MTX_INSET_H + MTX_INSET_BORDER
+			   && x >= MTX_INSET_X - MTX_INSET_BORDER
+			   && x < MTX_INSET_X + MTX_INSET_W + MTX_INSET_BORDER)
+				continue;
+			canvas[y * 320u + x] = mine[y * 320u + x];
+		}
 }
 
 /*
@@ -1860,6 +1946,14 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		if(me->present_src)
 			*((uint32_t *)((uint8_t *)(void *)I_FinishUpdate + 4)) = me->present_src;
 
+		/* ...and keep the SCREEN live from this side. While this depth runs the root
+		   is suspended, so without this the picture on screen is the root's last
+		   frame for the whole slice - measured as 3.9 s of a still screen and a
+		   nested view changing 1.1 times a second. The host's inset is preserved
+		   (see mtx_paint_view). */
+		if(me->inset_on && me->canvas && me->screen)
+			mtx_paint_view((uint8_t *)(uintptr_t)me->canvas, (uint8_t *)me->screen);
+
 		/* The switch key: Doom's key state is per-depth, so a press that lands
 		   during THIS depth's slice is invisible to the host. Record it here, in
 		   host memory, for the host to apply - and track this depth's own previous
@@ -1871,15 +1965,27 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		   reads as a fresh press - measured, one held key toggling the inset once
 		   per slice (ON 372, OFF 391, ON 421, OFF 451...), i.e. a flicker instead
 		   of a switch. A real press lasts far longer than the guard window. */
-		if(gamekeydown[MTX_SWITCH_KEY] && !me->key_down
-		   && ((me->frames - 1u) % MTX_DEMO_INTERVAL) >= MTX_KEY_GUARD_FRAMES)
-			me->switch_req = 1u;
-		me->key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+		if(((me->frames - 1u) % MTX_DEMO_INTERVAL) >= MTX_KEY_GUARD_FRAMES)
+		{
+			if(gamekeydown[MTX_SWITCH_KEY] && !me->key_down)
+				me->switch_req = 1u;
+			me->key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+		}
 
-		/* This depth's slice begins when its own frame count starts a new run -
-		   the host reads this to apply the same guard to its own first frames. */
+		/* This depth's slice begins when its own frame count starts a new run - and
+		   that is exactly where its key state has to be distrusted: the array is
+		   snapshot state, so it says what THIS depth last saw, and the events since
+		   were consumed by the other one. Measured: without this, a held key
+		   toggled once per slice, forever (the other side never processed the keyup,
+		   so the copy kept saying "down"). Clearing the one entry we care about is
+		   enough, and the shared key_down tracker is deliberately kept, so a key
+		   that re-asserts itself through this depth's own key processing does not
+		   read as a fresh press. */
 		if((me->frames % MTX_DEMO_INTERVAL) == 1u)
+		{
 			me->slice_gen++;
+			gamekeydown[MTX_SWITCH_KEY] = 0;
+		}
 
 		/* Hand the frame back, every MTX_DEMO_INTERVAL frames, through the HOST's
 		   own service (see the parameter block). This is what makes the two
