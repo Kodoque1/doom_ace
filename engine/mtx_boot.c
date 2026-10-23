@@ -51,7 +51,31 @@
    half. 2 MiB against a measured 209,184 B single request - the pool logs its
    peak and the size of any refusal, so the figure is checked by a live run. */
 #define MTX_RAW_PER_DEPTH   (2u * 1024u * 1024u)
-#define MTX_DEMO_INTERVAL   1u
+/* SLICE LENGTH, in frames of the level that is running.
+ *
+ * 1 was the value for a two-body ping-pong, and it silently stops the switch key from
+ * working in a RING. Measured, three levels, interval 1: not one switch line in a
+ * 30 s run. The reason is the guards: both sides ignore the key for the first
+ * MTX_KEY_GUARD_FRAMES frames of a slice (the restored snapshot key state reads as a
+ * fresh press), and at a one-frame slice EVERY frame is a slice start, so the dead
+ * window is permanent on both sides - the child never checks the key, and the root's
+ * guard is re-armed by a slice start every frame.
+ *
+ * 4 gives each level four frames in a row, so the guard fits INSIDE the slice and
+ * there are three frames left to see a press. It is also what gives a level a run of
+ * frames rather than one frame per lap, which is what makes its own motion visible.
+ * Measured in the two-depth days: at 4-frame slices the outer view ran 13.8/s and a
+ * depth's own animation 4.4/s; at 1 frame, 7.3/s and 8.7/s - so 4 is the better outer
+ * view and 1 the better inner one. A ring pays a third of either per level, which is
+ * the price of three levels instead of two. */
+#define MTX_DEMO_INTERVAL   4u
+
+/* HOW MANY CHILDREN THE RING BOOTS. Two children make a three-level nest - the root
+   plus two instances - which is what the ring needs to be a ring: with one child it
+   is the two-body ping-pong it always was, and the wrap has nothing to close. Each
+   child costs a full arena slot (see mtx_engine_reserve), so this number and the
+   arena size are ONE decision, not two. */
+#define MTX_RING_CHILDREN   2u
 
 /* Frames at the start of a slice during which the switch key is ignored, on both
    sides. Doom's key array lives in Doom's data, so it is snapshot state: a
@@ -1317,20 +1341,30 @@ static void mtx_engine_probe_check(void)
 	mtx_log((const char *)buf);
 }
 
-// Depth 1's entry. It loads a code image of its own out of the WAD and runs it.
+// A child depth's entry. It loads a code image of its own out of the WAD and runs it.
 //
 // The image is a real WAD lump, read through the engine's WAD layer, and it lands
 // in this depth's own arena slot - so the bytes that execute here belong to this
 // depth alone. That matters: ACE patches code at run time (its hook tables), so
 // two depths sharing one code page would fight over the same bytes.
+//
+// WHICH DEPTH IS NOT AN ARGUMENT. The scheduler knows - it is the depth this
+// context was created for - and taking it from there is what lets ONE entry boot
+// every level of the ring. The literal `1` that used to be scattered through this
+// function is the same literal the ring replaced everywhere else: correct while
+// there was exactly one child, and wrong the moment there are two. Note that the
+// host object read here is the HOST's: this entry runs in the root's context,
+// before the instance's own image is entered.
 static void mtx_demo_child(void *arg)
 {
 	uint8_t buf[176];
 	uint32_t entry = 0, total = 0;
 	int32_t r;
+	uint8_t d = (uint8_t)mtx_depth();
 
 	(void)arg;
-	mtx_log("[MTX] depth1 entered\n");
+	doom_sprintf(buf, (const uint8_t *)"[MTX] depth%u entered\n", (uint32_t)d);
+	mtx_log((const char *)buf);
 
 #if MTX_CHILD_ENGINE_IMAGE
 	/*
@@ -1342,19 +1376,20 @@ static void mtx_demo_child(void *arg)
 	 * calls ace_main. So what runs here is a second instance's initialisation, on
 	 * this depth's heap (256 KiB, mtx_engine_zone_init) and this depth's stack.
 	 */
-	r = mtx_ldr_load(MTX_ACE_LUMP, 1, ace_git_version, &entry, &total);
+	r = mtx_ldr_load(MTX_ACE_LUMP, d, ace_git_version, &entry, &total);
 	if(r != 0)
 	{
 		doom_sprintf(buf, (const uint8_t *)
-		             "[MTX] depth1: engine image load FAILED (%d)\n", r);
+		             "[MTX] depth%u: engine image load FAILED (%d)\n",
+		             (uint32_t)d, r);
 		mtx_log((const char *)buf);
 		mtx_finish();
 	}
 
 	doom_sprintf(buf, (const uint8_t *)
-	             "[MTX] depth1: engine image %u B at %u entry %u bss %u\n",
-	             total, (uint32_t)(uintptr_t)mtx_hs.images[1], entry,
-	             ((uint32_t *)mtx_hs.images[1])[0]);
+	             "[MTX] depth%u: engine image %u B at %u entry %u bss %u\n",
+	             (uint32_t)d, total, (uint32_t)(uintptr_t)mtx_hs.images[d], entry,
+	             ((uint32_t *)mtx_hs.images[d])[0]);
 	mtx_log((const char *)buf);
 
 	/* The instance's parameter block, filled by the host and read by the
@@ -1364,26 +1399,27 @@ static void mtx_demo_child(void *arg)
 	   descriptor. It travels in %ebp (see mtx_params.h), and the block itself
 	   lives in mtx_hs - HOST memory - so the accounting the instance updates is
 	   the same accounting the host reports. */
-	mtx_params_fill(1);
+	mtx_params_fill(d);
 	doom_sprintf(buf, (const uint8_t *)
-	             "[MTX] depth1 params at %u: depth %u zone %u screen %u raw %u log %d\n",
-	             (uint32_t)(uintptr_t)&mtx_hs.params[1], mtx_hs.params[1].depth,
-	             (uint32_t)(uintptr_t)mtx_hs.params[1].zone,
-	             (uint32_t)(uintptr_t)mtx_hs.params[1].screen,
-	             (uint32_t)(uintptr_t)mtx_hs.params[1].raw,
-	             mtx_hs.params[1].log_fd);
+	             "[MTX] depth%u params at %u: depth %u zone %u screen %u raw %u log %d\n",
+	             (uint32_t)d, (uint32_t)(uintptr_t)&mtx_hs.params[d],
+	             mtx_hs.params[d].depth,
+	             (uint32_t)(uintptr_t)mtx_hs.params[d].zone,
+	             (uint32_t)(uintptr_t)mtx_hs.params[d].screen,
+	             (uint32_t)(uintptr_t)mtx_hs.params[d].raw,
+	             mtx_hs.params[d].log_fd);
 	mtx_log((const char *)buf);
 
 	doom_sprintf(buf, (const uint8_t *)
-	             "[MTX] depth1: entering, ECX=%u ESI=%u EDI=%u EBP=%u, free DPMI %u B\n",
-	             entry, doom_code_segment, doom_data_segment,
-	             (uint32_t)(uintptr_t)&mtx_hs.params[1], dpmi_get_ram());
+	             "[MTX] depth%u: entering, ECX=%u ESI=%u EDI=%u EBP=%u, free DPMI %u B\n",
+	             (uint32_t)d, entry, doom_code_segment, doom_data_segment,
+	             (uint32_t)(uintptr_t)&mtx_hs.params[d], dpmi_get_ram());
 	mtx_log((const char *)buf);
 
 	mtx_hs.ldr_guest_entry = entry;
 	mtx_hs.ldr_guest_total = total;
 
-	mtx_ldr_enter_engine(entry, (uint32_t)(uintptr_t)&mtx_hs.params[1]);	// never returns
+	mtx_ldr_enter_engine(entry, (uint32_t)(uintptr_t)&mtx_hs.params[d]);	// never returns
 #else
 	r = mtx_ldr_load(MTX_GUEST_LUMP, 1, MTX_LDR_GUEST_VERSION, &entry, &total);
 	if(r != 0)
@@ -1634,10 +1670,32 @@ static void mtx_engine_boot(void)
 		mtx_log((const char *)buf);
 	}
 
-	if(mtx_push(mtx_demo_child, 0) == MTX_OK)
-		mtx_child_live = 1;
-	else
-		mtx_log("[MTX] could not create depth 1\n");
+	/* THE RING'S CHILDREN. One push per level, in order. mtx_push appends the next
+	   slot, and because a child hands the frame back at its own boundary (through
+	   the host's service) control RETURNS here between children - so the second
+	   child boots exactly the way the first did, from the root's context, and each
+	   gets its own arena slot, zone, raw pool, screen and stack. A refusal is
+	   reported per child: "the ring is shorter than asked for" must not look like a
+	   working nest. */
+	{
+		uint8_t d;
+
+		for(d = 1; d <= (uint8_t)MTX_RING_CHILDREN; d++)
+		{
+			if(mtx_push(mtx_demo_child, (void *)(uintptr_t)d) == MTX_OK)
+				mtx_child_live = 1;
+			else
+			{
+				uint8_t msg[112];
+
+				doom_sprintf(msg, (const uint8_t *)
+				             "[MTX] could not create depth %u - ring is %u level(s)\n",
+				             (uint32_t)d, (uint32_t)d - 1u);
+				mtx_log((const char *)msg);
+				break;
+			}
+		}
+	}
 }
 
 /*
@@ -1802,13 +1860,15 @@ static void mtx_engine_policy(void)
 		mtx_hs.ldr_guest_ok = 1;
 	}
 
-	/* Take turns. The depth hands the frame back at its own boundary (through the
+	/* Take turns. A level hands the frame back at its own boundary (through the
 	   host's service - see mtx_host_take_frame), and the root hands it over again
-	   here. The gate is the depth's LIVENESS, not the old guest-demo flag: an
-	   engine instance never finishes, it yields, so `mtx_child_live` (set when a
-	   pushed payload returns) says nothing about it - measured, it stayed 0 while
-	   the depth was running frames and handing them back. */
-	if(mtx_depth() != MTX_ROOT_DEPTH || !mtx_alive(1))
+	   here. The gate is LIVENESS, not the old guest-demo flag: an engine instance
+	   never finishes, it yields, so `mtx_child_live` (set when a pushed payload
+	   returns) says nothing about it - measured, it stayed 0 while the depth was
+	   running frames and handing them back. "Is there anyone to hand a frame to" is
+	   the ring's own question, and from the root the answer is the root itself when
+	   no child exists. */
+	if(mtx_depth() != MTX_ROOT_DEPTH || mtx_ring_next(MTX_ROOT_DEPTH) == MTX_ROOT_DEPTH)
 		return;
 
 	if((mtx_frame_no % 10u) == 0u)
@@ -1817,7 +1877,9 @@ static void mtx_engine_policy(void)
 
 	if((mtx_frame_no % MTX_DEMO_INTERVAL) == 0u)
 	{
-		mtx_request_switch(1);
+		/* The RING turns: the root hands the frame to the next live level, exactly
+		   as every level hands it back to its own next one. */
+		mtx_request_switch(mtx_ring_next(MTX_ROOT_DEPTH));
 	}
 }
 
@@ -1856,7 +1918,10 @@ void mtx_host_take_frame(void)
 	   lines are the only record of which part was reached: the depth's own logging
 	   is the instance's copy of this engine, and it does not come back to say. */
 	mtx_log("[MTX] hand-back: entered the host service\n");
-	mtx_request_switch(MTX_ROOT_DEPTH);
+	/* The RING, from a level's side: hand the frame to the NEXT live level, which
+	   at the deepest level is the wrap back to the root. Hardcoding the root here
+	   is what made this a two-body ping-pong rather than a ring of N. */
+	mtx_request_switch(mtx_ring_next((uint8_t)mtx_depth()));
 	mtx_log("[MTX] hand-back: request set, servicing\n");
 	mtx_frame_tick();
 	mtx_log("[MTX] hand-back: returned (the host handed the frame back)\n");
@@ -1890,11 +1955,30 @@ void mtx_host_take_frame(void)
 #define MTX_INSET_H  100u
 #define MTX_INSET_BORDER 2u
 
+/*
+ * Spread ONE key observation to every participant.
+ *
+ * A press that spans a root slice and two child slices must be seen as one press by
+ * all three: a tracker per side is exactly the double-toggle this replaced (measured
+ * with two depths: one held key, inset ON at 384 and OFF at 391). The host's own copy
+ * is kept in mtx_hs.key_down, the children's in their parameter blocks.
+ */
+static void mtx_key_track(uint32_t pressed)
+{
+	uint8_t k;
+
+	for(k = 1; k < MTX_MAX_DEPTH; k++)
+		if(mtx_alive(k))
+			mtx_hs.params[k].key_down = pressed ? 1u : 0u;
+	mtx_hs.key_down = pressed ? 1u : 0u;
+}
+
 static void mtx_engine_switch(void)
 {
-	uint8_t *src = (uint8_t *)mtx_hs.screens[1];
+	uint8_t *src = mtx_hs.inset_depth ? (uint8_t *)mtx_hs.screens[mtx_hs.inset_depth] : 0;
 	uint8_t *dst = (uint8_t *)screen_buffer;
 	uint32_t y, x;
+	uint8_t  dl;
 	const uint32_t ix = 8u, iy = 8u, iw = 160u, ih = 100u;
 	/* The key, from either side: the root's own leading edge, or a press the DEPTH
 	   saw while it was the active one and recorded in its parameter block.
@@ -1905,9 +1989,19 @@ static void mtx_engine_switch(void)
 	   held key. The block is host memory that both sides already read and write,
 	   so it is the natural place for the one flag that says "the key was down
 	   when I last looked". */
-	if(mtx_hs.slice_seen != mtx_hs.params[1].slice_gen)
+	/* EVERY live depth, not one fixed child. With a ring, any of the children can
+	   have begun a slice since the host last looked, and each has its own stamp;
+	   a single shared stamp let one child's slice start consume the other's, i.e.
+	   one child's key state would never be distrusted. Note this code runs only in
+	   the ROOT's copy of the engine - an instance returns earlier in the frame path
+	   (its own branch) - so `mtx_alive` here is the host's answer, not an empty
+	   object's. */
+	for(dl = 1; dl < MTX_MAX_DEPTH; dl++)
 	{
-		mtx_hs.slice_seen = mtx_hs.params[1].slice_gen;
+		if(!mtx_alive(dl) || mtx_hs.slice_seen[dl] == mtx_hs.params[dl].slice_gen)
+			continue;
+
+		mtx_hs.slice_seen[dl] = mtx_hs.params[dl].slice_gen;
 
 		/* The slice-start window, but never LOWERING the dead time left by a
 		   toggle: assigning it outright is what let a 30-frame dead time become 1
@@ -1926,7 +2020,7 @@ static void mtx_engine_switch(void)
 		   depth's own key processing, and the shared tracker (which is NOT reset) is
 		   what stops that from counting as a second press. */
 		gamekeydown[MTX_SWITCH_KEY] = 0;
-		mtx_hs.params[1].key_down = 0;
+		mtx_hs.params[dl].key_down = 0;
 
 		/* State and tracker have to be cleared TOGETHER: clearing only the state
 		   left the tracker saying "already down", so the held key re-asserting
@@ -1934,50 +2028,96 @@ static void mtx_engine_switch(void)
 		   altogether (measured: zero switches for a whole run). */
 	}
 
-	if(mtx_hs.key_guard)
+	/* The key, from either side and from ANY depth: the root's own leading edge, or
+	   a press a child saw while it was the active one and recorded in its own
+	   block. Every live depth is checked - with two children, looking at one of
+	   them means that child's presses are simply lost. */
 	{
-		/* Inside the window the key state is what this depth's snapshot restored,
-		   not what this side last saw: writing the shared tracker from it is what
-		   produced a phantom second press (measured: ON at 381 and OFF at 394 from
-		   one held key). Leave the tracker alone, and drop any request that arrived
-		   in the window - a key still held re-asserts itself here, and that is not a
-		   press. */
-		mtx_hs.key_guard--;
-		mtx_hs.params[1].switch_req = 0;
-	}
-	else if((gamekeydown[MTX_SWITCH_KEY] && !mtx_hs.params[1].key_down)
-	        || mtx_hs.params[1].switch_req)
-	{
-		mtx_hs.params[1].switch_req = 0;
-		mtx_hs.key_guard = MTX_KEY_DEBOUNCE_FRAMES;
-		mtx_hs.inset_on = mtx_hs.inset_on ? 0u : 1u;
-		mtx_hs.inset_frame = mtx_frame_no;
+		uint8_t req = 0;
+
+		for(dl = 1; dl < MTX_MAX_DEPTH; dl++)
+			if(mtx_alive(dl) && mtx_hs.params[dl].switch_req)
+			{
+				mtx_hs.params[dl].switch_req = 0;
+				req = 1;
+			}
+
 		{
-			uint8_t buf[160];
-			doom_sprintf(buf, (const uint8_t *)
-			             "[MTX] switch: key '%c' -> inset %s at frame %u\n",
-			             (uint32_t)MTX_SWITCH_KEY,
-			             mtx_hs.inset_on ? "ON" : "OFF", mtx_frame_no);
-			mtx_log((const char *)buf);
+			uint32_t pressed = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+
+			/* A REQUEST FROM A LEVEL IS NOT SUBJECT TO THE HOST'S GUARD. The level
+			   already validated it against the same guard on its own side, and it
+			   can only fire once per press of the key (its own tracker is set by the
+			   same block). Dropping it here because the host happened to be inside
+			   its window is how the ring lost the key entirely: measured, three
+			   levels, not one switch line in a 30 s run, with the host's window up
+			   on one frame in four - the one frame the child's edge landed on. */
+			if(req || (!mtx_hs.key_guard && pressed && !mtx_hs.key_down))
+			{
+				mtx_hs.key_guard = MTX_KEY_DEBOUNCE_FRAMES;
+				mtx_hs.inset_frame = mtx_frame_no;
+
+				/* CYCLE the inset through the live depths: off, then each level, then
+				   off again. The innermost level is the view worth reaching - its own
+				   walls show the level outside it - and a bool cannot say which one
+				   that is. */
+				{
+					uint8_t next = 0, d2;
+
+					for(d2 = (uint8_t)(mtx_hs.inset_depth + 1u); d2 < MTX_MAX_DEPTH; d2++)
+						if(mtx_alive(d2))
+						{
+							next = d2;
+							break;
+						}
+					mtx_hs.inset_depth = next;
+				}
+				mtx_hs.inset_on = mtx_hs.inset_depth ? 1u : 0u;
+				{
+					uint8_t buf[160];
+					doom_sprintf(buf, (const uint8_t *)
+					             "[MTX] switch: key '%c' -> inset depth %u at frame %u\n",
+					             (uint32_t)MTX_SWITCH_KEY,
+					             (uint32_t)mtx_hs.inset_depth, mtx_frame_no);
+					mtx_log((const char *)buf);
+				}
+
+				/* the press is consumed for everyone, on the toggle frame too */
+				mtx_key_track(pressed);
+			}
+			else if(mtx_hs.key_guard)
+			{
+				/* Inside the window the key state is what a depth's snapshot restored,
+				   not what this side last saw: writing the tracker from it is what
+				   produced a phantom second press (measured: ON at 381 and OFF at 394
+				   from one held key). Leave the trackers ALONE - that is the whole
+				   point of the window - and just run it down. */
+				mtx_hs.key_guard--;
+			}
+			else
+				mtx_key_track(pressed);
 		}
-		mtx_hs.params[1].key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
 	}
-	else
-		mtx_hs.params[1].key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
 
-	/* Tell a running depth what the picture is: which buffer is the canvas, and
-	   whether the inset is on (mtx_params.h). Host memory the instance already
-	   reads, so this is only the host keeping the shared description current -
-	   without it a depth cannot know that its own view is supposed to be on
-	   screen, and leaves the canvas showing the suspended root's last frame. */
-	mtx_hs.params[1].canvas   = (uint32_t)(uintptr_t)mtx_hs.screens[0];
-	mtx_hs.params[1].inset_on = mtx_hs.inset_on;
-	/* The RING, from the host side: this depth's screen-walls show the next live
-	   depth, which at the deepest depth is the wrap back to the root. Handed over
-	   in the block because a nested instance cannot read the host's screens[]. */
-	mtx_hs.params[1].screen_src = (uint32_t)(uintptr_t)mtx_hs.screens[mtx_ring_next(1u)];
+	/* Tell every running depth what the picture is: which buffer is the canvas,
+	   whether an inset is up, and WHICH level its screen-walls show (mtx_params.h).
+	   Host memory the instances already read, so this is only the host keeping the
+	   shared description current - without it a depth cannot know that its own view
+	   is supposed to be on screen, and leaves the canvas showing the suspended
+	   root's last frame. Every live depth, because the answers now DIFFER per
+	   depth: the ring shows level d the frame of the next level, and the deepest
+	   level the root's. */
+	for(dl = 1; dl < MTX_MAX_DEPTH; dl++)
+	{
+		if(!mtx_alive(dl))
+			continue;
+		mtx_hs.params[dl].canvas     = (uint32_t)(uintptr_t)mtx_hs.screens[0];
+		mtx_hs.params[dl].inset_on   = mtx_hs.inset_on;
+		mtx_hs.params[dl].screen_src =
+			(uint32_t)(uintptr_t)mtx_hs.screens[mtx_ring_next(dl)];
+	}
 
-	if(!mtx_hs.inset_on || !src || !dst || !mtx_hs.params[1].frames)
+	if(!mtx_hs.inset_depth || !src || !dst || !mtx_hs.params[mtx_hs.inset_depth].frames)
 		return;
 
 	/* half scale: every other pixel of the depth's 320x200 frame */
