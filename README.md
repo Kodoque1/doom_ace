@@ -629,6 +629,67 @@ identical to perfect isolation, which is why both halves are logged.
 The snapshot figure is an independent check on the arithmetic: 529,468 + 9,056 + 1,517
 = 540,041 exactly.
 
+## Entering the real engine image: how far it gets, and what stops it
+
+`MTX_CHILD_ENGINE_IMAGE` in `engine/mtx_boot.c` switches depth 1 from the purpose-built
+guest to the real ACE image. It is off in the shipped build because the attempt stops
+partway — but it stops at a *known place*, for a *measured* reason. To reproduce:
+set it to `1`, `make -C nested guest && make -C doom_ace/engine`, then
+`verify/trial.sh <label> 30` and look at the capture — `verify/trial-entry2/` is kept as
+the record.
+
+What had to be right first, and now is:
+
+  - **The entry contract.** ACE's `_start` needs `%ecx` = the entry address, not the
+    guest's service table: it does `sub $0x1008,%ecx` to recover its base and relocates
+    everything relative to that. Handing it the service table would make it relocate
+    itself around a garbage base. Hence two functions —
+    `mtx_ldr_enter` (ECX = service table) and `mtx_ldr_enter_engine` (ECX = entry).
+  - **Per-depth isolation**, above: 405 patches and `.data`, without which a second
+    instance's `ace_main` re-patching Doom's shared code would corrupt the root.
+
+How far it gets, from the log:
+
+    [MTX] depth1: engine image 355772 B at 4551752 entry 4551760 bss 22156
+    [MTX] depth1: entering, ECX=4551760 ESI=1802240 EDI=2093056, free DPMI 61440 B
+    ...then the bluescreen:
+
+    ACE Engine
+    An error has occurred. There is not much you can do now.
+    Module that caused this error is LOADER
+    Render memory allocation failed! (209184B)
+
+So the image loads, is entered correctly, `_start` relocates itself and clears its own
+`.bss`, and `ace_main` runs at depth 1 through config, WAD and the texture/flat/sprite
+loads — reaching `init_render()` (render.c:2495) — where the first large allocation
+fails. Note there is no crash: 0 illegal reads, 0 `DYNX86`. It is an orderly refusal.
+
+**Why, measured rather than guessed.** The line above the failure is the reason:
+
+    [MTX] free DPMI after root Z_Init: 61440 B
+
+The root's `Z_Init` walks `dpmi_get_ram()` down until an allocation succeeds, so it
+consumes everything except a 32 KiB reserve — 60 KiB left, measured. A depth's engine
+init needs 209,184 bytes in one `doom_malloc`. The zone is per-depth (that is what
+`mtx_engine_zone_init` solved); the engine's *raw* allocations are not, and after the
+root's `Z_Init` there is nothing left to give.
+
+So the next piece is: **give a depth a source for its own raw allocations.** The
+contained version is to route the engine's own allocation wrappers (`ldr_malloc` /
+`ldr_realloc` in `main.c`, plus the handful of direct `doom_malloc` sites in
+`wadfile.c`, `utils.c`, `dehacked.c`) through a depth-aware allocator backed by arena
+space reserved for it — when the depth is the root, behaviour is unchanged. That needs
+a decision on free/realloc semantics for the depth pool, which is why it is a piece of
+work rather than a patch.
+
+Two things follow from this that are worth knowing before that work:
+
+  - The child's stack is `MTX_STACK_SIZE` (8 KiB) and `ace_main` ran on it without
+    dying, but 8 KiB is far below what Doom's boot uses. Expect it to need raising too.
+  - A fatal error *inside a depth* currently terminates the whole program (the
+    bluescreen above is `dos_exit`). One instance must not be able to kill the others;
+    that is a policy the host does not have yet.
+
 ## State footprint and the zone-sizing decision (measured)
 
 From `engine/doom_vars.S` (416 variables, 0x1A84 `finetangent` … 0x75CA0
@@ -668,11 +729,13 @@ than guessed — see the video section — and it is the third largest item per 
 
 ## Not done yet (the honest remainder)
 
-* **Entering the real engine image.** The next real step. The depth half of `Z_Init`
-  now exists (above), so `ace_main` at a depth would get a real heap rather than walk
-  uninitialised memory — what is left is video (below), plus the fact that
-  `ace_main` re-patches Doom's *shared* code at run time, which the per-depth hook
-  snapshots exist for but which nothing exercises yet (`nhok` is still 0).
+* **Entering the real engine image: the wall is now identified and measured.** The
+  depth half of `Z_Init` and the isolation both exist, the entry contract is right, and
+  `ace_main` runs at depth 1 up to `init_render()` — where its first large *raw*
+  allocation fails, because the root's `Z_Init` leaves only 60 KiB of DPMI (measured)
+  and the allocation wants 209,184 B. The zone is per-depth; the engine's `doom_malloc`
+  is not. Giving a depth a source for its own raw allocations is the next piece — see
+  the section above for what it involves.
 * **Video: the remaining gap is VESA and mode set.** Both screen pointers now follow
   the depth (ACE's `screen_buffer` and Doom's `screens[0]`), each depth's screen
   region is sized for the engine's real appetite, and the presentation source is the
