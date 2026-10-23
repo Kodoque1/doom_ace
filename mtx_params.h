@@ -83,6 +83,10 @@ typedef struct {
 	                           memory, and the host consumes it. */
 	uint32_t   key_down;	/* this depth's own view of the key, so one press is one
 	                           switch rather than one per frame it is held */
+	uint32_t   slice_gen;	/* incremented by a depth when ITS slice starts. The
+	                           host uses it as the same guard on its own side: a
+	                           slice boundary must not be read as a key press (see
+	                           MTX_KEY_GUARD_FRAMES in the engine). */
 	uint32_t   present_src;	/* what this depth's frame blit should copy FROM. The
 	                           engine bakes that source into its own code at init
 	                           (the value of `screen_buffer` then), and each depth
