@@ -69,4 +69,15 @@ uint32_t mtx_dos_hook_count(void);
 void mtx_dos_save_state(mtx_context_t *outgoing);
 void mtx_dos_load_state(mtx_context_t *incoming);
 
+/*
+ * Copyless accounting, for the caller to report rather than guess: what the last
+ * save and the last load actually COPIED (against a 572,945-byte snapshot, the
+ * number that says whether the change pays), the union of blocks ever seen
+ * differing (the hot set, informational), how many switches it is based on, and
+ * how many cold blocks a canary round had to promote. Any out pointer may be NULL.
+ */
+void mtx_dos_copyless(uint32_t *save_bytes, uint32_t *load_bytes,
+                      uint32_t *ever_hot_bytes, uint32_t *switches,
+                      uint32_t *promoted);
+
 #endif /* MATRYOSHKA_DOS_STATE_H */
