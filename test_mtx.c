@@ -16,6 +16,7 @@
 #include "ldr1n.h"
 #include "mtx_sched.h"
 #include "mtx_zone.h"
+#include "mtx_hooks.h"
 
 /* ---------------------------------------------------------------- runtime */
 /* int 0x80 clobbers ecx and edx (Linux i386 ABI), so declare them modified or
@@ -826,6 +827,109 @@ static int test13(void)
 	return 1;
 }
 
+/* ---------------------------------------------------------------- test 14 */
+/*
+ * Classifying the engine's patches (mtx_hooks.c).
+ *
+ * The patch LENGTHS decide how many bytes a depth saves and restores, so they are the
+ * whole point: too few and one depth's patch stays visible to the others, too many and
+ * a restore overwrites the instruction next door. The expected numbers below are
+ * written out from what the engine's installer actually writes (`utils_install_hooks`:
+ * opcode + rel32 for call/jmp, the value field as a memset count for SET_NOPS, the
+ * length packed in the type's high bits for MEM_COPY) - NOT derived from the function
+ * under test, which would make the test agree with any bug.
+ */
+#define T14_CODE 0x00100000u
+#define T14_DATA 0x00200000u
+
+static uint32_t t14_addr[16], t14_len[16], t14_n;
+
+static int t14_add(void *ctx, void *addr, uint32_t len)
+{
+	(void)ctx;
+	if(t14_n >= 16)
+		return -1;			/* registry full */
+	t14_addr[t14_n] = (uint32_t)(uintptr_t)addr;
+	t14_len[t14_n]  = len;
+	t14_n++;
+	return 0;
+}
+
+static int t14_full(void *ctx, void *addr, uint32_t len)
+{
+	(void)ctx; (void)addr; (void)len;
+	return -1;				/* always refuses */
+}
+
+static int test14(void)
+{
+	/* a table shaped like the engine's: entries that patch Doom's memory, entries
+	   that only READ from it, a terminator, and an entry past the terminator that
+	   must never be reached */
+	static const mtx_hook_t tab[] =
+	{
+		{0x0001000, MTX_HOOK_CODE | MTX_HOOK_CALL_ACE,  0xDEADu},
+		{0x0002000, MTX_HOOK_CODE | MTX_HOOK_JMP_DOOM,  0x1D4A6u},
+		{0x0003000, MTX_HOOK_DATA | MTX_HOOK_UINT32,    0xBEEFu},
+		{0x0004000, MTX_HOOK_DATA | MTX_HOOK_UINT16,    0xD089u},
+		{0x0005000, MTX_HOOK_CODE | MTX_HOOK_UINT8,     0xC3u},
+		{0x0006000, MTX_HOOK_DATA | MTX_HOOK_SET_NOPS,  5u},		/* len from value */
+		{0x0007000, MTX_HOOK_DATA | (9u << 16) | MTX_HOOK_MEM_COPY, 0x1234u}, /* len 9 */
+		{0x0008000, MTX_HOOK_DATA | MTX_HOOK_IMPORT,    0u},		/* not a patch */
+		{0x0009000, MTX_HOOK_DATA | MTX_HOOK_READ32,    0u},		/* not a patch */
+		{0,         MTX_HOOK_CODE | MTX_HOOK_UINT8,     0u},		/* terminator */
+		{0x000A000, MTX_HOOK_CODE | MTX_HOOK_UINT8,     0xC3u},		/* unreachable */
+	};
+	uint32_t n;
+
+	/* lengths, one per kind the installer writes */
+	if(mtx_hook_patch_len(MTX_HOOK_CODE | MTX_HOOK_CALL_ACE,  0) != 5) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_CODE | MTX_HOOK_JMP_ACE,   0) != 5) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_CODE | MTX_HOOK_CALL_DOOM, 0) != 5) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_DATA | MTX_HOOK_UINT32,    0) != 4) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_DATA | MTX_HOOK_ABSADDR_DATA, 0) != 4) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_DATA | MTX_HOOK_UINT16,    0) != 2) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_CODE | MTX_HOOK_UINT8,     0) != 1) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_DATA | MTX_HOOK_SET_NOPS,  7) != 7) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_DATA | (12u << 16) | MTX_HOOK_MEM_COPY, 0) != 12) return 0;
+	/* and the ones with nothing to restore */
+	if(mtx_hook_patch_len(MTX_HOOK_DATA | MTX_HOOK_IMPORT, 0) != 0) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_DATA | MTX_HOOK_READ8,  0) != 0) return 0;
+	if(mtx_hook_patch_len(MTX_HOOK_DATA | MTX_HOOK_READ32, 0) != 0) return 0;
+
+	/* addresses: mirror the installer's segment arithmetic, refuse a bare address */
+	if(mtx_hook_patch_addr(0x10, MTX_HOOK_CODE, T14_CODE, T14_DATA) != T14_CODE + 0x10) return 0;
+	if(mtx_hook_patch_addr(0x10, MTX_HOOK_DATA, T14_CODE, T14_DATA) != T14_DATA + 0x10) return 0;
+	if(mtx_hook_patch_addr(0x10, 0,             T14_CODE, T14_DATA) != 0) return 0;
+	if(mtx_hook_patch_addr(0x10, MTX_HOOK_UINT8, T14_CODE, T14_DATA) != 0) return 0;
+
+	/* the walk: 7 patches registered, the two READ/IMPORT ones skipped, the
+	   post-terminator entry never reached */
+	t14_n = 0;
+	n = mtx_hooks_scan(tab, sizeof(tab) / sizeof(tab[0]), T14_CODE, T14_DATA, t14_add, 0);
+	if(n != 7 || t14_n != 7) return 0;
+	if(t14_addr[0] != T14_CODE + 0x1000 || t14_len[0] != 5) return 0;
+	if(t14_addr[1] != T14_CODE + 0x2000 || t14_len[1] != 5) return 0;
+	if(t14_addr[2] != T14_DATA + 0x3000 || t14_len[2] != 4) return 0;
+	if(t14_addr[3] != T14_DATA + 0x4000 || t14_len[3] != 2) return 0;
+	if(t14_addr[4] != T14_CODE + 0x5000 || t14_len[4] != 1) return 0;
+	if(t14_addr[5] != T14_DATA + 0x6000 || t14_len[5] != 5) return 0;
+	if(t14_addr[6] != T14_DATA + 0x7000 || t14_len[6] != 9) return 0;
+
+	/* a registry that cannot take them all must be REPORTED, not silently
+	   truncated: an isolation that quietly drops patches is worse than none,
+	   because it looks like it works. Checked at the FIRST entry too, where a
+	   "return the negative count" encoding would have collided with 0. */
+	if(mtx_hooks_scan(tab, sizeof(tab) / sizeof(tab[0]), T14_CODE, T14_DATA,
+	                  t14_full, 0) != MTX_HOOKS_SCAN_REFUSED) return 0;
+
+	/* an empty table is not a crash */
+	t14_n = 0;
+	if(mtx_hooks_scan(tab, 0, T14_CODE, T14_DATA, t14_add, 0) != 0) return 0;
+
+	return 1;
+}
+
 /* ------------------------------------------------------------------- main */
 void _start(void)
 {
@@ -849,6 +953,7 @@ void _start(void)
 	r = test11(); puts_("  [11] reentrant 1st stage ... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test12(); puts_("  [12] nested depth zone ...... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test13(); puts_("  [13] depth screen budget .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
+	r = test14(); puts_("  [14] engine patch isolation . "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 
 	puts_(ok ? "ALL PASS\n" : "SOME FAILED\n");
 	sys_exit(ok ? 0 : 1);

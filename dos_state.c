@@ -90,6 +90,9 @@ static uint32_t mtx_layout(void)
 
 uint32_t mtx_dos_snapshot_bytes(void) { return mtx_layout(); }
 
+uint32_t mtx_dos_region_count(void) { return (uint32_t)nrgn; }
+uint32_t mtx_dos_hook_count(void)   { return (uint32_t)nhok; }
+
 int mtx_dos_add_region(void *base, uint32_t size)
 {
 	if(nrgn >= MTX_DOS_MAX_REGIONS || !base || !size)

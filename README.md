@@ -259,14 +259,17 @@ the loaders section) — and drives an auto-switch policy. Evidence goes to `MTX
 because stdout capture stops once the engine takes over:
 
     [MTX] first frame
-    [MTX] host up: depths 2 snap 529468 img 353984
+    [MTX] host up: depths 2 snap 540041 img 355428
     [MTX] screen region 297472 B/depth (frame 64000 + loader 69632 + parse 163840)
+    [MTX] isolation: 3 regions, 405 patches, snapshot 540041 B
+    [MTX] probe site 2022787, byte there now 232
     [MTX] doom screens[0] at 2572228 = 36528; ace screen_buffer = 36528
-    [MTX] ace image: 353952 B at 3634508 entry 3634516 bss 22312
+    [MTX] ace image: 355396 B at 3635952 entry 3635960 bss 22148
     [MTX] depth1 entered
-    [MTX] depth1: guest alloc 114 B at 4548116, entering
-    [MTX] depth1 zone 262144 B at 3988832 build 0 alloc 3988888 probe 0
-    [MTX] doom screens[0] -> 4251936: marker in depth1 buffer YES, in root buffer NO
+    [MTX] depth1: guest alloc 128 B at 4551032, entering
+    [MTX] depth1 zone 262144 B at 3991392 build 0 alloc 3991448 probe 0
+    [MTX] hook isolation: depth1 wrote 204 at 2022787 (read back 204); root now 232, was 232 => ISOLATED
+    [MTX] doom screens[0] -> 4253536: marker in depth1 buffer YES, in root buffer NO
     [MTX] frame 1 child=1
     ...
     [MTX] frame 30 child=1
@@ -565,6 +568,67 @@ lands in depth 1's memory and nowhere near the root's frame. The marker is
 `0x4D545853` ('MTXS'), which is also why the next screen check reads
 `vga 1297373267 vs buffer 1297373267` — the thing on screen is that write.
 
+## Per-depth isolation: what a depth can change, and what it cannot
+
+A depth is only an instance if the state it shares with the others is exactly the state
+it is allowed to share. Four kinds of machine state move per depth now, and the fourth
+is the one that had to be hunted down.
+
+  1. **Regions.** Doom's data range (475,676 B, from `doom_vars.S`), the engine's
+     `.bss` split around `mtx_hs` so the host's own control state is never covered, and
+     now the engine's `.data` (9,056 B, which holds `mod_config` among others).
+     `.data` needed a `_data_start`/`_data_end` pair in `engine/linker.ld`; it is a
+     section of its own, so `mtx_hs` cannot be inside it — checked anyway, because a
+     region covering the host's control state is the wild jump the `.bss` split exists
+     to prevent.
+  2. **Pinned pointers.** `mainzone`, ACE's `screen_buffer`, and Doom's own
+     `screens[0]`. Three pins; the third is the one Doom's renderer writes through.
+  3. **Patched locations.** See below.
+  4. **Per-depth zone and screen.** Not snapshotted, because they are separate memory
+     at separate addresses; that is what makes them per-depth for free.
+
+### 405 patches, and why they were the missing piece
+
+ACE does not patch its own code: it patches DOOM's. Measured from the built engine's
+hook table (419 entries, `_hooks_start`..`_hooks_end`):
+
+    JMP_ACE 24  JMP_DOOM 24  CALL_ACE 111  CALL_DOOM 1
+    UINT32  87  UINT16   84  UINT8     40  ABSADDR_DATA 8  SET_NOPS 26
+    IMPORT  10  READ32    4
+
+`IMPORT` and `READ*` copy *from* Doom *into* ACE, so they have nothing to restore —
+ACE's own memory is already per-depth through the region snapshot. That leaves **405
+patches that modify Doom's memory, totalling 1,517 bytes**, and **399 of them land in
+Doom's CODE segment, which no snapshot region covers.** Those 399 are the whole reason
+this exists: a nested instance re-patching Doom's code at run time would otherwise be
+visible to every other depth, root included.
+
+The addresses are read out of the engine's OWN hook table rather than transcribed into
+a list. A list would rot the first time the engine gains a hook, and the failure would
+look like memory corruption instead of a missing entry. `mtx_hooks.c` mirrors
+`utils.h`'s `HOOK_` enum and the engine build asserts the mirror, so a drift there is a
+compile error rather than a wrong restore length. The patch lengths come from what the
+installer actually writes (opcode + rel32 for call/jmp, the `value` field as a memset
+count for `SET_NOPS`, the length packed in the type's high bits for `MEM_COPY`) — and a
+registry that cannot take them all is *reported*, not silently truncated, because an
+isolation that quietly drops some patches looks exactly like one that works.
+
+**Verified live, not asserted** (0 illegal reads, 0 `DYNX86`):
+
+    [MTX] isolation: 3 regions, 405 patches, snapshot 540041 B
+    [MTX] probe site 2022787, byte there now 232
+    [MTX] hook isolation: depth1 wrote 204 at 2022787 (read back 204);
+          root now 232, was 232 => ISOLATED
+
+Read it as two claims, because either alone would be worthless. The depth wrote 0xCC
+over an `0xE8` (a call opcode ACE had installed) and read it back — so the write really
+happened, inside the depth. Then the root read the same address after the switch back
+and found `0xE8` again — so it did not survive. A write that never happened would look
+identical to perfect isolation, which is why both halves are logged.
+
+The snapshot figure is an independent check on the arithmetic: 529,468 + 9,056 + 1,517
+= 540,041 exactly.
+
 ## State footprint and the zone-sizing decision (measured)
 
 From `engine/doom_vars.S` (416 variables, 0x1A84 `finetangent` … 0x75CA0
@@ -574,14 +638,16 @@ From `engine/doom_vars.S` (416 variables, 0x1A84 `finetangent` … 0x75CA0
     engine .bss              53,792 B    53 KiB
     engine .data              9,056 B     9 KiB
     ------------------------------------------------
-    snapshot per depth      529,468 B   517 KiB  <- live: "snap 529468"
+    snapshot per depth      540,041 B   527 KiB  <- live: "snapshot 540041 B"
+                                                   = 529,468 + 9,056 (.data)
+                                                   + 1,517 (405 hook bytes)
     + zone (policy)         262,144 B   256 KiB  <- MTX_ZONE_PER_DEPTH
     + screen                297,472 B   290 KiB  <- the engine's real appetite
                                                    for the screen_buffer pointer
     + stack                   8,192 B     8 KiB
-    + code image            353,952 B   346 KiB  <- bss + ACE_CODE lump
+    + code image            355,428 B   347 KiB  <- bss + ACE_CODE lump
     ------------------------------------------------
-    per depth             1,451,228 B  1.38 MiB
+    per depth             1,463,277 B  1.40 MiB
 
 A 3 MiB arena divides into two of those, which is what the live run reports
 (`depths 2`) — still enough to nest, and now arithmetic rather than observed luck.
@@ -615,11 +681,16 @@ than guessed — see the video section — and it is the third largest item per 
   (`swap_buffers` page-flip, and `R_InitBuffer`'s framebuffer patch); and entering a
   real engine image re-runs `I_InitGraphics`, i.e. a real mode set at a depth, which
   is not virtualised.
-* `.data` is still not in the snapshot region list — it needs a
-  `PROVIDE(_data_start/_data_end)` pair in `engine/linker.ld`. `mod_config` lives
-  there, and when it is added it needs the same split that keeps `mtx_hs` out.
+* `.data` is now in the snapshot region list (9,056 B, split-checked against `mtx_hs`).
+* Hook isolation is no longer empty. `nhok` is 405, populated from the engine's own
+  hook table, and the isolation is verified in DOS by writing over a patch site at a
+  depth and confirming the root never sees it. This was the prerequisite for entering a
+  real engine image: `ace_main` re-patches Doom's shared code at run time.
+* Nothing sets a switch request from the game yet: there is no key bound to
+  `mtx_request_yield()` / `mtx_request_switch()`, so the policy is a frame counter.
+  (And see the input-routing item below — a key alone would not be enough.)
 * **The depth ceiling is a reservation policy, not a wall.** The arena is requested
-  at 3 MiB (`mtx_engine_reserve`, sizes `{3, 2, 0}`) and a depth costs 1,451,228 B,
+  at 3 MiB (`mtx_engine_reserve`, sizes `{3, 2, 0}`) and a depth costs 1,463,277 B,
   so the live run reports 2. The arithmetic, against ~60 MiB of DPMI RAM: 8 MiB → 5
   depths, 12 MiB → 8, 16 MiB → 11, 20 MiB → 12. What that costs is the ROOT's zone,
   which gets whatever is left — so this is a trade to measure, not a limit. Nothing

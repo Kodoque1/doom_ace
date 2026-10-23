@@ -96,6 +96,12 @@ mtx_guest:
 	mov	(%edx), %edx
 	mov	%eax, 16(%edx)		/* report[4]: where that write landed */
 
+	/* Overwrite one of the 405 patch sites ACE installed in Doom's memory. The host
+	   checks afterwards that the ROOT never sees it: that is what hook isolation
+	   has to do before a real engine image can run at a depth. */
+	mov	(%esp), %eax
+	call	*24(%eax)
+
 	/* Yield: the parent runs a frame, we come back here. Twice, so this depth is
 	   alive across two boundaries instead of completing at the first one. */
 	mov	(%esp), %eax

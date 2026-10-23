@@ -59,6 +59,12 @@ void mtx_dos_set_value(uint8_t depth, int pin, void *value);
 /* Per-depth footprint actually required, so the caller can size its pool. */
 uint32_t mtx_dos_snapshot_bytes(void);
 
+/* How many regions and patched locations the wiring registered. For the boot log and
+   for tests that need to know the isolation is actually populated rather than merely
+   implemented - an empty registry isolates nothing and looks identical from outside. */
+uint32_t mtx_dos_region_count(void);
+uint32_t mtx_dos_hook_count(void);
+
 /* The callbacks to pass into mtx_init(). */
 void mtx_dos_save_state(mtx_context_t *outgoing);
 void mtx_dos_load_state(mtx_context_t *incoming);

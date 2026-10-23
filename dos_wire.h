@@ -25,6 +25,6 @@ void mtx_dos_wire(uint8_t max_depth,
                   void **heaps, void **screens);
 
 /* Call once per patched address (from utils_install_hooks). */
-void mtx_dos_wire_hook(void *addr);
+void mtx_dos_wire_hook(void *addr, uint32_t len);
 
 #endif /* MATRYOSHKA_DOS_WIRE_H */
