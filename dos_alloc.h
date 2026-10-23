@@ -29,12 +29,30 @@ void    *mtx_arena_alloc(mtx_arena_t *a, uint32_t size, uint32_t align);
 uint32_t mtx_arena_used(const mtx_arena_t *a);
 
 /*
- * Per-depth costs. `screen` and `zone` are policy inputs: the engine's real
- * screen_buffer usage and a level's real working set both need measuring on
- * hardware, so they are pass-throughs, not constants baked in here.
- * 320*200 is one 8-bit framebuffer - the minimum a depth needs to render into.
+ * A depth's screen region, sized from what the ENGINE actually puts behind the
+ * `screen_buffer` pointer - not from one framebuffer. Measured from the engine's
+ * own source:
+ *
+ *   [0, 64000)                  the 320x200 frame the renderer draws into
+ *   [64000, 133632)             loader progress-bar patch (main.c reads 69632 B
+ *                               at screen_buffer + 64000)
+ *   [133632, 133632 + 0x28000)  TP_MEMORY_ADDR, the text/script parse arena
+ *                               (textpars.h reads 0x28000 B at screen_buffer +
+ *                               64000 + 69632)
+ *
+ * Sizing a depth's screen at one frame (64000) would let a nested instance's
+ * engine write ~233 KiB past its own buffer, straight into the next depth's
+ * zone. One frame is the minimum a depth can render into; it is not what the
+ * engine needs. The three parts stay separate constants so the host test can
+ * assert the total against the engine's measured appetite, i.e. shrinking this
+ * becomes a test failure rather than a silent overrun.
  */
-#define MTX_SCREEN_BYTES  (320u * 200u)
+#define MTX_SCREEN_FRAME_BYTES   (320u * 200u)      /* 64000  */
+#define MTX_SCREEN_LOADER_BYTES  (69632u)
+#define MTX_SCREEN_PARSE_BYTES   (0x28000u)         /* 163840 */
+#define MTX_SCREEN_BYTES  (MTX_SCREEN_FRAME_BYTES + MTX_SCREEN_LOADER_BYTES \
+                           + MTX_SCREEN_PARSE_BYTES)
+
 #define MTX_ZONE_DEFAULT  (1u * 1024u * 1024u)
 
 typedef struct {

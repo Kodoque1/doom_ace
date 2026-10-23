@@ -152,9 +152,16 @@ continuation, `4(%esp)` = banner.
     Makefile         make run | make doscheck | make ldr0n | make guest
 
 The engine side lives in `doom_ace/engine/`: `mtx_boot.c` (boot + demo policy +
-`mtx_engine_zone_init`, the nested half of `Z_Init`), `mtx_ldr.c` (the three ldr1n
-services wired to the engine, plus image validation), and `main.c`'s `Z_Init`, which
-branches on depth.
+`mtx_engine_zone_init`, the nested half of `Z_Init`, + the video presentation the
+host owns), `mtx_ldr.c` (the three ldr1n services wired to the engine, plus image
+validation), and `main.c`'s `Z_Init`, which branches on depth.
+
+**Build trap worth knowing:** `engine/makefile` now carries header dependencies
+(`${OBJ}: ${HDRS}`, every object on every header). Without them, editing
+`nested/mtx_host.h` leaves the other objects compiled against the old `mtx_hs`
+offsets while `mtx_boot.o` is rebuilt against the new ones — measured as
+`ace image: load FAILED (-1)` with a perfectly good WAD and a clean boot. The rule
+must stay after `build:` or make takes its first target as the default goal.
 
 ## Verified (real execution, not description)
 
@@ -174,6 +181,7 @@ branches on depth.
       [10] ops table lifetime .... PASS
       [11] reentrant 1st stage ... PASS
       [12] nested depth zone ...... PASS
+      [13] depth screen budget .... PASS
     ALL PASS
 
 [1] three depths nest and unwind in order (A C E D B).
@@ -214,6 +222,11 @@ branches on depth.
     block, two consecutive free blocks) and requires the checker to name each one.
     Verified to FAIL against a checker neutered to always report "intact" — a
     checker that cannot see corruption would pass every zone ever built.
+[13] the depth screen budget covers what the engine puts behind `screen_buffer`.
+    The engine's appetite is written as a literal (64000 + 69632 + 0x28000), not
+    recomputed from the constants under test — a test that derives its expectation
+    from the thing it checks passes whatever that thing becomes. Verified to FAIL
+    with `MTX_SCREEN_BYTES` set back to one frame.
 
 ### Wired into the engine, and verified not to regress
 
@@ -244,17 +257,22 @@ the loaders section) — and drives an auto-switch policy. Evidence goes to `MTX
 because stdout capture stops once the engine takes over:
 
     [MTX] first frame
-    [MTX] host up: depths 2 snap 529468 img 353464
-    [MTX] ace image: 353432 B at 3633988 entry 3633996 bss 22376
+    [MTX] host up: depths 2 snap 529468 img 353984
+    [MTX] screen region 297472 B/depth (frame 64000 + loader 69632 + parse 163840)
+    [MTX] ace image: 353952 B at 3634508 entry 3634516 bss 22312
     [MTX] depth1 entered
-    [MTX] depth1: guest alloc 94 B at 4313612, entering
-    [MTX] depth1 zone 262144 B at 3987460 build 0 alloc 3987516 probe 0
+    [MTX] depth1: guest alloc 114 B at 4548116, entering
+    [MTX] depth1 zone 262144 B at 3988832 build 0 alloc 3988888 probe 0
     [MTX] frame 1 child=1
     ...
     [MTX] frame 30 child=1
     [MTX] request switch -> 1        <- frame boundary, depth 0 -> 1
-    [MTX] guest OK: magic 1297373255 addr 4313612 loaded 4313612 zone 3987460
-    [MTX] frame 250 child=1          <- root keeps running on its own frame loop
+    [MTX] present -> depth 1, buffer 4250976 (blit runs this frame; checked next frame)
+    [MTX] screen check: depth 1 CONFIRMED (vga 16843009 vs buffer 16843009)
+    [MTX] guest OK: magic 1297373255 addr 4548472 loaded 4548472 zone 3988832
+    [MTX] present -> depth 0, buffer 36528 (blit runs this frame; checked next frame)
+    [MTX] screen check: depth 0 CONFIRMED (vga 16843014 vs buffer 16843014)
+    [MTX] frame 400 child=1          <- root keeps running on its own frame loop
 
 529,468 B/depth is the measured figure (475,676 Doom data + ~53 KiB engine .bss,
 minus `mtx_hs` which is deliberately outside the snapshot). Depth 1 genuinely ran
@@ -457,6 +475,60 @@ the corruption cases — a checker that cannot see a broken zone would pass ever
 ever built. It was verified to FAIL against a checker neutered to always report
 "intact".
 
+## Video: which depth the screen shows
+
+A frame reaches the screen through ONE asm routine, `I_FinishUpdate`
+(`engine/asm.S`): it copies 64000 bytes to 0xA0000. Its copy SOURCE is a dword baked
+into its own code by `init_draw()` — the value of `screen_buffer` at init, i.e. the
+ROOT's buffer. Nothing about that is per-depth, so before this change every depth
+presented the root's buffer: a nested instance's frames could never reach the screen,
+and there was no way to choose between depths.
+
+The host owns that dword now (`mtx_present`, `engine/mtx_boot.c`). The offset is
+verified against the built code rather than assumed — the routine starts with three
+1-byte pushes, so the `mov $imm32,%esi` immediate begins exactly at
+`I_FinishUpdate+4`, which is the offset `init_draw()` already patches:
+
+    1141:  57                   push %edi
+    1142:  56                   push %esi
+    1143:  51                   push %ecx
+    1144:  be 78 56 34 12       mov $0x12345678,%esi   <- the source, patched at +4
+    1149:  bf 00 00 0a 00       mov $0xa0000,%edi
+    114e:  b9 80 3e 00 00       mov $0x3e80,%ecx
+    1153:  f3 a5                rep movsl %ds:(%esi),%es:(%edi)
+
+**Setting the source is not evidence, so the screen is read back.** `mtx_present`
+compares the first dword of VGA memory with the depth's own buffer. On the frame of
+the change the answer is expected to be "not yet" — the blit for that frame has not
+run when the policy does — so the check is repeated one frame later. That is the
+difference between "I pointed the pointer" and "the screen changed":
+
+    [MTX] present -> depth 1, buffer 4250976 (blit runs this frame; checked next frame)
+    [MTX] screen check: depth 1 CONFIRMED (vga 16843009 vs buffer 16843009)
+    [MTX] present -> depth 0, buffer 36528 (blit runs this frame; checked next frame)
+    [MTX] screen check: depth 0 CONFIRMED (vga 16843014 vs buffer 16843014)
+
+16843009 is `0x01010101`, the first dword of the depth's colour-bar pattern;
+16843014 is `0x01010106`, the root's first pixel. Both directions are checked, so the
+screen really did change and really did change back — 0 illegal reads, 0 `DYNX86`.
+
+The pattern is drawn by the DEPTH, not by the host: the guest calls a service that
+fills `screen_buffer`, and at depth 1 `screen_buffer` is that depth's own region
+(pinned on switch-in). One run captures both states — `verify/trial-video6/`
+`video6_a.png` is the nested depth's bars, `_b` and `_c` are the root's MAP01 after
+the switch back.
+
+### A depth's screen region is bigger than a frame
+
+`MTX_SCREEN_BYTES` used to be one 320x200 framebuffer (64000). That is the minimum a
+depth can render into, not what the engine needs behind the pointer: `main.c` reads
+69632 bytes at `screen_buffer + 64000` (the loader progress bar) and `textpars.h`
+reads 0x28000 at `screen_buffer + 64000 + 69632` (`TP_MEMORY_ADDR`). A depth sized at
+one frame would let a nested engine write ~233 KiB past its own buffer — into the next
+depth's zone. The region is now the sum of those three parts (297472 B), and test [13]
+asserts the total against the engine's measured appetite as a **literal**, so shrinking
+it fails the tests instead of silently corrupting a neighbour.
+
 ## State footprint and the zone-sizing decision (measured)
 
 From `engine/doom_vars.S` (416 variables, 0x1A84 `finetangent` … 0x75CA0
@@ -468,11 +540,12 @@ From `engine/doom_vars.S` (416 variables, 0x1A84 `finetangent` … 0x75CA0
     ------------------------------------------------
     snapshot per depth      529,468 B   517 KiB  <- live: "snap 529468"
     + zone (policy)         262,144 B   256 KiB  <- MTX_ZONE_PER_DEPTH
-    + screen                 64,000 B    63 KiB  <- 320x200x8
+    + screen                297,472 B   290 KiB  <- the engine's real appetite
+                                                   for the screen_buffer pointer
     + stack                   8,192 B     8 KiB
-    + code image            352,684 B   344 KiB  <- bss + ACE_CODE lump
+    + code image            353,952 B   346 KiB  <- bss + ACE_CODE lump
     ------------------------------------------------
-    per depth             1,216,488 B  1.16 MiB
+    per depth             1,451,228 B  1.38 MiB
 
 A 3 MiB arena divides into two of those, which is what the live run reports
 (`depths 2`) — still enough to nest, and now arithmetic rather than observed luck.
@@ -486,10 +559,10 @@ The levers, in order of effect:
 * **snapshot** — 529 KiB, dominated by Doom's data region. Shrinking it means
   knowing which Doom globals a nested depth actually needs.
 
-`screen` is still an estimate, and worth being honest about: `MTX_SCREEN_BYTES` is
-one 320x200x8 framebuffer, but the engine also uses `screen_buffer + 64000 + 69632`
-as loader scratch (`textpars.h`), so 64 KiB is less than the engine's real
-appetite for that pointer.
+`screen` used to be an estimate and was honest about it: `MTX_SCREEN_BYTES` was one
+320x200x8 framebuffer, while the engine also uses `screen_buffer + 64000 + 69632` as
+a parse arena (`textpars.h`). It is now measured from the engine's source rather
+than guessed — see the video section — and it is the third largest item per depth.
 
 ## Not done yet (the honest remainder)
 
@@ -498,10 +571,14 @@ appetite for that pointer.
   uninitialised memory — what is left is video (below), plus the fact that
   `ace_main` re-patches Doom's *shared* code at run time, which the per-depth hook
   snapshots exist for but which nothing exercises yet (`nhok` is still 0).
-* **Video is not virtualised.** Each depth has its own `screen_buffer` pointer, but
-  they all present through the same `swap_buffers` IRQ, so the visible screen is
-  whichever depth presented last. A child needs an off-screen buffer with the root
-  blitting the active one.
+* **Video is only half virtualised.** The presentation source is now the host's
+  decision and each depth's screen region is sized for the engine's real appetite,
+  so a depth's frames can reach the screen and the visible one is chosen. What is
+  NOT per-depth: Doom's own screen pointer variable (the dword at `data + 0x74FC4`
+  that ACE copies into `screen_buffer` at init). ACE's own code and the blit follow
+  the depth; Doom's renderer still targets the root's buffer unless that variable is
+  pinned too. And VESA mode is a different presentation path entirely
+  (`swap_buffers` page-flip) which this does not touch.
 * `.data` is still not in the snapshot region list — it needs a
   `PROVIDE(_data_start/_data_end)` pair in `engine/linker.ld`. `mod_config` lives
   there, and when it is added it needs the same split that keeps `mtx_hs` out.

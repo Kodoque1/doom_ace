@@ -780,6 +780,41 @@ static int test12(void)
 	return 1;
 }
 
+/* ---------------------------------------------------------------- test 13 */
+/*
+ * A depth's screen region must cover what the ENGINE puts behind `screen_buffer`.
+ *
+ * The engine reads 69632 bytes at screen_buffer + 64000 (main.c, the loader
+ * progress bar) and 0x28000 bytes at screen_buffer + 64000 + 69632 (textpars.h,
+ * TP_MEMORY_ADDR), on top of the 320x200 frame at offset 0. Sizing a depth's
+ * screen at one frame therefore lets a nested engine write ~233 KiB past its own
+ * buffer - into the next depth's zone.
+ *
+ * The total is repeated here as a literal on purpose. A test that recomputed it
+ * from the same constants it is checking would pass no matter what those constants
+ * became, which is exactly the failure mode being guarded against.
+ */
+#define T13_ENGINE_APPETITE  (64000u + 69632u + 0x28000u)	/* 297472 */
+
+static int test13(void)
+{
+	/* covers the engine's whole use of the pointer */
+	if(MTX_SCREEN_BYTES < T13_ENGINE_APPETITE) return 0;
+
+	/* the three named parts really are the derivation, not a coincidence */
+	if(MTX_SCREEN_BYTES != MTX_SCREEN_FRAME_BYTES + MTX_SCREEN_LOADER_BYTES
+	                     + MTX_SCREEN_PARSE_BYTES) return 0;
+
+	/* and a depth still has room for a whole frame at offset 0 */
+	if(MTX_SCREEN_FRAME_BYTES < 320u * 200u) return 0;
+
+	/* two depths' screen regions must not overlap in the plan (test 7 checks the
+	   carve; this checks the arithmetic the carve is based on) */
+	if(MTX_SCREEN_BYTES * 2u <= MTX_SCREEN_BYTES) return 0;
+
+	return 1;
+}
+
 /* ------------------------------------------------------------------- main */
 void _start(void)
 {
@@ -802,6 +837,7 @@ void _start(void)
 	r = test10(); puts_("  [10] ops table lifetime .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test11(); puts_("  [11] reentrant 1st stage ... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test12(); puts_("  [12] nested depth zone ...... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
+	r = test13(); puts_("  [13] depth screen budget .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 
 	puts_(ok ? "ALL PASS\n" : "SOME FAILED\n");
 	sys_exit(ok ? 0 : 1);

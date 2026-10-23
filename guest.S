@@ -30,6 +30,14 @@
  *   [12] void *  (*zone)()    this depth's own zone, or 0 - the engine's nested
  *                             Z_Init path, so the guest obtains a heap the same
  *                             way a real nested instance would
+ *   [16] void *  (*screen)()  fill this depth's OWN screen region and return it.
+ *                             At a depth, `screen_buffer` is that depth's own
+ *                             buffer, so the drawing lands there and not in the
+ *                             root's - which is what makes the screens separate.
+ *
+ * It yields TWICE, so the depth stays alive across two frame boundaries rather
+ * than completing at the first one: a nested instance that exists for exactly one
+ * frame cannot demonstrate anything about being switched away from and back.
  *
  * Position independence is not a luxury: the same image is loaded at a different
  * address for every depth, so it must contain no absolute addresses. Note it also
@@ -66,7 +74,17 @@ mtx_guest:
 	mov	(%edx), %edx		/* report - reloaded, the call clobbered it */
 	mov	%eax, 12(%edx)		/* report[3]: this depth's own zone */
 
-	/* Yield: the parent runs a frame, we come back here. */
+	/* Draw on this depth's own screen, through the engine's own screen pointer. */
+	mov	(%esp), %eax
+	call	*16(%eax)
+	mov	(%esp), %edx
+	mov	(%edx), %edx
+	mov	%eax, 8(%edx)		/* report[2]: this depth's own screen */
+
+	/* Yield: the parent runs a frame, we come back here. Twice, so this depth is
+	   alive across two boundaries instead of completing at the first one. */
+	mov	(%esp), %eax
+	call	*4(%eax)
 	mov	(%esp), %eax
 	call	*4(%eax)
 
