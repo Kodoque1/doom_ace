@@ -10,6 +10,7 @@
 #include "wadfile.h"
 #include "decorate.h"
 #include "mobj.h"
+#include "mtx_boot.h"	// matryoshka: TEMPORARY lump-index probe
 #include "ldr_sprite.h"
 
 uint16_t *sprite_lump;
@@ -104,6 +105,8 @@ static void cb_s_parse(lumpinfo_t *li)
 static __attribute((regparm(2),no_caller_saved_registers))
 void *vissprite_cache_lump(uint32_t idx)
 {
+	if(sprite_lump[idx] >= numlumps)			/* TEMPORARY probe */
+		mtx_lump_probe(2u, idx, sprite_lump[idx], numsprites);
 	return W_CacheLumpNum(sprite_lump[idx], PU_CACHE);
 }
 

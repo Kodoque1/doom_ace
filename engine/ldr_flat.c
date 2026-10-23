@@ -10,6 +10,7 @@
 #include "draw.h"
 #include "ldr_texture.h"
 #include "ldr_flat.h"
+#include "mtx_boot.h"	// matryoshka: TEMPORARY lump-index probe
 
 //
 
@@ -55,6 +56,8 @@ void *precache_flat(uint32_t idx)
 {
 	if(idx >= numflats)
 		return NULL; // 'R_PrecacheLevel' does not use this anyway
+	if(flatlump[idx] >= numlumps)				/* TEMPORARY probe */
+		mtx_lump_probe(1u, idx, flatlump[idx], numflats);
 	return W_CacheLumpNum(flatlump[idx], PU_CACHE);
 }
 

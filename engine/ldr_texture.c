@@ -8,6 +8,7 @@
 #include "config.h"
 #include "wadfile.h"
 #include "ldr_texture.h"
+#include "mtx_boot.h"	// matryoshka: depth-aware raw allocation
 
 #define EXTRA_TEXTURES	1	// this is 'missing texture'
 
@@ -199,7 +200,7 @@ static uint32_t texture_size_check(uint8_t *name, uint32_t idx)
 			*dst = size;
 		}
 
-		doom_free(td);
+		mtx_engine_free(td);
 	}
 
 	return idx;
@@ -261,7 +262,7 @@ static uint32_t texture_load(uint8_t *name, uint32_t idx)
 			textureheightpow[idx] = get_height_pow(tex->height);
 		}
 
-		doom_free(td);
+		mtx_engine_free(td);
 	}
 
 	return idx;
@@ -483,7 +484,7 @@ void init_textures(uint32_t count)
 	// PASS 6
 
 	if(patch_lump)
-		doom_free(patch_lump);
+		mtx_engine_free(patch_lump);
 
 	// add internal textures
 	for(uint32_t i = 0; i < EXTRA_TEXTURES; i++, tmp_count++)
@@ -547,6 +548,8 @@ uint8_t *texture_get_column(uint32_t tex, uint32_t col)
 	if(lump != 0xFFFF)
 	{
 		tex_was_composite = 0;
+		if(lump < 0 || lump >= (int32_t)numlumps)	/* TEMPORARY probe */
+			mtx_lump_probe(3u, tex, (uint32_t)lump, (uint32_t)col);
 		return W_CacheLumpNum(lump, PU_CACHE) + offs;
 	}
 

@@ -34,8 +34,15 @@
 #include "mtx_ldr.h"
 #include "mtx_zone.h"
 #include "mtx_hooks.h"
+#include "mtx_params.h"
+#include "mtx_boot.h"		// own declarations: the diagnostics below take &mtx_engine_alloc
 
 #define MTX_ZONE_PER_DEPTH  (256u * 1024u)
+/* A child's raw (non-zone) pool. See mtx_raw.h and the raw-allocation block
+   further down: the zone was half of what a depth needs, this is the other
+   half. 2 MiB against a measured 209,184 B single request - the pool logs its
+   peak and the size of any refusal, so the figure is checked by a live run. */
+#define MTX_RAW_PER_DEPTH   (2u * 1024u * 1024u)
 #define MTX_DEMO_INTERVAL   30u
 
 /* Which code image depth 1 runs.
@@ -59,7 +66,7 @@
  * a depth has no source for its raw - non-zone - allocations. The zone is per-depth;
  * the engine's doom_malloc is not. That is the next piece of work, not a bug in this
  * switch. */
-#define MTX_CHILD_ENGINE_IMAGE 0
+#define MTX_CHILD_ENGINE_IMAGE 1
 
 /* The code images the host loads. Both are reachable by name through ACE's own
    WAD layer - the descriptors LDR1 threw away on first boot were Doom's, and ACE
@@ -81,6 +88,196 @@
 #define mtx_screens     (mtx_hs.screens)
 
 /*
+ * ---- whose copy of the engine is this? -------------------------------------
+ *
+ * `mtx_hs` is the host's control state: one object in the ROOT engine's .bss,
+ * excluded from every guest snapshot. A nested ENGINE instance is a relocated
+ * COPY of the engine with its own .bss, so its `mtx_hs` is a different, empty
+ * object - measured, and the reason a nested instance used to ask DPMI for its
+ * raw memory while its own pool sat unused.
+ *
+ * The way out is the parameter block the host hands over in %ebp at the entry,
+ * which the engine's own `_start` stores here (asm.S) after validating it. So:
+ *
+ *   mtx_params == 0   -> this IS the host. The depth is whatever the scheduler
+ *                        is running, which is also correct for the GUEST path:
+ *                        a guest reaches the host through its service table, so
+ *                        it runs HOST code, and the host's scheduler knows.
+ *   mtx_params != 0   -> a nested instance, with its own depth, zone, screen,
+ *                        pool and log descriptor - all of them in host memory,
+ *                        so the host can see the same accounting the instance
+ *                        uses.
+ *
+ * THE BLOCK POINTER LIVES IN .data, NOT .bss, and that is not cosmetic. Measured:
+ * an instance's .bss is cleared MORE THAN ONCE during its boot - the engine's own
+ * entry is re-reached while the boot continues into Doom's code - and a pointer
+ * held in .bss is wiped by the later clear, so the instance forgets what it is
+ * halfway through starting up. .data survives it (which is also why `mainzone`,
+ * a Doom variable, was still correct while this was not). The entry only ever
+ * writes it when validation passes, so a re-entry with a stale %ebp leaves the
+ * good value alone. `mtx_starts` counts the entries: the number is in the log.
+ */
+__attribute__((section(".data"))) void *mtx_params;
+__attribute__((section(".data"))) uint32_t mtx_starts;
+
+/*
+ * Called from the engine's entry (asm.S) with the value it was handed in %ebp,
+ * before ace_main runs. See mtx_params.h for what the block is and asm.S for why
+ * the store happens here rather than there.
+ *
+ * A ROOT boot reaches this too, with whatever the ACE loader left in %ebp (a
+ * Doom code address, since that is what the loader last put there) - and the
+ * block can NOT be recognised by address: the blocks live in the HOST's mtx_hs,
+ * while a nested instance's own `&mtx_hs` is a different object at a different
+ * address, so a range test against it would reject the very block being handed
+ * over. Measured, not assumed. So the test is on the block's own contents, and
+ * it is two fields that must agree with each other: the magic word, and the
+ * block's address written inside it. A stray code address satisfies neither, and
+ * it is readable, so the test cannot fault on it.
+ */
+void mtx_params_adopt(uint32_t candidate)
+{
+	mtx_depth_params_t *p;
+
+	/* Incremented before any test: "how many times was this image entered" is
+	   evidence about the boot, and a rejected candidate is still an entry. */
+	mtx_starts++;
+
+	if(!candidate)
+		return;
+
+	p = (mtx_depth_params_t *)(uintptr_t)candidate;
+	if(p->magic != MTX_PARAMS_MAGIC)
+		return;
+	if(p->self != candidate)
+		return;
+
+	/* Only ever overwrite with something verified: this runs again on every
+	   re-entry, and a stale %ebp must not wipe a good block. */
+	mtx_params = p;
+}
+
+static mtx_depth_params_t *mtx_self(void)
+{
+	mtx_depth_params_t *p = (mtx_depth_params_t *)mtx_params;
+
+	/* The entry already validated, but this pointer is read on every
+	   allocation: a second check costs four comparisons and turns a corrupt
+	   block into "no block" instead of a wild pointer. */
+	if(!p || p->magic != MTX_PARAMS_MAGIC)
+		return 0;
+	if(p->self != (uint32_t)(uintptr_t)p)
+		return 0;
+	if(p->depth == MTX_ROOT_DEPTH || p->depth >= MTX_MAX_DEPTH)
+		return 0;
+	if(!p->zone || !p->raw)
+		return 0;
+	return p;
+}
+
+/* The depth whose engine-side glue is running: an instance's own, or the
+   scheduler's for host code. */
+static uint8_t mtx_glue_depth(void)
+{
+	mtx_depth_params_t *p = mtx_self();
+
+	return p ? (uint8_t)p->depth : mtx_depth();
+}
+
+/* Fill depth `d`'s parameter block from the host's own state. Everything in it
+   is an address or a value the HOST already holds, so the instance can neither
+   invent nor lose track of any of it - including the pool, whose counters live
+   in host memory and are therefore readable from both sides. */
+static void mtx_params_fill(uint8_t d)
+{
+	mtx_depth_params_t *p = &mtx_hs.params[d];
+
+	p->magic      = MTX_PARAMS_MAGIC;
+	p->self       = (uint32_t)(uintptr_t)p;
+	p->depth      = d;
+	p->log_fd     = mtx_log_fd;
+	p->zone       = mtx_hs.heaps[d];
+	p->zone_bytes = MTX_ZONE_PER_DEPTH;
+	p->screen     = mtx_hs.screens[d];
+	p->raw        = &mtx_hs.raw[d];
+}
+
+/* The pool the CALLING code must allocate from. Host code uses the pool of the
+   depth the scheduler runs; an instance uses the pool its block names. */
+static mtx_raw_t *mtx_self_pool(void)
+{
+	mtx_depth_params_t *p = mtx_self();
+
+	return p ? p->raw : &mtx_hs.raw[mtx_glue_depth()];
+}
+
+/* Public: the pool the calling code allocates from, for diagnostics that need to
+   report what the pool itself thinks happened. */
+mtx_raw_t *mtx_engine_raw_pool(void)
+{
+	return mtx_self_pool();
+}
+
+/* TEMPORARY: record a lump-cache call with an index that cannot be valid, so the
+   caller and the table it came from are identified rather than guessed at.
+   Carries MTX_FRAME_TICK_ABI because its callers are ACE hook functions declared
+   regparm(2)/no_caller_saved_registers: a plain C function called from one of
+   those breaks Doom's assumption that eax/ecx/edx survive. Everything it calls
+   (doom_open/doom_write/doom_close) carries the same contract. */
+void MTX_FRAME_TICK_ABI mtx_lump_probe(uint32_t site, uint32_t idx, uint32_t value,
+                                       uint32_t aux)
+{
+	uint32_t v[8];
+	int32_t fd;
+
+	v[0] = 0x4D54584Cu;				/* 'MTXL' */
+	v[1] = site;
+	v[2] = idx;
+	v[3] = value;
+	v[4] = numlumps;
+	v[5] = aux;
+	v[6] = mtx_hs.cur;				/* the scheduler's view, read directly */
+	v[7] = 0x4D54584Cu;
+	fd = doom_open_WR("MTXL.LOG");
+	if(fd >= 0)
+	{
+		doom_write(fd, v, sizeof(v));
+		doom_close(fd);
+	}
+}
+
+/* TEMPORARY: record an absurd allocation request with the address it was made
+   from, so the caller is identified rather than guessed at. */
+void mtx_alloc_probe(uint32_t size, uint32_t caller, uint32_t self)
+{
+	uint32_t v[8];
+	int32_t fd;
+
+	v[0] = 0x4D545841u;				/* 'MTXA' */
+	v[1] = size;
+	v[2] = caller;
+	v[3] = self;
+	v[4] = numlumps;
+	v[5] = (uint32_t)(uintptr_t)mainzone;
+	v[6] = mtx_hs.cur;
+	v[7] = 0x4D545841u;
+	fd = doom_open_WR("MTXA.LOG");
+	if(fd >= 0)
+	{
+		doom_write(fd, v, sizeof(v));
+		doom_close(fd);
+	}
+}
+
+/* Public form of mtx_glue_depth(). The engine's own init branches on it (Z_Init:
+	 a nested instance must build its zone in its slot instead of walking DPMI),
+   and it has to agree with what the allocator uses - one answer, one place. */
+uint8_t mtx_engine_depth(void)
+{
+	return mtx_glue_depth();
+}
+
+/*
  * Reserve the arena for the nested instances. MUST run before ACE's Z_Init takes
  * the rest of RAM: Z_Init walks dpmi_get_ram() down until malloc succeeds, i.e.
  * it consumes everything except a 32 KiB reserve, so an arena requested later
@@ -88,7 +285,14 @@
  */
 void MTX_FRAME_TICK_ABI mtx_engine_reserve(void)
 {
-	static const uint32_t sizes[] = {3u, 2u, 0u};	// MiB
+	/* Sized for what is actually wanted - the root plus ONE nested instance -
+	   rather than for the depth ceiling. Two depths need
+	   snapshot + zone + screen + stack + image + raw each (MTX_RAW_PER_DEPTH is
+	   the biggest term), so ~7 MiB covers the pair with room to spare, and the
+	   fallbacks cover a machine where the single 8 MiB block will not come
+	   loose. Asking for the ceiling instead would take ~40 MiB away from the
+	   root's zone for depths nothing is going to run. */
+	static const uint32_t sizes[] = {8u, 7u, 0u};	// MiB
 	uint32_t i;
 
 	/* A nested depth reaches this too: its ACE image runs ace_main, which calls
@@ -97,6 +301,12 @@ void MTX_FRAME_TICK_ABI mtx_engine_reserve(void)
 	   fail (the memory is gone) and a depth would silently get a smaller arena
 	   than the one the planner budgeted against. */
 	if(mtx_hs.arena)
+		return;
+
+	/* A nested INSTANCE must never claim an arena either: it already IS one,
+	   and asking DPMI for 8 MiB it does not have would eat the little the root
+	   left behind. Its parameter block is how it knows. */
+	if(mtx_self())
 		return;
 
 	/* mtx_hs is zero-filled, so the "log not open yet" sentinel - which used to
@@ -120,19 +330,32 @@ void MTX_FRAME_TICK_ABI mtx_engine_reserve(void)
 }
 
 // no libc in here: length by hand
+//
+// A nested instance logs into the HOST's file rather than opening its own: DOS
+// descriptors are process-wide, so the descriptor in its parameter block writes
+// to the same MTX.LOG at the same offset, and the instance's own view of what it
+// did lands in one place with the host's. (Without that, an instance's
+// `mtx_log_fd` is its own zeroed .bss and the whole of its boot is silent.)
 static void mtx_log(const char *s)
 {
+	mtx_depth_params_t *sp = mtx_self();
 	const char *p = s;
 	uint32_t n = 0;
+	int32_t fd = sp ? sp->log_fd : mtx_log_fd;
 
-	if(mtx_log_fd < 0)
+	if(fd < 0)
+	{
+		if(sp)
+			return;			/* an instance never opens its own */
 		mtx_log_fd = doom_open_WR("MTX.LOG");
-	if(mtx_log_fd < 0)
+		fd = mtx_log_fd;
+	}
+	if(fd < 0)
 		return;
 
 	while(p[n])
 		n++;
-	doom_write(mtx_log_fd, (void *)s, n);
+	doom_write(fd, (void *)s, n);
 }
 
 /* The zone layout the nested side builds must be byte-for-byte the one Doom's
@@ -180,19 +403,26 @@ typedef char mtx_hook_constants_must_match[
  */
 void *mtx_engine_zone_init(void)
 {
-	uint8_t d = mtx_depth();
+	mtx_depth_params_t *sp = mtx_self();
+	uint8_t d = mtx_glue_depth();
 	memzone_t *save;
 	void *mem, *p = 0, *q = 0;
+	uint32_t bytes;
 	int bad, after;
 	uint8_t buf[176];
 
 	if(d >= MTX_MAX_DEPTH)
 		return 0;
-	mem = mtx_hs.heaps[d];
-	if(!mem)
+
+	/* An instance's zone slot and its size come from its parameter block; host
+	   code takes them from the arena the host carved. Either way the object is
+	   the same one the planner budgeted for. */
+	mem = sp ? sp->zone : mtx_hs.heaps[d];
+	bytes = sp ? sp->zone_bytes : MTX_ZONE_PER_DEPTH;
+	if(!mem || !bytes)
 		return 0;
 
-	mtx_zone_build(mem, MTX_ZONE_PER_DEPTH);
+	mtx_zone_build(mem, bytes);
 	bad = mtx_zone_check(mem);
 
 	save = mainzone;
@@ -208,14 +438,223 @@ void *mtx_engine_zone_init(void)
 	after = mtx_zone_check(mem);
 
 	doom_sprintf(buf, (const uint8_t *)
-	             "[MTX] depth%u zone %u B at %u build %d alloc %u probe %d\n",
-	             (uint32_t)d, MTX_ZONE_PER_DEPTH, (uint32_t)(uintptr_t)mem,
-	             bad, (uint32_t)(uintptr_t)p, after);
+	             "[MTX] depth%u zone %u B at %u build %d alloc %u probe %d%s\n",
+	             (uint32_t)d, bytes, (uint32_t)(uintptr_t)mem,
+	             bad, (uint32_t)(uintptr_t)p, after,
+	             sp ? " (instance)" : "");
 	mtx_log((const char *)buf);
 
 	if(bad || after || !p || !q)
 		return 0;
 	return mem;
+}
+
+/*
+ * ---- raw allocations: a depth's non-zone memory -----------------------------
+ *
+ * The zone was half the job. A depth can build its own heap, and Doom's
+ * allocator works in it - but ACE's own `ace_main` also asks the RAW allocator
+ * for memory, and the raw allocator is machine-global: the root's Z_Init walks
+ * dpmi_get_ram() down until an allocation succeeds, so it eats everything but a
+ * 32 KiB reserve. Measured, that left a depth 61,440 B against a single
+ * 209,184 B request at init_render(), and no arena increase helps because the
+ * root consumes the remainder either way.
+ *
+ * So the engine's own allocation entry points go through these three functions:
+ *
+ *   mtx_engine_alloc     decides by the CURRENT DEPTH - the root keeps using
+ *                        DPMI (its own memory, plenty of it), a child draws on
+ *                        the pool carved for it at boot.
+ *   mtx_engine_free /
+ *   mtx_engine_realloc   decide by the POINTER'S PROVENANCE - the pool that
+ *                        contains it, found by range plus block magic. Not by
+ *                        the current depth, because the depth that frees an
+ *                        object is not always the one that allocated it, and
+ *                        freeing pool memory into the DPMI heap (or the reverse)
+ *                        corrupts a heap silently. A pointer in no pool is a
+ *                        DPMI pointer and goes back to doom_free.
+ *
+ * Only the sites that hand memory across these two worlds are routed here: the
+ * loader's own ldr_malloc/ldr_realloc (which is where the texture, flat, sprite,
+ * render and WAD-cache loaders all end up), the two wad_cache_* lump readers,
+ * the string helpers, and the frees that match them. The root-only paths inside
+ * Z_Init keep calling doom_malloc directly - they cannot run at a depth.
+ */
+
+/* Which pool, if any, does this pointer come from? Scanning every pool (rather
+   than trusting the current depth) is what makes the decision provenance. The
+   current copy's own pool is tested first, so an instance answers for its own
+   memory without a scan. */
+static mtx_raw_t *mtx_raw_pool_of(void *ptr)
+{
+	mtx_depth_params_t *sp = mtx_self();
+	uint32_t i;
+
+	if(!ptr)
+		return 0;
+	if(sp && mtx_raw_owns(sp->raw, ptr))
+		return sp->raw;
+	for(i = 1; i < MTX_MAX_DEPTH; i++)		/* the root has no pool */
+		if(mtx_raw_owns(&mtx_hs.raw[i], ptr))
+			return &mtx_hs.raw[i];
+	return 0;
+}
+
+/* One refusal line per pool: a per-allocation log would be far larger than the
+   log file, and the interesting fact is the SIZE - that is what says whether the
+   pool is too small. */
+static void mtx_raw_report(mtx_raw_t *p, uint8_t depth, uint32_t want, uint32_t ra)
+{
+	uint8_t buf[192];
+
+	if(p->refusals != 1)			/* only the first one is news */
+		return;
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth%u raw pool: request for %u B refused, %u of %u used, peak %u (caller offset %u)\n",
+	             (uint32_t)depth, want, p->used, p->size, p->peak,
+	             ra - (uint32_t)(uintptr_t)&mtx_engine_alloc);
+	mtx_log((const char *)buf);
+}
+
+void *mtx_engine_alloc(uint32_t size)
+{
+	uint8_t d = mtx_glue_depth();
+	mtx_raw_t *p;
+	void *ret;
+	/* TEMPORARY: who called. The image is the same file at a different base, so
+	   the offset from &mtx_engine_alloc resolves against the root's ELF. */
+	uint32_t ra = (uint32_t)(uintptr_t)__builtin_return_address(0);
+
+	/* TEMPORARY diagnostic: independent evidence of what a nested instance's own
+	   copy of this engine believes. Writes its own file, so it does not depend
+	   on the parameter block working (which is the thing under test). */
+	{
+		static uint8_t probed;
+		if(!probed)
+		{
+			uint32_t v[16];
+			int32_t fd;
+
+			probed = 1;
+			v[0] = 0x4D54584Eu;			/* 'MTXN' */
+			v[1] = (uint32_t)(uintptr_t)mtx_params;
+			v[2] = (uint32_t)mtx_depth();
+			v[3] = (uint32_t)(uintptr_t)&mtx_params;
+			v[4] = (uint32_t)(uintptr_t)mtx_engine_alloc;
+			v[5] = (uint32_t)size;
+			v[6] = (uint32_t)(uintptr_t)mainzone;
+			v[7] = mtx_starts;
+			v[8] = (uint32_t)mtx_engine_depth();
+			v[9] = ace_segment;
+			v[10] = doom_code_segment;
+			v[11] = doom_data_segment;
+			v[12] = (uint32_t)(uintptr_t)&mtx_engine_reserve;
+			v[13] = 0;
+			v[14] = 0;
+			v[15] = 0x4D54584Eu;
+			fd = doom_open_WR("MTXN.LOG");
+			if(fd >= 0)
+			{
+				doom_write(fd, v, sizeof(v));
+				doom_close(fd);
+			}
+		}
+	}
+
+	/* The root allocates from the DPMI heap it owns; a depth - whether it
+	   reached here as the host's code serving a guest, or as an instance's own
+	   copy of the engine - allocates from its own pool. */
+	if(d == MTX_ROOT_DEPTH || d >= MTX_MAX_DEPTH)
+		return doom_malloc(size);
+
+	p = mtx_self_pool();
+	if(!p || !p->base)
+		return doom_malloc(size);	/* no pool carved: do not pretend */
+
+	ret = mtx_raw_alloc(p, size);
+	if(!ret)
+		mtx_raw_report(p, d, size, ra);
+
+	return ret;
+}
+
+void *mtx_engine_realloc(void *ptr, uint32_t size)
+{
+	mtx_raw_t *p;
+	void *ret;
+
+	if(!ptr)
+		return mtx_engine_alloc(size);
+
+	p = mtx_raw_pool_of(ptr);
+	if(!p)
+		return doom_realloc(ptr, size);	/* a DPMI pointer, back to DPMI */
+
+	ret = mtx_raw_realloc(p, ptr, size);
+	if(!ret)
+		mtx_raw_report(p, mtx_glue_depth(), size,
+		               (uint32_t)(uintptr_t)__builtin_return_address(0));
+
+	return ret;
+}
+
+void mtx_engine_free(void *ptr)
+{
+	mtx_raw_t *p;
+
+	if(!ptr)
+		return;
+
+	p = mtx_raw_pool_of(ptr);
+	if(!p)
+		doom_free(ptr);			/* a DPMI pointer */
+	else
+		mtx_raw_free(p, ptr);
+}
+
+/*
+ * Called at the top of Z_Init, BEFORE the root/child branch - because the block
+ * this reads is what decides which branch this is (see mtx_self).
+ *
+ * It is also where a nested instance first says anything at all: the log line
+ * below is written by the instance, through the host's descriptor, and repeats
+ * back the depth, zone, screen and pool it read out of its block. The host logs
+ * the block it FILLED; this logs the block the instance RECEIVED. If those two
+ * lines agree, the hand-off is proven rather than assumed, and if they differ
+ * the instance's whole idea of itself is wrong and should be visible rather than
+ * guessed at.
+ */
+void mtx_engine_apply_params(void)
+{
+	mtx_depth_params_t *p = mtx_self();
+	uint8_t buf[192];
+
+	if(!p)
+		return;				/* the host: nothing to apply */
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] instance: depth %u zone %u screen %u raw %u log %d\n",
+	             p->depth, (uint32_t)(uintptr_t)p->zone,
+	             (uint32_t)(uintptr_t)p->screen,
+	             (uint32_t)(uintptr_t)p->raw, p->log_fd);
+	mtx_log((const char *)buf);
+
+	/* Render into THIS instance's framebuffer rather than the root's. The
+	   renderer keeps writing through Doom's screens[0] and through the engine's
+	   own copy of it, and `init_draw()` bakes whichever `screen_buffer` holds
+	   into the presentation routine's immediate - all of which happens after
+	   Z_Init, so setting the pointer here is what makes an instance's frames
+	   land in its own region and nowhere else. */
+	if(p->screen && screen_buffer != (uint8_t *)p->screen)
+	{
+		screen_buffer = (uint8_t *)p->screen;
+
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] instance: screen_buffer -> %u\n",
+		             (uint32_t)(uintptr_t)screen_buffer);
+		mtx_log((const char *)buf);
+	}
 }
 
 /*
@@ -496,15 +935,34 @@ static void mtx_demo_child(void *arg)
 	             total, (uint32_t)(uintptr_t)mtx_hs.images[1], entry,
 	             ((uint32_t *)mtx_hs.images[1])[0]);
 	mtx_log((const char *)buf);
+
+	/* The instance's parameter block, filled by the host and read by the
+	   instance. The instance's own .bss is empty (it was never booted) and its
+	   `mtx_hs` is a different object, so this block is the only thing that can
+	   tell it its depth, its zone slot, its screen, its raw pool and the log
+	   descriptor. It travels in %ebp (see mtx_params.h), and the block itself
+	   lives in mtx_hs - HOST memory - so the accounting the instance updates is
+	   the same accounting the host reports. */
+	mtx_params_fill(1);
 	doom_sprintf(buf, (const uint8_t *)
-	             "[MTX] depth1: entering, ECX=%u ESI=%u EDI=%u, free DPMI %u B\n",
-	             entry, doom_code_segment, doom_data_segment, dpmi_get_ram());
+	             "[MTX] depth1 params at %u: depth %u zone %u screen %u raw %u log %d\n",
+	             (uint32_t)(uintptr_t)&mtx_hs.params[1], mtx_hs.params[1].depth,
+	             (uint32_t)(uintptr_t)mtx_hs.params[1].zone,
+	             (uint32_t)(uintptr_t)mtx_hs.params[1].screen,
+	             (uint32_t)(uintptr_t)mtx_hs.params[1].raw,
+	             mtx_hs.params[1].log_fd);
+	mtx_log((const char *)buf);
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth1: entering, ECX=%u ESI=%u EDI=%u EBP=%u, free DPMI %u B\n",
+	             entry, doom_code_segment, doom_data_segment,
+	             (uint32_t)(uintptr_t)&mtx_hs.params[1], dpmi_get_ram());
 	mtx_log((const char *)buf);
 
 	mtx_hs.ldr_guest_entry = entry;
 	mtx_hs.ldr_guest_total = total;
 
-	mtx_ldr_enter_engine(entry);	// never returns
+	mtx_ldr_enter_engine(entry, (uint32_t)(uintptr_t)&mtx_hs.params[1]);	// never returns
 #else
 	r = mtx_ldr_load(MTX_GUEST_LUMP, 1, MTX_LDR_GUEST_VERSION, &entry, &total);
 	if(r != 0)
@@ -575,9 +1033,9 @@ static void mtx_engine_boot(void)
 		mtx_log("[MTX] no code image lump: depths get no image slot\n");
 
 	if(mtx_dos_boot(mtx_arena, mtx_arena_size, MTX_ZONE_PER_DEPTH,
-	                mtx_hs.image_bytes,
+	                mtx_hs.image_bytes, MTX_RAW_PER_DEPTH,
 	                mtx_dos_wire_register, mtx_heaps, mtx_screens,
-	                mtx_hs.images, &bt) != 0)
+	                mtx_hs.images, mtx_hs.raw, &bt) != 0)
 	{
 		mtx_log("[MTX] boot failed (arena too small for two depths)\n");
 		mtx_boot_failed = 1;
@@ -594,10 +1052,18 @@ static void mtx_engine_boot(void)
 	             (uint32_t)bt.depth, bt.snapshot_per_depth, mtx_hs.image_bytes);
 	mtx_log((const char *)buf);
 
-	doom_sprintf(buf, (const uint8_t *)
+	doom_sprintf(buf, (const uint8_t *)\
 	             "[MTX] screen region %u B/depth (frame %u + loader %u + parse %u)\n",
 	             MTX_SCREEN_BYTES, MTX_SCREEN_FRAME_BYTES,
 	             MTX_SCREEN_LOADER_BYTES, MTX_SCREEN_PARSE_BYTES);
+	mtx_log((const char *)buf);
+
+	/* The pool's own arithmetic, in the log: what a child was given, where it
+	   is, and how much of the arena the ask actually took. */
+	doom_sprintf(buf, (const uint8_t *)\
+	             "[MTX] raw pool %u B/depth (child 1 at %u), arena used %u of %u\n",
+	             MTX_RAW_PER_DEPTH, (uint32_t)(uintptr_t)mtx_hs.raw[1].base,
+	             mtx_hs.raw[1].size, mtx_arena_size);
 	mtx_log((const char *)buf);
 
 	doom_sprintf(buf, (const uint8_t *)
@@ -612,6 +1078,17 @@ static void mtx_engine_boot(void)
 	   with for its raw (non-zone) allocations. Worth having in the log. */
 	doom_sprintf(buf, (const uint8_t *)"[MTX] free DPMI after root Z_Init: %u B\n",
 	             dpmi_get_ram());
+	mtx_log((const char *)buf);
+
+	/* What the engine's entry actually managed to write into its own three
+	   segment globals, and where this copy of the code really lives. Needed
+	   because the entry's own %ecx-relative stores are recorded as relocations
+	   and therefore get the image base added TWICE: these numbers say whether
+	   that corrupts them here, rather than leaving it to be inferred. */
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] root: ace_seg %u code_seg %u data_seg %u boot_fn %u\n",
+	             ace_segment, doom_code_segment, doom_data_segment,
+	             (uint32_t)(uintptr_t)&mtx_engine_reserve);
 	mtx_log((const char *)buf);
 
 	/* Record a patch site and what is there BEFORE any depth runs, so the probe has

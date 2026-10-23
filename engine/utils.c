@@ -3,6 +3,7 @@
 //
 #include "sdk.h"
 #include "utils.h"
+#include "mtx_boot.h"	// matryoshka: depth-aware raw allocation
 
 // this is '.hooks' section
 extern const hook_t _hooks_start;
@@ -256,13 +257,19 @@ char *strrchr(const char *__s, int __c)
 void *memmove(void *destination, const void *source, size_t num)
 {
 	void *temp;
+	/* TEMPORARY: an absurd length here means a caller's structure is corrupt,
+	   and the return address says which caller. */
+	uint32_t ra = (uint32_t)(uintptr_t)__builtin_return_address(0);
 
-	temp = doom_malloc(num);
+	if(num > 4u * 1024u * 1024u)
+		mtx_alloc_probe((uint32_t)num, ra, (uint32_t)(uintptr_t)&memmove);
+
+	temp = mtx_engine_alloc(num);
 	if(!temp)
 		return NULL;
 	memcpy(temp, source, num);
 	memcpy(destination, temp, num);
-	doom_free(temp);
+	mtx_engine_free(temp);
 
 	return destination;
 }
@@ -271,7 +278,7 @@ char *strdup(const char *str1)
 {
 	char *ret;
 
-	ret = doom_malloc(strlen(str1) + 1);
+	ret = mtx_engine_alloc(strlen(str1) + 1);
 	if(!ret)
 		return ret;
 

@@ -116,6 +116,28 @@ bss_loop:
 	jmp	bss_loop
 bss_end:
 
+/*
+ * matryoshka: hand %ebp - the parameter block the host gave this image (see
+ * nested/mtx_params.h) - to C, which stores it through an ordinary relocated
+ * reference.
+ *
+ * WHY NOT STORE IT HERE. `mov %eax,mtx_params(%ecx)` is the idiom the rest of
+ * this entry uses for its globals, and it looks right, but the assembler records
+ * that displacement as a relocation - so the relocator above adds the image base
+ * to it a SECOND time and the store lands somewhere else entirely. Measured: the
+ * pointer stayed null through a whole nested boot while the instance went on to
+ * ask DPMI for memory it had a pool for. A C store (or a C read) goes through a
+ * relocated absolute address and is not subject to that. The same trap applies to
+ * any %ecx-relative global access added here, so keep them out of this file.
+ *
+ * The call also runs AFTER the .bss clear, which matters: the instance's .bss is
+ * cleared more than once during its boot, so the value has to be re-adopted (and
+ * must live in .data, not .bss - see mtx_boot.c).
+ */
+	push	%ebp
+	call	mtx_params_adopt
+	add	$4,%esp
+
 	// run custom code
 	call	ace_main
 

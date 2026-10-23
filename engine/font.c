@@ -477,6 +477,9 @@ void *font_load(int32_t lump)
 		// font is already processed
 		return lumpcache[lump];
 
+	if(lump >= (int32_t)numlumps)				/* TEMPORARY probe */
+		mtx_lump_probe(4u, 0u, (uint32_t)lump, 0u);
+
 	data = W_CacheLumpNum(lump, PU_CACHE);
 	ptr = data;
 	head = data;

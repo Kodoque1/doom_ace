@@ -36,16 +36,20 @@ uint32_t mtx_ldr_image_bytes(const uint8_t *name);
  *                               matryoshka guest's own convention: the guest is
  *                               hand-written and expects its services there.
  *
- *  mtx_ldr_enter_engine(entry)  ECX = the entry address ITSELF. This is what ACE's
- *                               own `_start` requires: `sub $0x1008,%ecx` recovers
+ *  mtx_ldr_enter_engine(entry,  ECX = the entry address ITSELF. This is what ACE's
+ *                        params) own `_start` requires: `sub $0x1008,%ecx` recovers
  *                               the image base from it, and every relocation is
  *                               applied relative to that. Handing the engine image
  *                               the service table instead would make it relocate
  *                               itself around a garbage base.
  *
  * Both hand ESI/EDI the Doom code/data segments, which both conventions need.
+ * The engine one also hands %ebp = `params`, the nested-instance parameter block
+ * (see mtx_params.h): an engine instance has its own empty `.bss`, so this is how
+ * it learns its depth, its zone, its screen and its raw pool. The guest does not
+ * need it - it reaches the host through its service table - so it passes 0.
  */
 void mtx_ldr_enter(uint32_t entry);
-void mtx_ldr_enter_engine(uint32_t entry);
+void mtx_ldr_enter_engine(uint32_t entry, uint32_t params);
 
 #endif // MATRYOSHKA_MTX_LDR_H

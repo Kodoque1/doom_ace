@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "engine.h"
 #include "wadfile.h"
+#include "mtx_boot.h"	// matryoshka: depth-aware raw allocation
 
 //
 
@@ -231,7 +232,48 @@ uint32_t wad_read_lump(void *dest, int32_t idx, uint32_t limit)
 	doom_lseek(li->fd, li->offset, SEEK_SET);
 	ret = doom_read(li->fd, dest, limit);
 	if(ret != limit)
+	{
+		/* TEMPORARY diagnostic: a nested instance's lump read now fails where
+		   it used to die earlier. Record what the read was given, from the
+		   instance's own memory, in its own file - plus what the pool says it
+		   did, since the lump table and the read buffer both come from it. */
+		uint32_t v[24];
+		int32_t fd;
+		mtx_raw_t *pool = mtx_engine_raw_pool();
+
+		v[0] = 0x4D54584Cu;				/* 'MTXL' */
+		v[1] = (uint32_t)(uintptr_t)lumpinfo;
+		v[2] = (uint32_t)numlumps;
+		v[3] = (uint32_t)idx;
+		v[4] = (uint32_t)li->fd;
+		v[5] = li->offset;
+		v[6] = li->size;
+		v[7] = (uint32_t)(uintptr_t)dest;
+		v[8] = (uint32_t)limit;
+		v[9] = (uint32_t)ret;
+		v[10] = (uint32_t)(uintptr_t)lumpcache;
+		v[11] = (uint32_t)(uintptr_t)li;
+		v[12] = (uint32_t)mtx_engine_depth();
+		v[13] = (uint32_t)(uintptr_t)mainzone;
+		v[14] = (uint32_t)(uintptr_t)li - (uint32_t)(uintptr_t)lumpinfo;
+		v[15] = 0x4D54584Cu;
+		v[16] = pool ? (uint32_t)(uintptr_t)pool->base : 0;
+		v[17] = pool ? pool->size : 0;
+		v[18] = pool ? pool->used : 0;
+		v[19] = pool ? pool->served : 0;
+		v[20] = pool ? pool->refusals : 0;
+		v[21] = pool ? pool->reclaimed : 0;
+		v[22] = pool ? pool->leaked : 0;
+		v[23] = pool ? pool->invalid : 0;
+		fd = doom_open_WR("MTXW.LOG");
+		if(fd >= 0)
+		{
+			doom_write(fd, v, sizeof(v));
+			doom_close(fd);
+		}
+
 		engine_error("WAD", "Lump %.8s read failed!", li->name);
+	}
 
 	return limit;
 }
@@ -244,7 +286,15 @@ void *wad_cache_lump(int32_t idx, uint32_t *size)
 	if(!li->size)
 		engine_error("WAD", "Lump %.8s is empty!");
 
-	data = doom_malloc(li->size + 4); // extra space for text files
+	/* TEMPORARY: an absurd lump size, or an index off the end of the table,
+	   says which of the two is corrupted. */
+	if(idx < 0 || idx >= (int32_t)numlumps || li->size > 4u * 1024u * 1024u)
+		mtx_lump_probe(5u, (uint32_t)idx, li->size, (uint32_t)(uintptr_t)lumpinfo);
+
+	/* A lump can be large enough to matter to a nested instance, so the cache
+	   allocates through the depth-aware wrapper: at the root that is still
+	   doom_malloc, at a depth it is that depth's own pool. */
+	data = mtx_engine_alloc(li->size + 4); // extra space for text files
 	if(!data)
 		engine_error("WAD", "Lump %.8s allocation failed!", li->name);
 
@@ -269,7 +319,14 @@ void *wad_cache_optional(const uint8_t *name, uint32_t *size)
 
 	li = lumpinfo + idx;
 
-	data = doom_malloc(li->size + 4); // extra space for text files
+	/* TEMPORARY: mirror of the check in wad_cache_lump. */
+	if(li->size > 4u * 1024u * 1024u)
+		mtx_lump_probe(6u, (uint32_t)idx, li->size, (uint32_t)(uintptr_t)lumpinfo);
+
+	/* A lump can be large enough to matter to a nested instance, so the cache
+	   allocates through the depth-aware wrapper: at the root that is still
+	   doom_malloc, at a depth it is that depth's own pool. */
+	data = mtx_engine_alloc(li->size + 4); // extra space for text files
 	if(!data)
 		engine_error("WAD", "Lump %.8s allocation failed!", li->name);
 

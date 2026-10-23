@@ -97,11 +97,26 @@ void error_message(uint8_t *text)
 //
 // loading
 
+/*
+ * The loader's allocation entry points, and therefore where the texture, flat,
+ * sprite, render and WAD-cache loaders all end up. Routed through the depth-aware
+ * wrapper: at the root it is exactly doom_malloc (DPMI, unchanged), at a depth it
+ * is that depth's own raw pool. Without this a nested instance's engine init dies
+ * asking for memory the root's Z_Init has already taken - see mtx_boot.c.
+ */
 void *ldr_malloc(uint32_t size)
 {
 	void *ret;
+	/* TEMPORARY: catch an absurd request and record WHO asked. The return
+	   address is enough: this image is the same file at a different base, so
+	   the OFFSET from &ldr_malloc is relocation-invariant and can be resolved
+	   against the root's ELF. */
+	uint32_t ra = (uint32_t)(uintptr_t)__builtin_return_address(0);
 
-	ret = doom_malloc(size);
+	if(size > 4u * 1024u * 1024u)
+		mtx_alloc_probe(size, ra, (uint32_t)(uintptr_t)&ldr_malloc);
+
+	ret = mtx_engine_alloc(size);
 	if(!ret)
 		engine_error("LOADER", "%s memory allocation failed! (%uB)", ldr_alloc_message, size);
 
@@ -111,8 +126,14 @@ void *ldr_malloc(uint32_t size)
 void *ldr_realloc(void *ptr, uint32_t size)
 {
 	void *ret;
+	/* TEMPORARY: a realloc with no pointer, or with an absurd size, is the same
+	   corruption seen from the other end. */
+	uint32_t ra = (uint32_t)(uintptr_t)__builtin_return_address(0);
 
-	ret = doom_realloc(ptr, size);
+	if(!ptr || size > 4u * 1024u * 1024u)
+		mtx_alloc_probe(size, ra, (uint32_t)(uintptr_t)&ldr_realloc);
+
+	ret = mtx_engine_realloc(ptr, size);
 	if(!ret)
 		engine_error("LOADER", "%s memory allocation failed! (%uB)", ldr_alloc_message, size);
 
@@ -520,7 +541,15 @@ void Z_Init()
 	// depth's zone lives in the arena slot reserved for it, laid out by the same
 	// construction used below (see mtx_engine_zone_init). Without this branch the
 	// first Doom-side allocation in a child walks an uninitialised memblock_t.
-	if(mtx_depth() != MTX_ROOT_DEPTH)
+	//
+	// The branch is decided by the parameter block, not by the scheduler: a nested
+	// instance is a COPY of this engine with its own empty .bss and its own empty
+	// mtx_hs, so asking the scheduler here would answer "root" inside every
+	// instance. mtx_glue_depth() reads the block when there is one. Applying it
+	// first is what keeps an instance's screen pointer its own.
+	mtx_engine_apply_params();
+
+	if(mtx_engine_depth() != MTX_ROOT_DEPTH)
 	{
 		mainzone = mtx_engine_zone_init();
 		if(!mainzone)

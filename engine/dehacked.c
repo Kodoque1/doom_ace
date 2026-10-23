@@ -7,6 +7,7 @@
 #include "textpars.h"
 #include "config.h"
 #include "dehacked.h"
+#include "mtx_boot.h"	// matryoshka: depth-aware raw allocation
 
 #define POINTER_COUNT	448
 
@@ -605,7 +606,7 @@ void init_dehacked()
 	if(lump < 0)
 		return;
 
-	syst = doom_malloc(POINTER_COUNT * sizeof(uint16_t) + NUMSTATES * sizeof(void*));
+	syst = mtx_engine_alloc(POINTER_COUNT * sizeof(uint16_t) + NUMSTATES * sizeof(void*));
 	if(!syst)
 		return;
 
@@ -637,7 +638,7 @@ void init_dehacked()
 	dehacked_parse(data, size);
 
 	if(data != TP_MEMORY_ADDR)
-		doom_free(data);
-	doom_free(syst);
+		mtx_engine_free(data);
+	mtx_engine_free(syst);
 }
 

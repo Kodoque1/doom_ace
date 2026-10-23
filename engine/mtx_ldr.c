@@ -56,7 +56,8 @@ static void *ldr_alloc(void *ctx, uint32_t n)
    entry: ldr0N is the part that takes its bases as data instead of re-deriving
    them from the startup stack, which is what makes this repeatable. */
 static void ldr_enter(void *ctx, void *code, uint32_t code_base,
-                      uint32_t data_base, uint32_t ace_base, uint32_t arg)
+                      uint32_t data_base, uint32_t ace_base, uint32_t arg,
+                      uint32_t params)
 {
 	(void)ctx; (void)code_base; (void)data_base; (void)ace_base;
 
@@ -65,6 +66,7 @@ static void ldr_enter(void *ctx, void *code, uint32_t code_base,
 	mtx_hs.ldr0_desc.data_base  = doom_data_segment;
 	mtx_hs.ldr0_desc.next_stage = code;
 	mtx_hs.ldr0_desc.arg        = arg;
+	mtx_hs.ldr0_desc.params     = params;
 
 	mtx_ldr0n_entry(&mtx_hs.ldr0_desc);	// never returns
 }
@@ -72,14 +74,16 @@ static void ldr_enter(void *ctx, void *code, uint32_t code_base,
 void mtx_ldr_enter(uint32_t entry)
 {
 	ldr_enter(0, (void *)(uintptr_t)entry, 0, 0, 0,
-	          (uint32_t)(uintptr_t)mtx_hs.ldr_svc);
+	          (uint32_t)(uintptr_t)mtx_hs.ldr_svc, 0);
 }
 
-/* The engine's own convention: ECX carries the entry address (see mtx_ldr.h). */
-void mtx_ldr_enter_engine(uint32_t entry)
+/* The engine's own convention: ECX carries the entry address (see mtx_ldr.h), and
+   EBP the parameter block an engine INSTANCE needs - its own .bss is empty, so it
+   cannot know its depth, zone, screen or raw pool any other way. */
+void mtx_ldr_enter_engine(uint32_t entry, uint32_t params)
 {
 	mtx_hs.ldr0_desc.banner = "- [MTX] engine image: entering (ECX = entry)\n";
-	ldr_enter(0, (void *)(uintptr_t)entry, 0, 0, 0, entry);
+	ldr_enter(0, (void *)(uintptr_t)entry, 0, 0, 0, entry, params);
 }
 
 // ---- loading ---------------------------------------------------------------
