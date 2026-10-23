@@ -329,19 +329,25 @@ void mtx_screen_paint(void)
 	mtx_seg_cols = 0;
 
 	/* Evidence, sampled: a demo must not be claimable from a log that only says the
-	   code exists. */
+	   code exists.
+	   The period is 30, not 300, because 300 was chosen when ONE depth had the whole
+	   frame budget: in a ring each level gets a third of the frames, so a 30 s run
+	   ends before any level's 300th frame and the log goes silent exactly when the
+	   steady state begins. Measured: three levels, 30 s, three lines per level, all
+	   from the first frames - while the children were still booting. */
 	{
 		static uint32_t frames;
-		uint8_t buf[160];
+		uint8_t buf[176];
 
 		frames++;
-		if(frames <= 3u || (frames % 300u) == 0u)
+		if(frames <= 3u || (frames % 30u) == 0u)
 		{
 			doom_sprintf(buf, (const uint8_t *)
 			             "[MTX] diegetic: depth %u painted texture %u over screen x %u..%u "
-			             "(%u pixels) [frame %u]\n",
+			             "(%u pixels) src %s [frame %u]\n",
 			             mtx_glue_depth(), MTX_SCREEN_TEX,
-			             x0 == 0xFFFFFFFFu ? 0u : x0, x1, done, frames);
+			             x0 == 0xFFFFFFFFu ? 0u : x0, x1, done,
+			             src ? "yes" : "NONE", frames);
 			mtx_log((const char *)buf);
 		}
 	}
@@ -2045,6 +2051,20 @@ static void mtx_engine_switch(void)
 		{
 			uint32_t pressed = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
 
+			/* TEMPORARY (diagnosis): does the press reach the HOST at all? With
+			   three levels the root runs one frame in three, and Doom's key array
+			   is per depth, so a press can land in a child's copy and never appear
+			   in the host's. Compared against the per-instance sightings below. */
+			if(pressed && (mtx_frame_no % 8u) == 0u)
+			{
+				uint8_t m2[144];
+
+				doom_sprintf(m2, (const uint8_t *)
+				             "[MTX] key: ROOT sees the key down (tracker %u, guard %u) frame %u\n",
+				             (uint32_t)mtx_hs.key_down, mtx_hs.key_guard, mtx_frame_no);
+				mtx_log((const char *)m2);
+			}
+
 			/* A REQUEST FROM A LEVEL IS NOT SUBJECT TO THE HOST'S GUARD. The level
 			   already validated it against the same guard on its own side, and it
 			   can only fire once per press of the key (its own tracker is set by the
@@ -2280,6 +2300,25 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		   reads as a fresh press - measured, one held key toggling the inset once
 		   per slice (ON 372, OFF 391, ON 421, OFF 451...), i.e. a flicker instead
 		   of a switch. A real press lasts far longer than the guard window. */
+		if(gamekeydown[MTX_SWITCH_KEY])
+		{
+			/* TEMPORARY (diagnosis): does the press reach an INSTANCE at all? The
+			   host reads its own copy of Doom's key array and the array is per
+			   depth, so "the key switched nothing" has two very different causes -
+			   nobody saw it, or somebody saw it and the result was dropped.
+			   Counted in this depth's own block, sampled. */
+			me->key_seen++;
+			if((me->key_seen % 4u) == 1u)
+			{
+				uint8_t msg[128];
+
+				doom_sprintf(msg, (const uint8_t *)
+				             "[MTX] key: depth %u SEES the key down (seen %u) at frame %u\n",
+				             (uint32_t)me->depth, me->key_seen, me->frames);
+				mtx_log((const char *)msg);
+			}
+		}
+
 		if(((me->frames - 1u) % MTX_DEMO_INTERVAL) >= MTX_KEY_GUARD_FRAMES)
 		{
 			if(gamekeydown[MTX_SWITCH_KEY] && !me->key_down)
