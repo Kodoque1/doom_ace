@@ -167,22 +167,49 @@ static void mtx_log(const char *s);
 static uint8_t mtx_glue_depth(void);
 
 /*
- * Which framebuffer the world's screens show.
+ * THE RING: which framebuffer the screen-walls show.
  *
- * The ROOT draws the frame that ends up on the monitor, so its screen-walls show the
- * nested instance (mtx_hs.screens[1], host memory it can reach directly). A DEPTH
- * renders its own view with its own copy of this code, and cannot reach the host's
- * screens[] array - so it shows its parent's frame, the pointer for which is in its
- * parameter block. Either way it is a picture of the world one level out, which is
- * exactly what a window in a nested world should be.
+ * A level shows the NEXT live depth, and the deepest level wraps back to the root -
+ * the modulo IS the wrap. That is what turns the nest into a cycle: without it the
+ * ladder's last rung has nothing to show but blankness, and with it every level's
+ * picture contains the whole nest, one lap older per frame.
+ *
+ * With two live depths this is EXACTLY the rule that was hardcoded here before (root
+ * -> screens[1], a depth -> the root), which is what makes the change checkable
+ * rather than a matter of opinion: the diegetic log of a two-depth run has to come
+ * out identical, and it does (verify/trial_levels.sh compares them).
+ *
+ * A depth cannot read mtx_hs.screens[] itself: that array lives in the HOST's state
+ * object and a nested instance has its own copy of that object, empty. So the host
+ * hands it the pointer through the parameter block (screen_src), exactly the way it
+ * already hands it the presentation buffer.
  */
+static uint8_t mtx_ring_next(uint8_t d)
+{
+	uint8_t k;
+
+	for(k = 1; k < MTX_MAX_DEPTH; k++)
+	{
+		uint8_t c = (uint8_t)((d + k) % MTX_MAX_DEPTH);
+
+		if(mtx_alive(c))
+			return c;
+	}
+	return d;                       /* nothing else live: nothing to show */
+}
+
 uint8_t *mtx_world_screen(void)
 {
 	mtx_depth_params_t *p = mtx_self();
+	uint8_t             next;
 
 	if(p)
-		return (uint8_t *)(uintptr_t)p->canvas;
-	return (uint8_t *)mtx_hs.screens[1];
+		return (uint8_t *)(uintptr_t)p->screen_src;
+
+	next = mtx_ring_next(MTX_ROOT_DEPTH);
+	if(next == MTX_ROOT_DEPTH)
+		return 0;               /* no child yet: an empty screen, not garbage */
+	return (uint8_t *)mtx_hs.screens[next];
 }
 
 /*
@@ -663,15 +690,19 @@ void MTX_FRAME_TICK_ABI mtx_texcount_probe(uint32_t t1, uint32_t t2, uint32_t id
  */
 void MTX_FRAME_TICK_ABI mtx_engine_reserve(void)
 {
-	/* Sized for what is actually wanted - the root plus ONE nested instance -
-	   rather than for the depth ceiling. A depth costs
+	/* Sized for what is actually wanted rather than for the depth ceiling: the
+	   root plus the instances THIS video needs. A depth costs
 	   snapshot + zone + screen + stack + image + raw (MTX_ZONE_PER_DEPTH and
 	   MTX_RAW_PER_DEPTH are the two biggest terms), i.e. ~7.2 MiB each, so two
 	   depths need ~14.5 MiB and 20 leaves the pair room to spare while the root
-	   still gets the rest of DPMI for its own zone. The 16 MiB fallback still
-	   fits the pair (2.2); anything smaller would not, and a refusal is reported
-	   rather than quietly booting a depth with less than the planner promised. */
-	static const uint32_t sizes[] = {20u, 16u, 0u};	// MiB
+	   still gets the rest of DPMI for its own zone.
+
+	   RAISED to 28 for the RING. Three levels (the root plus two instances) cost
+	   ~21.6 MiB, and the planner takes the FLOOR of the division, so at 20 it
+	   plans two depths and refuses the third at mtx_push time. The ladder below
+	   keeps the pair working wherever 28 cannot be had, so a smaller machine
+	   loses the ring rather than the nest. */
+	static const uint32_t sizes[] = {28u, 24u, 20u, 16u, 0u};	// MiB
 	uint32_t i;
 
 	/* A nested depth reaches this too: its ACE image runs ace_main, which calls
@@ -1941,6 +1972,10 @@ static void mtx_engine_switch(void)
 	   screen, and leaves the canvas showing the suspended root's last frame. */
 	mtx_hs.params[1].canvas   = (uint32_t)(uintptr_t)mtx_hs.screens[0];
 	mtx_hs.params[1].inset_on = mtx_hs.inset_on;
+	/* The RING, from the host side: this depth's screen-walls show the next live
+	   depth, which at the deepest depth is the wrap back to the root. Handed over
+	   in the block because a nested instance cannot read the host's screens[]. */
+	mtx_hs.params[1].screen_src = (uint32_t)(uintptr_t)mtx_hs.screens[mtx_ring_next(1u)];
 
 	if(!mtx_hs.inset_on || !src || !dst || !mtx_hs.params[1].frames)
 		return;
