@@ -108,7 +108,16 @@ uint32_t mtx_ldr_image_bytes(const uint8_t *name)
 	if(doom_read(li->fd, &bss, 4) != 4)
 		return 0;
 
-	return bss + li->size + 32u + 32u;	/* + alignment slack for the arena */
+	/* Measured, and it cost a nested instance its entry: the loader reported
+	   loading 363,592 B into a slot this function had sized at 363,368 - 224 B
+	   more than the arithmetic here - and the slop went into the NEXT arena
+	   region, the depth's raw pool. The instance then died before it could draw a
+	   single frame, with no error anywhere: its entry reads its own image, and
+	   part of that image was somebody else's memory. The exact discrepancy is not
+	   worth chasing to the byte; a slot that is a page larger than the loader's
+	   own total is, and it makes "the image fits its slot" a margin rather than a
+	   coincidence. */
+	return bss + li->size + 32u + 32u + 4096u;	/* + a page of slack */
 }
 
 int mtx_ldr_load(const uint8_t *name, uint8_t depth, uint32_t expect_ver,

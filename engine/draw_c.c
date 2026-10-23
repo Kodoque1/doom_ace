@@ -3,6 +3,7 @@
 // Linear drawing. Replaces unchained mode.
 #include "sdk.h"
 #include "engine.h"
+#include "mtx_boot.h"	// matryoshka: the frame path hangs off the I_FinishUpdate hook below
 #include "utils.h"
 #include "render.h"
 #include "config.h"
@@ -868,6 +869,22 @@ void do_follow_player()
 
 //
 // hooks
+// matryoshka: the per-frame yield point, and why it lives HERE rather than in the
+// status bar. These two addresses are Doom's own `call I_FinishUpdate` inside
+// D_Display, which EVERY gamestate reaches; the status bar is only drawn in
+// GS_LEVEL. Measured consequence of driving the frame path from the status bar: as
+// soon as a nested instance's own Doom left the level - its menu, a notice - that
+// hook stopped being called, the instance never handed the frame back, and the whole
+// machine stayed on it: the root never got another frame, and nothing reported an
+// error. Rendering still happens - the engine's own I_FinishUpdate follows the
+// yield, so this wraps the presentation rather than replacing it.
+static __attribute((regparm(2),no_caller_saved_registers))
+void hook_finish_update()
+{
+	mtx_engine_frame();
+	I_FinishUpdate();
+}
+
 static const hook_t hooks[] __attribute__((used,section(".hooks"),aligned(4))) =
 {
 	// disable unchained mode
@@ -883,8 +900,8 @@ static const hook_t hooks[] __attribute__((used,section(".hooks"),aligned(4))) =
 	// replace patch drawers
 	{0x000392A0, CODE_HOOK | HOOK_JMP_ACE, (uint32_t)hook_draw_patch_direct},
 	// replace 'I_FinishUpdate'
-	{0x0001D4A6, CODE_HOOK | HOOK_CALL_ACE, (uint32_t)I_FinishUpdate},
-	{0x0001D4FC, CODE_HOOK | HOOK_CALL_ACE, (uint32_t)I_FinishUpdate},
+	{0x0001D4A6, CODE_HOOK | HOOK_CALL_ACE, (uint32_t)hook_finish_update},
+	{0x0001D4FC, CODE_HOOK | HOOK_CALL_ACE, (uint32_t)hook_finish_update},
 	// hack check in 'AM_drawWalls'
 	{0x00025E2F, CODE_HOOK | HOOK_UINT16, 0xD801},
 	{0x00025E31, CODE_HOOK | HOOK_CALL_ACE, (uint32_t)check_map_line},

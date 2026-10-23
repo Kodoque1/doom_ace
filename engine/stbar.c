@@ -430,12 +430,10 @@ void hook_draw_stbar(uint32_t fullscreen, uint32_t refresh)
 {
 	static uint_fast8_t was_in_menu;
 
-	// matryoshka: the reachable per-frame yield point. The .hooks section is
-	// installed unconditionally, so this runs every frame D_Display draws the
-	// status bar (GS_LEVEL), which is where the nested host boots and switches.
-	// It is a request/consume pair, so being called only in GS_LEVEL is safe -
-	// a pending request simply waits for the next frame that reaches here.
-	mtx_engine_frame();
+	// matryoshka: the frame path used to be driven from here, and it moved to
+	// draw_c.c's I_FinishUpdate hook - because this one only runs in GS_LEVEL, and a
+	// nested instance whose own Doom left the level stopped being serviced there
+	// (see the note in draw_c.c). This is now just the status bar.
 
 	ST_doPaletteStuff();
 

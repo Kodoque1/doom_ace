@@ -208,6 +208,13 @@ static void mtx_params_fill(uint8_t d)
 	p->zone_bytes = MTX_ZONE_PER_DEPTH;
 	p->screen     = mtx_hs.screens[d];
 	p->raw        = &mtx_hs.raw[d];
+	/* The host's own frame service. A depth hands the frame back by calling
+	   THIS, not its own copy: the contexts, the registries and the switch live
+	   in the host's state object, and this function's address is in the host's
+	   image, so every reference inside it resolves to the host's globals. A depth
+	   could not do it with its own copy of the same code - that copy's `mtx_hs`
+	   is a different, empty object (the whole reason this block exists). */
+	p->host_yield = mtx_host_take_frame;
 }
 
 /* The pool the CALLING code must allocate from. Host code uses the pool of the
@@ -809,13 +816,15 @@ void mtx_engine_apply_params(void)
 /* Present depth 1 for a window, then the root, so a capture can catch both. The
    window is long on purpose: the captures happen at fixed wall-clock times, so a
    short window is a coin flip on which depth a given capture catches. */
-#define MTX_PRESENT_FROM   10u
-#define MTX_PRESENT_UNTIL  200u
-
 /* How often a depth reads video memory back and compares it with its own frame
    (see mtx_engine_self_check): often enough to catch a depth that stops being
    presented, rare enough that scanning 64000 bytes does not show up in a frame. */
-#define MTX_SELF_CHECK_EVERY  300u
+#define MTX_SELF_CHECK_EVERY  100u
+
+/* The key that switches the inset on and off, in Doom's own key numbering (its
+   key state is indexed by character). 'Y' is not a default binding in a level and
+   is not the first letter of any cheat, so pressing it does nothing else. */
+#define MTX_SWITCH_KEY  'y'
 
 /*
  * Point the presentation at `depth`. Returns whether the screen ALREADY agrees.
@@ -1288,28 +1297,18 @@ static void mtx_engine_boot(void)
  */
 static void mtx_engine_video(void)
 {
-	uint8_t want;
-	uint8_t buf[176];
+	/* The host owns which buffer both depths present - and it names the ROOT's
+	   frame for both. The root draws the inset into it; the depth, running its own
+	   copy of this code, blits from it too (mtx_params.h: present_src). So the
+	   screen shows one stable view with the nested instance inside it, instead of
+	   flickering between two views as the depths take turns over the frame. */
+	mtx_hs.params[1].present_src = (uint32_t)(uintptr_t)mtx_hs.screens[0];
 
-	/* What gates the presentation is no longer a guest's report: an engine
-	   instance reports by counting its frames into the parameter block it was
-	   entered with (see mtx_engine_frame). Until it has drawn one, presenting it
-	   would show uninitialised arena memory. */
-	if(!mtx_hs.params[1].frames)
-		return;
-
-	want = (mtx_frame_no >= MTX_PRESENT_FROM && mtx_frame_no < MTX_PRESENT_UNTIL)
-	     ? 1u : 0u;
-	if(want == mtx_hs.present_depth)
-		return;
-
-	mtx_present(want);
-	doom_sprintf(buf, (const uint8_t *)
-	             "[MTX] present -> depth %u, buffer %u (depth1 frames %u; blit runs "
-	             "this frame, checked next frame)\\n",
-	             (uint32_t)want, (uint32_t)(uintptr_t)mtx_hs.screens[want],
-	             mtx_hs.params[1].frames);
-	mtx_log((const char *)buf);
+	/* mtx_present() early-outs when the source already is this depth's, and it also
+	   reads the screen back, so a policy that changes this later gets the check for
+	   free. */
+	if(mtx_hs.present_depth != 0u)
+		mtx_present(0);
 }
 
 /*
@@ -1344,6 +1343,10 @@ static void mtx_engine_depth_check(void)
 	mtx_log((const char *)buf);
 }
 
+static void mtx_engine_switch(void);	/* the key and the inset, further down */
+
+static void mtx_engine_switch(void);	/* the key and the inset, further down */
+
 static void mtx_engine_policy(void)
 {
 	uint8_t buf[144];
@@ -1351,6 +1354,7 @@ static void mtx_engine_policy(void)
 	mtx_frame_no++;
 
 	mtx_engine_video();
+	mtx_engine_switch();
 	mtx_present_confirm();
 	mtx_engine_depth_check();
 	mtx_engine_doom_screen_check();
@@ -1383,19 +1387,109 @@ static void mtx_engine_policy(void)
 		mtx_hs.ldr_guest_ok = 1;
 	}
 
-	if(!mtx_child_live)
-		return;
-
-	/* the guest ends the depth when it finishes; once it is gone there is
-	   nothing left to switch to, so stop asking */
-	if(mtx_depth() == MTX_ROOT_DEPTH && !mtx_alive(1))
+	/* Take turns. The depth hands the frame back at its own boundary (through the
+	   host's service - see mtx_host_take_frame), and the root hands it over again
+	   here. The gate is the depth's LIVENESS, not the old guest-demo flag: an
+	   engine instance never finishes, it yields, so `mtx_child_live` (set when a
+	   pushed payload returns) says nothing about it - measured, it stayed 0 while
+	   the depth was running frames and handing them back. */
+	if(mtx_depth() != MTX_ROOT_DEPTH || !mtx_alive(1))
 		return;
 
 	if((mtx_frame_no % MTX_DEMO_INTERVAL) == 0u)
+		mtx_request_switch(1);
+}
+
+/*
+ * The host's frame service, as a depth sees it.
+ *
+ * Called BY a depth through the pointer in its parameter block (mtx_params.h), at
+ * the depth's own frame boundary, to hand the frame back to the root. This code is
+ * the host's - the pointer points into the root's image - so `mtx_hs` inside it is
+ * the ROOT's state object: the contexts, the registries and the switch all belong
+ * to the root, which is exactly what a depth cannot reach with its own copy of the
+ * same functions.
+ *
+ * It is the same request/service pair the root uses when it wants the depth, so a
+ * hand-back is not a special case: request, then service at the boundary. When the
+ * root later switches back, this call RETURNS, on the depth's own stack, exactly
+ * where it left off - that is what makes the two instances take turns.
+ */
+void mtx_host_take_frame(void)
+{
+	mtx_request_switch(MTX_ROOT_DEPTH);
+	mtx_frame_tick();
+}
+
+/*
+ * The switch, and the inset it turns on.
+ *
+ * The switch is a key the ROOT reads while it runs - Doom's own key state, which
+ * is per-depth, so the root reading it does not disturb the depth. It toggles on
+ * the LEADING edge: a key held down is one switch, not one per frame.
+ *
+ * What it turns on is the picture that makes the nesting legible. A depth's frames
+ * already reach the screen when that depth is the active one, and then they are
+ * simply a Doom frame - the same level, the same status bar, and nothing on a
+ * recording to say which of the two instances produced it. So instead the root
+ * composites the depth's last frame INTO its own frame, at half scale in a boxed
+ * corner: the outer instance renders the inner instance, which is what "Doom
+ * inside Doom" has to look like to be worth recording.
+ *
+ * Runs at the frame boundary, i.e. after the 3D view has been rendered into this
+ * depth's buffer and before the status bar is drawn at the bottom - so the inset
+ * lands in the frame that gets blitted and nothing paints over it.
+ */
+static void mtx_engine_switch(void)
+{
+	uint8_t *src = (uint8_t *)mtx_hs.screens[1];
+	uint8_t *dst = (uint8_t *)screen_buffer;
+	uint32_t y, x;
+	const uint32_t ix = 8u, iy = 8u, iw = 160u, ih = 100u;
+
+	/* the key, from either side: the root's own leading edge, or a press the DEPTH
+	   saw while it was the active one and recorded in its parameter block */
+	if((gamekeydown[MTX_SWITCH_KEY] && !mtx_hs.key_down) || mtx_hs.params[1].switch_req)
 	{
-		mtx_log("[MTX] request switch -> 1\n");
-		mtx_request_switch(1);		// serviced by mtx_frame_tick below
+		mtx_hs.params[1].switch_req = 0;
+		mtx_hs.inset_on = mtx_hs.inset_on ? 0u : 1u;
+		mtx_hs.inset_frame = mtx_frame_no;
+		{
+			uint8_t buf[160];
+			doom_sprintf(buf, (const uint8_t *)
+			             "[MTX] switch: key '%c' -> inset %s at frame %u\n",
+			             (uint32_t)MTX_SWITCH_KEY,
+			             mtx_hs.inset_on ? "ON" : "OFF", mtx_frame_no);
+			mtx_log((const char *)buf);
+		}
 	}
+	mtx_hs.key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+
+	if(!mtx_hs.inset_on || !src || !dst || !mtx_hs.params[1].frames)
+		return;
+
+	/* half scale: every other pixel of the depth's 320x200 frame */
+	for(y = 0; y < ih; y++)
+		for(x = 0; x < iw; x++)
+			dst[(iy + y) * 320u + (ix + x)] = src[(y * 2u) * 320u + (x * 2u)];
+
+	/* a border, so the inset reads as an inset and not as part of the level */
+	for(x = ix - 2u; x < ix + iw + 2u; x++)
+	{
+		dst[(iy - 2u) * 320u + x] = 4u;
+		dst[(iy - 1u) * 320u + x] = 4u;
+		dst[(iy + ih) * 320u + x] = 4u;
+		dst[(iy + ih + 1u) * 320u + x] = 4u;
+	}
+	for(y = iy - 2u; y < iy + ih + 2u; y++)
+	{
+		dst[y * 320u + (ix - 2u)] = 4u;
+		dst[y * 320u + (ix - 1u)] = 4u;
+		dst[y * 320u + (ix + iw)] = 4u;
+		dst[y * 320u + (ix + iw + 1u)] = 4u;
+	}
+
+	mtx_hs.inset_logged++;
 }
 
 /*
@@ -1415,26 +1509,34 @@ static void mtx_engine_policy(void)
 static void MTX_FRAME_TICK_ABI mtx_engine_self_check(mtx_depth_params_t *me)
 {
 	uint8_t buf[256];
-	uint32_t *mine = (uint32_t *)me->screen;
+	uint8_t *mine = (uint8_t *)me->screen;
 	uint32_t *sb = (uint32_t *)screen_buffer;
 	uint32_t *dv = (uint32_t *)(uintptr_t)(doom_data_segment + MTX_DOOM_SCREEN_VAR);
-	uint32_t same = 0, i;
+	const uint32_t ix = 8u, iy = 8u, iw = 160u, ih = 100u;
+	uint32_t same = 0, y, x;
+	const uint8_t *vga = (const uint8_t *)(uintptr_t)0xA0000;
 
 	if(!mine || (me->frames % MTX_SELF_CHECK_EVERY) != 0u)
 		return;
 
-	for(i = 0; i < MTX_SCREEN_FRAME_BYTES / 4u; i++)
-		if(mine[i] == ((const uint32_t *)(uintptr_t)0xA0000)[i])
-			same++;
+	/* Where this depth's pixels are on the screen: the host composites this
+	   depth's frame into the ROOT's frame as a half-scale inset, and the host has
+	   both depths present the root's frame - so the inset is the one place the
+	   nested picture appears, and this reads it back from video memory. Every other
+	   pixel of the inset area must equal the sampled pixel of this depth's frame;
+	   if the inset were showing something else, this count would not be near-full. */
+	for(y = 0; y < ih; y++)
+		for(x = 0; x < iw; x++)
+			if(vga[(iy + y) * 320u + (ix + x)] == mine[(y * 2u) * 320u + (x * 2u)])
+				same++;
 
 	doom_sprintf(buf, (const uint8_t *)
 	             "[MTX] depth %u frame %u: screen region %u, engine screen_buffer %u, "
-	             "doom screens[0] %u; video memory equals this depth's frame in "
-	             "%u/%u dwords\n",
+	             "doom screens[0] %u; the host's inset shows THIS depth's frame in "
+	             "%u/%u pixels\n",
 	             (uint32_t)me->depth, me->frames,
 	             (uint32_t)(uintptr_t)mine, (uint32_t)(uintptr_t)sb,
-	             (uint32_t)(uintptr_t)*dv, same,
-	             (uint32_t)(MTX_SCREEN_FRAME_BYTES / 4u));
+	             (uint32_t)(uintptr_t)*dv, same, iw * ih);
 	mtx_log((const char *)buf);
 }
 
@@ -1456,12 +1558,84 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 	if(me)
 	{
 		me->frames++;
+
+		/* TEMPORARY: the first frame this depth draws, said out loud. Everything
+		   else about a stuck depth is guesswork - the screen looks the same
+		   whether it never reached its frame path or reached it and did nothing -
+		   so this is the line that separates the two. */
+		if(me->frames == 1u)
+		{
+			uint8_t msg[160];
+			doom_sprintf(msg, (const uint8_t *)
+			             "[MTX] depth %u drew its first frame: screen %u, present_src "
+			             "%u, host_yield %u\n",
+			             (uint32_t)me->depth, (uint32_t)(uintptr_t)me->screen,
+			             me->present_src, (uint32_t)(uintptr_t)me->host_yield);
+			mtx_log((const char *)msg);
+		}
+
 		mtx_engine_self_check(me);
+
+		/* The HOST owns the presentation. This depth blits from whatever buffer the
+		   host named - its own copy of the code, so it can do it itself, and no
+		   address arithmetic is needed to find it. Both depths naming the root's
+		   frame is what keeps the screen from flickering between two views while
+		   they take turns: the running depth renders into its own buffer and
+		   presents the root's, and the nested picture reaches the screen where the
+		   host puts it - in the inset. */
+		if(me->present_src)
+			*((uint32_t *)((uint8_t *)(void *)I_FinishUpdate + 4)) = me->present_src;
+
+		/* The switch key: Doom's key state is per-depth, so a press that lands
+		   during THIS depth's slice is invisible to the host. Record it here, in
+		   host memory, for the host to apply - and track this depth's own previous
+		   state so one press is one switch, not one per frame it is held. */
+		if(gamekeydown[MTX_SWITCH_KEY] && !me->key_down)
+			me->switch_req = 1u;
+		me->key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+
+		/* Hand the frame back, every MTX_DEMO_INTERVAL frames, through the HOST's
+		   own service (see the parameter block). This is what makes the two
+		   instances take turns instead of one of them winning forever - and taking
+		   turns is what keeps the outer instance's view animating while the inset
+		   shows the inner one. A depth cannot switch with its own copy of the
+		   scheduler: the contexts are in the host's state object. */
+		if(me->host_yield && (me->frames % MTX_DEMO_INTERVAL) == 0u)
+		{
+			/* TEMPORARY: what a hand-back looks like from inside the depth. The
+			   instance's own frame counter is invisible to a host that is not
+			   running, so without this there is no way to tell "the depth never
+			   reached its frame path" from "the depth reached it and the hand-back
+			   did nothing" - and the screen looks the same either way. */
+			uint8_t msg[96];
+			doom_sprintf(msg, (const uint8_t *)
+			             "[MTX] instance hand-back at frame %u\n", me->frames);
+			mtx_log((const char *)msg);
+
+			me->host_yield();
+
+			doom_sprintf(msg, (const uint8_t *)
+			             "[MTX] instance resumed, frame %u\n", me->frames);
+			mtx_log((const char *)msg);
+		}
+
 		return;
 	}
 
 	if(!mtx_booted)
+	{
+		/* Boot where the host has always booted: the first frame of a LEVEL. This
+		   hook now fires in every gamestate (see draw_c.c), and booting from a title
+		   screen was measured to leave a nested instance's own boot stuck - it
+		   reached count_textures() and never reached tex_init_data(), with no error
+		   anywhere. The frame PATH must not depend on the gamestate, which is the
+		   whole reason for hooking here; only the boot waits for the state the rest
+		   of this file was measured in. */
+		if(gamestate != GS_LEVEL)
+			return;
+
 		mtx_engine_boot();
+	}
 
 	if(!mtx_boot_failed)
 		mtx_engine_policy();

@@ -54,6 +54,12 @@ void mtx_error_probe(uint32_t esp, uint32_t ret, uint32_t fmt, uint32_t value);
 // TEMPORARY diagnostic: the first index the texture loop processes, per depth.
 void MTX_FRAME_TICK_ABI mtx_tex_probe(uint32_t first, uint32_t count);
 
+// The HOST's frame service, called BY a depth through the pointer in its parameter
+// block to hand the frame back to the root (see mtx_params.h). Plain C on purpose:
+// it runs in the host's code with the host's state, and it has to be callable
+// through a function pointer the instance holds.
+void mtx_host_take_frame(void);
+
 // TEMPORARY diagnostic: what the texture count was derived from, per depth.
 void MTX_FRAME_TICK_ABI mtx_texcount_probe(uint32_t t1, uint32_t t2, uint32_t idx1,
                                            uint32_t idx2);

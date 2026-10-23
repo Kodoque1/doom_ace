@@ -2,6 +2,7 @@
 ////
 #include "sdk.h"
 #include "engine.h"
+#include "mtx_boot.h"	// matryoshka: the lump-index probe below takes &mtx_boot's ABI
 #include "utils.h"
 #include "vesa.h"
 #include "filebuf.h"
