@@ -15,6 +15,7 @@
 #include "ldr0n.h"
 #include "ldr1n.h"
 #include "mtx_sched.h"
+#include "mtx_zone.h"
 
 /* ---------------------------------------------------------------- runtime */
 /* int 0x80 clobbers ecx and edx (Linux i386 ABI), so declare them modified or
@@ -674,6 +675,111 @@ static int test11(void)
 	    && l0_ecx == 0x5678u;
 }
 
+/* ---------------------------------------------------------------- test 12 */
+/*
+ * A nested depth's zone (mtx_zone.c).
+ *
+ * Two things have to hold, and the second is the one that is easy to fake: the
+ * builder must lay out a zone Doom's allocator can walk, AND the checker must
+ * actually REJECT a broken one. The corruption cases below are exactly the three
+ * invariants the engine's own zone_info() enforces - block size touches the next
+ * block, the next block's back link, and no two consecutive free blocks - because
+ * a checker that cannot see those would pass every zone ever built, corrupt ones
+ * included. So the negative cases are the point of this test, not a formality.
+ *
+ * What this test deliberately does NOT do is re-implement Doom's Z_Malloc. The
+ * authoritative "can this zone be used" answer comes from the real allocator, and
+ * the live DOSBox run asks it (mtx_engine_zone_init). Guessing Z_Malloc's split
+ * arithmetic here would only test this file's guess against itself.
+ */
+#define T12_BYTES 4096u
+
+static uint8_t t12_mem[T12_BYTES]  __attribute__((aligned(16)));
+static uint8_t t12_zero[256]       __attribute__((aligned(16)));	/* stays zeroed */
+
+/* Split the single free block in two by hand, the way the allocator eventually
+   will: first block in use, second free, ring rewired. Leaves both free so the
+   "two consecutive free blocks" case can be observed. */
+static void t12_split(void)
+{
+	mtx_memzone_t *z = (mtx_memzone_t *)t12_mem;
+	mtx_memblock_t *b1 = (mtx_memblock_t *)(t12_mem + sizeof(mtx_memzone_t));
+	mtx_memblock_t *b2 = (mtx_memblock_t *)((uint8_t *)b1 + 1024u);
+
+	b2->size = (int32_t)(b1->size - 1024);
+	b2->user = 0;
+	b2->tag = 0;
+	b2->id = 0;
+	b2->next = &z->blocklist;
+	b2->prev = b1;
+
+	b1->size = 1024;
+	b1->next = b2;
+	z->blocklist.prev = b2;
+	z->rover = b1;
+}
+
+static int test12(void)
+{
+	mtx_memzone_t *z = (mtx_memzone_t *)t12_mem;
+	mtx_memblock_t *b1 = (mtx_memblock_t *)(t12_mem + sizeof(mtx_memzone_t));
+	mtx_memblock_t *b2 = (mtx_memblock_t *)((uint8_t *)b1 + 1024u);
+	int r;
+
+	/* --- shape: one block, spanning exactly the rest of the region --- */
+	mtx_zone_build(t12_mem, T12_BYTES);
+
+	if(mtx_zone_check(t12_mem) != 0) return 0;
+	if(z->size != (int32_t)T12_BYTES) return 0;
+	if(z->blocklist.next != b1 || z->blocklist.prev != b1) return 0;
+	if((void *)z->blocklist.user != (void *)z) return 0;
+	if(z->blocklist.id != MTX_ZONEID) return 0;
+	if(z->blocklist.tag != MTX_PU_STATIC) return 0;
+	if(z->rover != b1) return 0;
+	if(b1->prev != &z->blocklist || b1->next != &z->blocklist) return 0;
+	if(b1->user || b1->tag || b1->id) return 0;
+	if(b1->size != (int32_t)(T12_BYTES - (uint32_t)sizeof(mtx_memzone_t))) return 0;
+	if((uint8_t *)b1 + b1->size != t12_mem + T12_BYTES) return 0;	/* nothing lost */
+
+	/* --- a region too small to hold a zone is refused, not built --- */
+	mtx_zone_build(t12_zero, 8);
+	if(mtx_zone_check(t12_zero) == 0) return 0;
+
+	/* --- header corruption must be visible --- */
+	mtx_zone_build(t12_mem, T12_BYTES);
+	z->blocklist.id = 0;
+	if(mtx_zone_check(t12_mem) == 0) return 0;
+	z->blocklist.id = MTX_ZONEID;
+
+	z->blocklist.user = 0;
+	if(mtx_zone_check(t12_mem) == 0) return 0;
+	z->blocklist.user = (void **)z;
+
+	/* --- the three heap invariants, each broken on purpose --- */
+	mtx_zone_build(t12_mem, T12_BYTES);
+	t12_split();
+
+	r = mtx_zone_check(t12_mem);
+	if(r != 10) return 0;			/* two consecutive free blocks */
+
+	b1->user = (void **)1;			/* allocate the first: now legal */
+	if(mtx_zone_check(t12_mem) != 0) return 0;
+
+	b2->prev = &z->blocklist;		/* b2 loses its back link */
+	r = mtx_zone_check(t12_mem);
+	if(r != 9) return 0;
+	b2->prev = b1;
+	if(mtx_zone_check(t12_mem) != 0) return 0;
+
+	b1->size += 1;				/* block no longer touches the next */
+	r = mtx_zone_check(t12_mem);
+	if(r != 8) return 0;
+	b1->size -= 1;
+	if(mtx_zone_check(t12_mem) != 0) return 0;
+
+	return 1;
+}
+
 /* ------------------------------------------------------------------- main */
 void _start(void)
 {
@@ -695,6 +801,7 @@ void _start(void)
 	r = test9(); puts_("  [9] yield point (frame tick) "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test10(); puts_("  [10] ops table lifetime .... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 	r = test11(); puts_("  [11] reentrant 1st stage ... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
+	r = test12(); puts_("  [12] nested depth zone ...... "); puts_(r ? "PASS" : "FAIL"); puts_("\n"); ok &= r;
 
 	puts_(ok ? "ALL PASS\n" : "SOME FAILED\n");
 	sys_exit(ok ? 0 : 1);

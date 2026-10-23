@@ -5,16 +5,18 @@
  *
  * Why it exists: ldr1N can read a code image into depth-owned memory and enter
  * it, but "it was entered" is not evidence on its own. This guest is small,
- * position-independent, and reports two things from inside the loaded image:
+ * position-independent, and reports three things from inside the loaded image:
  *
  *   - a magic dword ('MTXG'), so the host can see that code fetched from a WAD
  *     lump, placed at an arbitrary depth-owned address and jumped to, really ran;
  *   - its own entry address, computed by the guest ITSELF (call/pop), so the host
- *     can see that the image executed at an address it was not linked for.
+ *     can see that the image executed at an address it was not linked for;
+ *   - the zone the engine handed it, so the host can see that a nested depth
+ *     really can obtain a heap of its own (see mtx_zone.c).
  *
- * Between the two reports it yields, which is the interesting part: control
- * leaves the loaded image, the parent runs a frame, and the image resumes exactly
- * where it stopped. A nested instance is a coroutine, not a one-shot call.
+ * Between the reports it yields, which is the interesting part: control leaves
+ * the loaded image, the parent runs a frame, and the image resumes exactly where
+ * it stopped. A nested instance is a coroutine, not a one-shot call.
  *
  * Entered as an ordinary cdecl function - `void mtx_guest(void *svc)` - because
  * the matryoshka depth entry is dispatched through C (mtx_run_entry), which is
@@ -22,14 +24,19 @@
  *
  * Service table, owned by the host, arrives in ECX (the ldr0N hand-off is a jump,
  * not a call, so there is no argument frame on the stack):
- *   [0] uint32_t *report     where the guest leaves its evidence
- *   [4] void    (*yield)()   parent runs a frame; RETURNS here afterwards
- *   [8] void    (*finish)()  end this depth (never returns)
+ *   [ 0] uint32_t *report     where the guest leaves its evidence
+ *   [ 4] void    (*yield)()   parent runs a frame; RETURNS here afterwards
+ *   [ 8] void    (*finish)()  end this depth (never returns)
+ *   [12] void *  (*zone)()    this depth's own zone, or 0 - the engine's nested
+ *                             Z_Init path, so the guest obtains a heap the same
+ *                             way a real nested instance would
  *
  * Position independence is not a luxury: the same image is loaded at a different
  * address for every depth, so it must contain no absolute addresses. Note it also
  * cannot keep anything in registers across the yield - a context switch is a real
  * switch, so it parks the service pointer on its own stack and reloads from there.
+ * For the same reason every slot is reloaded from that stack after a C call: a C
+ * function is free to clobber eax/ecx/edx, and the zone call above IS a C call.
  *
  * Image header (see ldr1n.h): [0] .bss size, [4] version, then the payload. The
  * entry is therefore payload + 8, the same arithmetic engine/asm.S does.
@@ -52,7 +59,16 @@ mtx_guest:
 	mov	(%eax), %edx		/* edx = report slot */
 	movl	$0x4D545847, (%edx)	/* report[0]: the loaded image ran */
 
-	call	*4(%eax)		/* yield: parent runs, we come back here */
+	/* Get this depth's zone through the engine's nested Z_Init path. */
+	mov	(%esp), %eax
+	call	*12(%eax)
+	mov	(%esp), %edx		/* svc back from our own stack */
+	mov	(%edx), %edx		/* report - reloaded, the call clobbered it */
+	mov	%eax, 12(%edx)		/* report[3]: this depth's own zone */
+
+	/* Yield: the parent runs a frame, we come back here. */
+	mov	(%esp), %eax
+	call	*4(%eax)
 
 	mov	(%esp), %eax		/* svc back from our own stack */
 	mov	(%eax), %edx

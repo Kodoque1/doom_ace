@@ -99,8 +99,8 @@ typedef struct mtx_host_state {
 	uint32_t              image_bytes;
 	mtx_ldr1n_ops_t       ldr_ops;
 	mtx_ldr0n_desc_t      ldr0_desc;
-	uint32_t              ldr_svc[3];	/* the guest's service table */
-	uint32_t              ldr_report[2];	/* what the loaded image reported */
+	uint32_t              ldr_svc[4];	/* the guest's service table */
+	uint32_t              ldr_report[4];	/* what the loaded image reported */
 	uint32_t              ldr_guest_entry;
 	uint32_t              ldr_guest_total;
 	uint32_t              ldr_ace_total;

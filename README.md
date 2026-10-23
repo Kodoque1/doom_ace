@@ -143,13 +143,18 @@ continuation, `4(%esp)` = banner.
                      from the depth's own memory; service table has no free()
                      and no close(), so it cannot damage the parent
     ldr1N.S          its final hand-off (ESI/EDI/ECX, jmp *%ecx)
+    mtx_zone.h/.c    a depth's OWN zone: build it in the depth's arena slot and
+                     check it with Doom's own heap invariants; layout mirrored
+                     from engine.h and size-asserted at build time
     guest.S          the payload a depth loads from the WAD and runs; built and
                      installed as the MTXGUEST lump by `make guest`
     test_mtx.c       host proof (32-bit freestanding, raw syscalls)
     Makefile         make run | make doscheck | make ldr0n | make guest
 
-The engine side lives in `doom_ace/engine/`: `mtx_boot.c` (boot + demo policy),
-`mtx_ldr.c` (the three ldr1n services wired to the engine, plus image validation).
+The engine side lives in `doom_ace/engine/`: `mtx_boot.c` (boot + demo policy +
+`mtx_engine_zone_init`, the nested half of `Z_Init`), `mtx_ldr.c` (the three ldr1n
+services wired to the engine, plus image validation), and `main.c`'s `Z_Init`, which
+branches on depth.
 
 ## Verified (real execution, not description)
 
@@ -168,6 +173,7 @@ The engine side lives in `doom_ace/engine/`: `mtx_boot.c` (boot + demo policy),
       [9] yield point (frame tick) PASS
       [10] ops table lifetime .... PASS
       [11] reentrant 1st stage ... PASS
+      [12] nested depth zone ...... PASS
     ALL PASS
 
 [1] three depths nest and unwind in order (A C E D B).
@@ -202,6 +208,12 @@ The engine side lives in `doom_ace/engine/`: `mtx_boot.c` (boot + demo policy),
     given base and that ESI/EDI/EBX/ECX arrive as code_base / data_base /
     next_stage / arg. Catches both the EBP-clobber and the
     registers-loaded-before-the-call bugs.
+[12] the nested zone builder and checker. Asserts the built zone's exact shape and
+    that its one block spans precisely the rest of the region, then breaks the three
+    heap invariants Doom's `Z_CheckHeap` enforces (back link, size touching the next
+    block, two consecutive free blocks) and requires the checker to name each one.
+    Verified to FAIL against a checker neutered to always report "intact" — a
+    checker that cannot see corruption would pass every zone ever built.
 
 ### Wired into the engine, and verified not to regress
 
@@ -225,32 +237,31 @@ It is that small because nothing calls `mtx_init` yet: `--gc-sections` keeps onl
 
 ### Booted live in DOOM2.EXE
 
-The host now boots for real inside DOOM2.EXE in DOSBox, and depth 1 exists as a
-running instance. `engine/mtx_boot.c` boots it once on the first frame with a
-reserved arena, creates depth 1 (a stub that logs and yields), and drives an
-auto-switch policy. Evidence goes to `MTX.LOG` because stdout capture stops once
-the engine takes over:
+The host boots for real inside DOOM2.EXE in DOSBox, and depth 1 exists as a running
+instance. `engine/mtx_boot.c` boots it once on the first frame with a reserved
+arena, creates depth 1 — which loads a code image out of the WAD and runs it (see
+the loaders section) — and drives an auto-switch policy. Evidence goes to `MTX.LOG`
+because stdout capture stops once the engine takes over:
 
     [MTX] first frame
-    [MTX] host up: depths 3 snap 529468 B/depth
+    [MTX] host up: depths 2 snap 529468 img 353464
+    [MTX] ace image: 353432 B at 3633988 entry 3633996 bss 22376
     [MTX] depth1 entered
-    [MTX] depth1 tick
+    [MTX] depth1: guest alloc 94 B at 4313612, entering
+    [MTX] depth1 zone 262144 B at 3987460 build 0 alloc 3987516 probe 0
     [MTX] frame 1 child=1
     ...
     [MTX] frame 30 child=1
     [MTX] request switch -> 1        <- frame boundary, depth 0 -> 1
-    [MTX] depth1 resumed             <- the suspended instance came back
-    [MTX] depth1 tick
-    ...
-    [MTX] depth1 done                <- child finished after MTX_DEMO_TICKS
-    [MTX] frame 300 child=1          <- root keeps running on its own frame loop
+    [MTX] guest OK: magic 1297373255 addr 4313612 loaded 4313612 zone 3987460
+    [MTX] frame 250 child=1          <- root keeps running on its own frame loop
 
 529,468 B/depth is the measured figure (475,676 Doom data + ~53 KiB engine .bss,
 minus `mtx_hs` which is deliberately outside the snapshot). Depth 1 genuinely ran
-on its own stack with its own snapshotted state, was suspended and resumed six
-times across 300+ frames, and completed — with zero illegal reads and zero
-`DYNX86` faults. The same run with `MTX_DEMO_INTERVAL` lowered to 3 shows the full
-cycle back-to-back (see `### Live switching` below).
+on its own stack with its own snapshotted state, yielded back to the root, was
+resumed, and completed — with zero illegal reads and zero `DYNX86` faults. The same
+run with `MTX_DEMO_INTERVAL` lowered to 3 shows the full cycle back-to-back (see
+`### Live switching` below).
 
 Three things had to be right, each found the hard way:
 
@@ -397,6 +408,55 @@ which is why the boot reports `depths 2`. Sharing one image would be cheaper but
 wrong: ACE patches code at run time, so two depths on one code page would fight
 over the same bytes.
 
+## A depth's own zone (`Z_Init`, per depth)
+
+A depth is not an instance until it has a heap of its own. Doom's allocator walks a
+`memzone_t` header and a ring of `memblock_t` blocks, so handing a depth raw arena
+memory is not enough: the first `Z_Malloc` would read an uninitialised block header.
+`Z_Init` is now depth-aware.
+
+    depth 0   walks dpmi_get_ram() down and takes what is left, as before
+    depth >0  builds its zone inside the arena slot reserved for it
+
+Both go through the same construction (`mtx_zone_build`, `nested/mtx_zone.c`), and
+`mtx_engine_reserve()` became idempotent: a nested depth's ACE image runs
+`ace_main` → `Z_Init` too, and the arena belongs to the *machine* rather than to a
+depth. A second claim would fail — the memory is already gone — and the depth would
+silently end up with less than the planner budgeted against.
+
+The layout is mirrored rather than shared: `mtx_zone.h` restates
+`memzone_t`/`memblock_t` the way `ldr1n.h` restates `lumpinfo_t`, because the nested
+side also has to build on the host. The engine build asserts the two sizes match, so
+a drift in `engine.h` is a compile error instead of a corrupted heap.
+
+**Verified live, in DOOM2.EXE** (0 illegal reads, 0 `DYNX86`, 250+ frames):
+
+    [MTX] depth1 zone 262144 B at 3987460 build 0 alloc 3987516 probe 0
+    [MTX] guest OK: magic 1297373255 addr 4313612 loaded 4313612 zone 3987460
+
+Three separate claims are packed into that line:
+
+* `build 0` — the zone passed Doom's own heap checks: block touches the next block,
+  back links intact, no two consecutive free blocks.
+* `alloc 3987516` — Doom's *real* `Z_Malloc` returned a pointer **inside the depth's
+  zone**: `3987516 - 3987460 = 56 = sizeof(memzone_t) (32) + sizeof(memblock_t)
+  (24)`. So the allocator walked *this* depth's header and carved *this* depth's
+  block. That is the difference between a zone that looks right and one that works.
+* `probe 0` — the checks still hold *after* the allocate/free round trip, i.e. the
+  allocator left the ring intact.
+
+The guest obtains its zone through its service table (`svc[3]`), which is the same
+call `Z_Init`'s nested branch makes — not a test-only shortcut — and it reports the
+pointer back (`zone 3987460`, matching what the host built). Meanwhile the root kept
+rendering MAP01 with the HUD intact: the probe swaps `mainzone` for the duration of
+the round trip and puts it straight back, so the root's heap is never the one being
+allocated from.
+
+Test [12] covers the builder and the checker on the host, and deliberately includes
+the corruption cases — a checker that cannot see a broken zone would pass every zone
+ever built. It was verified to FAIL against a checker neutered to always report
+"intact".
+
 ## State footprint and the zone-sizing decision (measured)
 
 From `engine/doom_vars.S` (416 variables, 0x1A84 `finetangent` … 0x75CA0
@@ -433,10 +493,11 @@ appetite for that pointer.
 
 ## Not done yet (the honest remainder)
 
-* **Entering the real engine image.** The next real step, and blocked on two
-  per-depth things: `Z_Init` — ACE's entry allocates *all* remaining RAM as its
-  zone, and the per-depth zone pin currently points at raw arena memory rather
-  than a `Z_Init`ed zone — and video, below.
+* **Entering the real engine image.** The next real step. The depth half of `Z_Init`
+  now exists (above), so `ace_main` at a depth would get a real heap rather than walk
+  uninitialised memory — what is left is video (below), plus the fact that
+  `ace_main` re-patches Doom's *shared* code at run time, which the per-depth hook
+  snapshots exist for but which nothing exercises yet (`nhok` is still 0).
 * **Video is not virtualised.** Each depth has its own `screen_buffer` pointer, but
   they all present through the same `swap_buffers` IRQ, so the visible screen is
   whichever depth presented last. A child needs an off-screen buffer with the root
