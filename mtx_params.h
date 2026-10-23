@@ -119,6 +119,13 @@ typedef struct {
 	                           with it the levels close into a cycle, and each
 	                           level's picture contains the whole nest, one lap
 	                           older per frame. */
+	uint32_t   key_seen;	/* TEMPORARY (diagnosis): how many times THIS depth has
+	                           seen the switch key down in its own copy of Doom's key
+	                           array. Doom's key state is per depth, so "the key
+	                           switches nothing" can mean "no instance ever saw the
+	                           press" - and the host cannot observe that about a
+	                           suspended instance. Appended, like screen_src, so the
+	                           fields above keep their offsets. */
 } mtx_depth_params_t;
 
 #endif /* MATRYOSHKA_PARAMS_H */
