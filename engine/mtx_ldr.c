@@ -56,7 +56,7 @@ static void *ldr_alloc(void *ctx, uint32_t n)
    entry: ldr0N is the part that takes its bases as data instead of re-deriving
    them from the startup stack, which is what makes this repeatable. */
 static void ldr_enter(void *ctx, void *code, uint32_t code_base,
-                      uint32_t data_base, uint32_t ace_base)
+                      uint32_t data_base, uint32_t ace_base, uint32_t arg)
 {
 	(void)ctx; (void)code_base; (void)data_base; (void)ace_base;
 
@@ -64,14 +64,22 @@ static void ldr_enter(void *ctx, void *code, uint32_t code_base,
 	mtx_hs.ldr0_desc.code_base  = doom_code_segment;
 	mtx_hs.ldr0_desc.data_base  = doom_data_segment;
 	mtx_hs.ldr0_desc.next_stage = code;
-	mtx_hs.ldr0_desc.arg        = (uint32_t)(uintptr_t)mtx_hs.ldr_svc;
+	mtx_hs.ldr0_desc.arg        = arg;
 
 	mtx_ldr0n_entry(&mtx_hs.ldr0_desc);	// never returns
 }
 
 void mtx_ldr_enter(uint32_t entry)
 {
-	ldr_enter(0, (void *)(uintptr_t)entry, 0, 0, 0);
+	ldr_enter(0, (void *)(uintptr_t)entry, 0, 0, 0,
+	          (uint32_t)(uintptr_t)mtx_hs.ldr_svc);
+}
+
+/* The engine's own convention: ECX carries the entry address (see mtx_ldr.h). */
+void mtx_ldr_enter_engine(uint32_t entry)
+{
+	mtx_hs.ldr0_desc.banner = "- [MTX] engine image: entering (ECX = entry)\n";
+	ldr_enter(0, (void *)(uintptr_t)entry, 0, 0, 0, entry);
 }
 
 // ---- loading ---------------------------------------------------------------

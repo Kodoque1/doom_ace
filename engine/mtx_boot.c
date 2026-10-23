@@ -38,6 +38,29 @@
 #define MTX_ZONE_PER_DEPTH  (256u * 1024u)
 #define MTX_DEMO_INTERVAL   30u
 
+/* Which code image depth 1 runs.
+ *
+ *  0 = the purpose-built guest. Proves the loader, the zone, the screen and the
+ *      isolation paths without depending on an engine instance coming up. Shipped as
+ *      the default, because it is the one that works.
+ *  1 = the REAL engine image. The same loader and the same depth, but the entry is
+ *      ACE's own `_start`, which relocates itself against the address it is handed,
+ *      clears ITS OWN .bss (this depth's slot, not the root's) and calls ace_main.
+ *
+ * Set to 1 and the attempt gets a long way - see the README's "Entering the real
+ * engine image" section. Measured state of it: the image loads, is entered with the
+ * right register contract, and ace_main runs at depth 1 all the way into
+ * init_render(), where the first LARGE raw allocation fails:
+ *
+ *     free DPMI after root Z_Init: 61440 B
+ *     LOADER: Render memory allocation failed! (209184B)
+ *
+ * The root's Z_Init consumes all of DPMI except a 32 KiB reserve (60 KiB measured), so
+ * a depth has no source for its raw - non-zone - allocations. The zone is per-depth;
+ * the engine's doom_malloc is not. That is the next piece of work, not a bug in this
+ * switch. */
+#define MTX_CHILD_ENGINE_IMAGE 0
+
 /* The code images the host loads. Both are reachable by name through ACE's own
    WAD layer - the descriptors LDR1 threw away on first boot were Doom's, and ACE
    rebuilt its own, which is what makes this lookup non-destructive. */
@@ -442,14 +465,47 @@ static void mtx_engine_probe_check(void)
 // two depths sharing one code page would fight over the same bytes.
 static void mtx_demo_child(void *arg)
 {
-	uint8_t buf[128];
+	uint8_t buf[176];
 	uint32_t entry = 0, total = 0;
-
 	int32_t r;
 
 	(void)arg;
 	mtx_log("[MTX] depth1 entered\n");
 
+#if MTX_CHILD_ENGINE_IMAGE
+	/*
+	 * The milestone: the REAL engine image, in this depth's own slot, entered with
+	 * the engine's own register convention (ECX = entry, ESI/EDI = Doom's segments).
+	 *
+	 * Its `_start` relocates itself against that address, rewrites the code-address
+	 * tables, clears ITS OWN .bss - this depth's image slot, not the root's - and
+	 * calls ace_main. So what runs here is a second instance's initialisation, on
+	 * this depth's heap (256 KiB, mtx_engine_zone_init) and this depth's stack.
+	 */
+	r = mtx_ldr_load(MTX_ACE_LUMP, 1, ace_git_version, &entry, &total);
+	if(r != 0)
+	{
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] depth1: engine image load FAILED (%d)\n", r);
+		mtx_log((const char *)buf);
+		mtx_finish();
+	}
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth1: engine image %u B at %u entry %u bss %u\n",
+	             total, (uint32_t)(uintptr_t)mtx_hs.images[1], entry,
+	             ((uint32_t *)mtx_hs.images[1])[0]);
+	mtx_log((const char *)buf);
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth1: entering, ECX=%u ESI=%u EDI=%u, free DPMI %u B\n",
+	             entry, doom_code_segment, doom_data_segment, dpmi_get_ram());
+	mtx_log((const char *)buf);
+
+	mtx_hs.ldr_guest_entry = entry;
+	mtx_hs.ldr_guest_total = total;
+
+	mtx_ldr_enter_engine(entry);	// never returns
+#else
 	r = mtx_ldr_load(MTX_GUEST_LUMP, 1, MTX_LDR_GUEST_VERSION, &entry, &total);
 	if(r != 0)
 	{
@@ -458,9 +514,8 @@ static void mtx_demo_child(void *arg)
 		mtx_log((const char *)buf);
 		mtx_finish();
 	}
-
-	doom_sprintf(buf, (const uint8_t *)"[MTX] depth1: guest alloc %u B at %u, entering\n",
-	             total, entry);
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth1: guest alloc %u B at %u, entering\n", total, entry);
 	mtx_log((const char *)buf);
 
 	mtx_hs.ldr_guest_entry = entry;
@@ -472,12 +527,9 @@ static void mtx_demo_child(void *arg)
 	mtx_hs.ldr_report[4] = 0;
 
 	/* The whole authority the loaded image has over the machine: leave evidence,
-	   ask for a zone of its own, draw on its OWN screen, yield, finish. No free,
-	   no close, no arbitrary allocation - the same reasoning as ldr1n's service
-	   table, so a guest cannot damage the parent. Both of the middle two are the
-	   engine's own nested paths, not extra privilege: a real nested instance gets
-	   the same heap by running ace_main and the same screen pointer by the
-	   per-depth pin. */
+	   ask for a zone of its own, draw on its OWN screen, overwrite a patch site,
+	   yield, finish. No free, no close, no arbitrary allocation - the same
+	   reasoning as ldr1n's service table, so a guest cannot damage the parent. */
 	mtx_hs.ldr_svc[0] = (uint32_t)(uintptr_t)mtx_hs.ldr_report;
 	mtx_hs.ldr_svc[1] = (uint32_t)(uintptr_t)mtx_yield;
 	mtx_hs.ldr_svc[2] = (uint32_t)(uintptr_t)mtx_finish;
@@ -487,6 +539,7 @@ static void mtx_demo_child(void *arg)
 	mtx_hs.ldr_svc[6] = (uint32_t)(uintptr_t)mtx_engine_probe_patch;
 
 	mtx_ldr_enter(entry);		// hands off through ldr0N; never returns
+#endif
 
 	mtx_log("[MTX] depth1: enter returned (cannot happen)\n");
 	mtx_finish();
@@ -551,6 +604,14 @@ static void mtx_engine_boot(void)
 	             "[MTX] isolation: %u regions, %u patches, snapshot %u B\n",
 	             mtx_dos_region_count(), mtx_dos_hook_count(),
 	             bt.snapshot_per_depth);
+	mtx_log((const char *)buf);
+
+	/* What is left of DPMI after the root's own Z_Init. The root's Z_Init walks
+	   dpmi_get_ram() down until an allocation succeeds - it consumes everything but a
+	   32 KiB reserve - so this number is the budget a depth's engine init has to work
+	   with for its raw (non-zone) allocations. Worth having in the log. */
+	doom_sprintf(buf, (const uint8_t *)"[MTX] free DPMI after root Z_Init: %u B\n",
+	             dpmi_get_ram());
 	mtx_log((const char *)buf);
 
 	/* Record a patch site and what is there BEFORE any depth runs, so the probe has

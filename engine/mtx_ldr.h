@@ -27,7 +27,25 @@ int mtx_ldr_load(const uint8_t *name, uint8_t depth, uint32_t expect_ver,
  */
 uint32_t mtx_ldr_image_bytes(const uint8_t *name);
 
-/* Hand off to an already-loaded image through ldr0N. Never returns. */
+/*
+ * Hand off to an already-loaded image through ldr0N. Never returns.
+ *
+ * TWO CONVENTIONS, and they are not interchangeable:
+ *
+ *  mtx_ldr_enter(entry)         ECX = the service table pointer. This is the
+ *                               matryoshka guest's own convention: the guest is
+ *                               hand-written and expects its services there.
+ *
+ *  mtx_ldr_enter_engine(entry)  ECX = the entry address ITSELF. This is what ACE's
+ *                               own `_start` requires: `sub $0x1008,%ecx` recovers
+ *                               the image base from it, and every relocation is
+ *                               applied relative to that. Handing the engine image
+ *                               the service table instead would make it relocate
+ *                               itself around a garbage base.
+ *
+ * Both hand ESI/EDI the Doom code/data segments, which both conventions need.
+ */
 void mtx_ldr_enter(uint32_t entry);
+void mtx_ldr_enter_engine(uint32_t entry);
 
 #endif // MATRYOSHKA_MTX_LDR_H
