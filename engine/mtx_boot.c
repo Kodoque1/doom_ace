@@ -1708,11 +1708,6 @@ void mtx_host_take_frame(void)
 #define MTX_INSET_H  100u
 #define MTX_INSET_BORDER 2u
 
-/* Host-side state of the key guard: how many frames of the current slice are
-   still ignored, and the depth's slice stamp this host has already acted on. */
-static uint32_t mtx_key_guard;
-static uint32_t mtx_slice_seen;
-
 static void mtx_engine_switch(void)
 {
 	uint8_t *src = (uint8_t *)mtx_hs.screens[1];
@@ -1728,10 +1723,10 @@ static void mtx_engine_switch(void)
 	   held key. The block is host memory that both sides already read and write,
 	   so it is the natural place for the one flag that says "the key was down
 	   when I last looked". */
-	if(mtx_slice_seen != mtx_hs.params[1].slice_gen)
+	if(mtx_hs.slice_seen != mtx_hs.params[1].slice_gen)
 	{
-		mtx_slice_seen = mtx_hs.params[1].slice_gen;
-		mtx_key_guard  = MTX_KEY_GUARD_FRAMES;
+		mtx_hs.slice_seen = mtx_hs.params[1].slice_gen;
+		mtx_hs.key_guard  = MTX_KEY_GUARD_FRAMES;
 
 		/* Doom's key array is snapshot state, so what is restored here is what THIS
 		   side last saw - and the events that changed it since were consumed by the
@@ -1745,7 +1740,7 @@ static void mtx_engine_switch(void)
 		gamekeydown[MTX_SWITCH_KEY] = 0;
 	}
 
-	if(mtx_key_guard)
+	if(mtx_hs.key_guard)
 	{
 		/* Inside the window the key state is what this depth's snapshot restored,
 		   not what this side last saw: writing the shared tracker from it is what
@@ -1753,14 +1748,14 @@ static void mtx_engine_switch(void)
 		   one held key). Leave the tracker alone, and drop any request that arrived
 		   in the window - a key still held re-asserts itself here, and that is not a
 		   press. */
-		mtx_key_guard--;
+		mtx_hs.key_guard--;
 		mtx_hs.params[1].switch_req = 0;
 	}
 	else if((gamekeydown[MTX_SWITCH_KEY] && !mtx_hs.params[1].key_down)
 	        || mtx_hs.params[1].switch_req)
 	{
 		mtx_hs.params[1].switch_req = 0;
-		mtx_key_guard = MTX_KEY_DEBOUNCE_FRAMES;
+		mtx_hs.key_guard = MTX_KEY_DEBOUNCE_FRAMES;
 		mtx_hs.inset_on = mtx_hs.inset_on ? 0u : 1u;
 		mtx_hs.inset_frame = mtx_frame_no;
 		{
