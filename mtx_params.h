@@ -109,6 +109,16 @@ typedef struct {
 	                           renders into its own buffer and presents the root's,
 	                           so the nested picture reaches the screen only where
 	                           the host puts it - in the inset. */
+	uint32_t   screen_src;	/* what this depth's SCREEN-WALLS show: the frame of
+	                           the NEXT live depth, and at the deepest depth the
+	                           wrap back to the root. Appended at the END of the
+	                           block deliberately - every field above keeps its
+	                           offset, so a purpose-built guest compiled against
+	                           the older layout is unaffected. Without the wrap the
+	                           chain is a ladder whose last rung shows nothing;
+	                           with it the levels close into a cycle, and each
+	                           level's picture contains the whole nest, one lap
+	                           older per frame. */
 } mtx_depth_params_t;
 
 #endif /* MATRYOSHKA_PARAMS_H */
