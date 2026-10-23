@@ -15,6 +15,7 @@
 #include "decorate.h"
 #include "extra3d.h"
 #include "draw.h"
+#include "mtx_boot.h"	// matryoshka: the diegetic screen texture
 #include "textpars.h"
 #include "font.h"
 #include "render.h"
@@ -800,8 +801,26 @@ static void R_RenderSegLoop()
 				dc_yl = yl;
 				dc_yh = yh;
 				dc_texturemid = rw_midtexturemid;
-				dc_source = texture_get_column(midtexture, texturecolumn);
-				colfunc();
+
+				/* matryoshka: this wall is a SCREEN. The column comes from the other
+				   instance's framebuffer instead of from the texture, using the seg's
+				   own screen extent (rw_x..rw_stopx) and this column's y range - see
+				   mtx_screen_wall_column. Everything else about the seg (clipping,
+				   occlusion, the planes) is Doom's and is untouched. */
+				/* matryoshka: this wall is a SCREEN. The column is not drawn here - the
+				   rectangle is RECORDED, and the frame hook paints it after the whole
+				   frame is rendered. Drawing from inside the seg loop means writing to
+				   Doom's screen while its clipping state is mid-flight, and a version
+				   that did that wrote 112 times to an address outside video memory and
+				   left a black screen. Recording costs one comparison per column and
+				   puts every bound in code we control. */
+				if(midtexture == MTX_SCREEN_TEX)
+					mtx_screen_seg_note(x, yl, yh);
+				else
+				{
+					dc_source = texture_get_column(midtexture, texturecolumn);
+					colfunc();
+				}
 			}
 			ceilingclip[x] = viewheight;
 			floorclip[x] = -1;

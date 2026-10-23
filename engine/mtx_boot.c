@@ -164,6 +164,137 @@ __attribute__((section(".data"))) uint32_t mtx_entry_esp;
 
 static mtx_depth_params_t *mtx_self(void);
 static void mtx_log(const char *s);
+static uint8_t mtx_glue_depth(void);
+
+/*
+ * Which framebuffer the world's screens show.
+ *
+ * The ROOT draws the frame that ends up on the monitor, so its screen-walls show the
+ * nested instance (mtx_hs.screens[1], host memory it can reach directly). A DEPTH
+ * renders its own view with its own copy of this code, and cannot reach the host's
+ * screens[] array - so it shows its parent's frame, the pointer for which is in its
+ * parameter block. Either way it is a picture of the world one level out, which is
+ * exactly what a window in a nested world should be.
+ */
+uint8_t *mtx_world_screen(void)
+{
+	mtx_depth_params_t *p = mtx_self();
+
+	if(p)
+		return (uint8_t *)(uintptr_t)p->canvas;
+	return (uint8_t *)mtx_hs.screens[1];
+}
+
+/*
+ * DIEGETIC RENDERING: one wall texture IS the other instance's screen.
+ *
+ * Two halves, on purpose. mtx_screen_seg_note (called from the seg loop) only
+ * RECORDS the screen rectangle of a screen-textured wall; mtx_screen_paint (called
+ * from the frame hook, once the frame is finished) fills it with the other
+ * instance's framebuffer. The first version drew columns from inside the seg loop,
+ * where Doom's clipping state is mid-flight, and a ylookup[] indexed with an
+ * unclipped row is a wild address: measured, 112 writes outside video memory and a
+ * black screen. Recording is one comparison per column; painting has every bound in
+ * one place.
+ */
+static uint8_t  mtx_seg_top[320];
+static uint8_t  mtx_seg_bot[320];
+static uint8_t  mtx_seg_mark[320];
+static uint32_t mtx_seg_cols;
+
+void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh)
+{
+	/* Doom's clipping arithmetic is INPUT here, not something already validated. */
+	if(x >= 320u || yl > 199u || yh > 199u || yh < yl)
+		return;
+	mtx_seg_top[x] = (uint8_t)yl;
+	mtx_seg_bot[x] = (uint8_t)yh;
+	mtx_seg_mark[x] = 1;
+	mtx_seg_cols++;
+}
+
+/*
+ * Paint the recorded rectangle with the other instance's frame.
+ *
+ * The whole 320x200 frame is mapped across the wall (a screen shows its picture; it
+ * does not tile its texture), with the horizontal span taken from the marked columns
+ * so a wall that is partly off-screen still maps correctly. No colormap: a screen is
+ * emissive, and one that darkened with distance would read as a texture rather than
+ * as a picture. Writes go to THIS copy's framebuffer, so a depth's own screens show
+ * up inside the inset that composites its frame - the nesting is visible from both
+ * sides.
+ */
+void mtx_screen_paint(void)
+{
+	const uint8_t *src = mtx_world_screen();
+	uint32_t x, y, x0 = 0xFFFFFFFFu, x1 = 0u, span, done = 0;
+
+	if(!mtx_seg_cols)
+		return;
+
+	for(x = 0; x < 320u; x++)
+		if(mtx_seg_mark[x])
+		{
+			if(x < x0)
+				x0 = x;
+			x1 = x;
+		}
+
+	if(src && x1 >= x0)
+	{
+		span = x1 - x0 + 1u;
+		for(x = x0; x <= x1; x++)
+		{
+			uint32_t u, top, h, vstep, vfrac;
+
+			if(!mtx_seg_mark[x])
+				continue;
+
+			u = ((x - x0) * 320u) / span;
+			if(u > 319u)
+				u = 319u;
+
+			top = mtx_seg_top[x];
+			h = (uint32_t)mtx_seg_bot[x] - top + 1u;
+			vstep = (200u << 16) / h;
+			vfrac = 0;
+
+			for(y = 0; y < h; y++)
+			{
+				uint32_t v = vfrac >> 16;
+
+				if(v > 199u)
+					v = 199u;
+				if(screen_buffer && (top + y) < 200u)
+					((uint8_t *)screen_buffer)[(top + y) * 320u + x] = src[v * 320u + u];
+				vfrac += vstep;
+				done++;
+			}
+		}
+	}
+
+	for(x = 0; x < 320u; x++)
+		mtx_seg_mark[x] = 0;
+	mtx_seg_cols = 0;
+
+	/* Evidence, sampled: a demo must not be claimable from a log that only says the
+	   code exists. */
+	{
+		static uint32_t frames;
+		uint8_t buf[160];
+
+		frames++;
+		if(frames <= 3u || (frames % 300u) == 0u)
+		{
+			doom_sprintf(buf, (const uint8_t *)
+			             "[MTX] diegetic: depth %u painted texture %u over screen x %u..%u "
+			             "(%u pixels) [frame %u]\n",
+			             mtx_glue_depth(), MTX_SCREEN_TEX,
+			             x0 == 0xFFFFFFFFu ? 0u : x0, x1, done, frames);
+			mtx_log((const char *)buf);
+		}
+	}
+}
 
 /*
  * Called from the engine's entry (asm.S) with the value it was handed in %ebp,
@@ -1602,6 +1733,9 @@ static void mtx_engine_policy(void)
 
 	mtx_frame_no++;
 
+	/* early frames = the room the demo starts in, which is the room the effect has
+	   to be visible in */
+	mtx_screen_paint();      /* the world's screens, after the frame is rendered */
 	mtx_engine_video();
 	mtx_engine_switch();
 	mtx_engine_stack_water();
@@ -1952,6 +2086,11 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		   they take turns: the running depth renders into its own buffer and
 		   presents the root's, and the nested picture reaches the screen where the
 		   host puts it - in the inset. */
+		/* This depth's own screen is a world too: paint its screen-textured walls
+		   from its parent's frame, so the nesting is visible inside the nested
+		   view as well as around it. */
+		mtx_screen_paint();
+
 		if(me->present_src)
 			*((uint32_t *)((uint8_t *)(void *)I_FinishUpdate + 4)) = me->present_src;
 

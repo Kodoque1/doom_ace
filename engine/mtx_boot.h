@@ -39,6 +39,32 @@ void mtx_esp_probe(const uint8_t *tag);	/* TEMPORARY: stack trace through a boot
 // which is why it cannot be a macro over `doom_data_segment` any more.
 uint32_t mtx_engine_stack(void);
 
+// ---- diegetic rendering -------------------------------------------------------
+//
+// One wall texture is repointed at the other instance's framebuffer, so the nested
+// Doom appears as a surface in the world instead of an overlay on top of it. The
+// number is a TEXTURE index (position in Doom's TEXTURE1+TEXTURE2 list). 189 is
+// PIPE4, and the NUMBER comes from the renderer itself - counted, per drawn column -
+// rather than from a WAD analysis: the first attempt used what
+// verify/which_texture.py called MAP01's most used texture (409, ZZWOLF11) and
+// produced not one line of the effect, because the walls actually in view are
+// PIPE4/BRONZE2/TEKGREN/SUPPORT. Measured in the view the demo opens on: 189=3024
+// columns, 46=2835, 372=378, 374=231, 375=231, 281=21 - so 189 is the largest
+// surface on screen, which is what makes the effect legible rather than a keyhole.
+#define MTX_SCREEN_TEX 189u
+
+// The frame to show on those walls: for the ROOT, the nested instance's; for a
+// DEPTH (whose own copy of the renderer runs the same code), its parent's. A depth
+// cannot reach the host's screens[] array, so its pointer comes from its parameter
+// block.
+uint8_t *mtx_world_screen(void);
+
+// The seg loop RECORDS the screen rectangle of a screen-textured wall; the frame
+// hook PAINTS it from the other instance's framebuffer. Two halves so that every
+// bound lives in one place instead of inside Doom's clipping arithmetic.
+void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh);
+void mtx_screen_paint(void);
+
 // Which depth this copy of the engine is running as: a nested instance's own
 // (from its parameter block), or the scheduler's when this is the host. The
 // engine's init branches on this, so it must be the same answer the allocator
