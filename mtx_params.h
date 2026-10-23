@@ -69,6 +69,30 @@ typedef struct {
 	                           table or a report back: the host reads it as the
 	                           difference between an instance that booted and one
 	                           that boots and paints. */
+	void     (*host_yield)(void);	/* the HOST's frame service, for a depth that
+	                           wants to hand the frame back. It cannot switch with
+	                           its own copy of the scheduler - the contexts live
+	                           in the host's state object, and this pointer's code
+	                           is the host's, so calling it is calling the host.
+	                           It returns when the host hands the frame back to
+	                           this depth again. */
+	uint32_t   switch_req;	/* the switch key, seen at THIS depth. Doom's key state
+	                           is per-depth, so a press that lands during this
+	                           depth's slice is invisible to the host; the depth
+	                           that saw it records the request here, in host
+	                           memory, and the host consumes it. */
+	uint32_t   key_down;	/* this depth's own view of the key, so one press is one
+	                           switch rather than one per frame it is held */
+	uint32_t   present_src;	/* what this depth's frame blit should copy FROM. The
+	                           engine bakes that source into its own code at init
+	                           (the value of `screen_buffer` then), and each depth
+	                           has its OWN copy of that code - so a depth can point
+	                           its own blit at any buffer, and the HOST says which.
+	                           Both depths pointing at the root's frame is what
+	                           makes the screen stable: the depth that is running
+	                           renders into its own buffer and presents the root's,
+	                           so the nested picture reaches the screen only where
+	                           the host puts it - in the inset. */
 } mtx_depth_params_t;
 
 #endif /* MATRYOSHKA_PARAMS_H */

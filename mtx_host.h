@@ -92,6 +92,15 @@ typedef struct mtx_host_state {
 	uint32_t              present_frame;	/* frame the source changed (0 = none) */
 	uint8_t               doom_screen_ok;	/* Doom's screens[0] pin verified */
 
+	/* --- mtx_boot.c: the switch and the inset. `inset_on` is the state the key
+	       toggles; `key_down` remembers the previous state of that key so one press
+	       is one switch rather than one switch per frame it is held. Host state,
+	       like everything the screen policy depends on. --- */
+	uint8_t               inset_on;
+	uint8_t               key_down;
+	uint32_t              inset_frame;	/* frame the inset state last changed */
+	uint32_t              inset_logged;	/* frames composited, for the log */
+
 	/* --- mtx_boot.c: hook-isolation probe. A patch site the engine registered,
 	       the byte that was there, and what depth 1 wrote. Host state, so a guest
 	       snapshot cannot cover the evidence of its own test. --- */
