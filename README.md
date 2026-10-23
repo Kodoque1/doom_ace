@@ -521,9 +521,10 @@ screen really did change and really did change back — 0 illegal reads, 0 `DYNX
 
 The pattern is drawn by the DEPTH, not by the host: the guest calls a service that
 fills `screen_buffer`, and at depth 1 `screen_buffer` is that depth's own region
-(pinned on switch-in). One run captures both states — `verify/trial-video6/`
-`video6_a.png` is the nested depth's bars, `_b` and `_c` are the root's MAP01 after
-the switch back.
+(pinned on switch-in). One run captures both states: the `_a` capture is the nested
+depth's bars, `_b` and `_c` are the root's MAP01 after the switch back. (That run's
+directory was not kept; the same mechanism is what the engine-image path above now
+uses, and `verify/trial-confirm/` is its record.)
 
 ### A depth's screen region is bigger than a frame
 
