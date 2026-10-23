@@ -61,6 +61,14 @@ typedef struct {
 	uint32_t   zone_bytes;
 	void      *screen;	/* this depth's framebuffer */
 	mtx_raw_t *raw;		/* this depth's raw pool, in HOST memory */
+	uint32_t   frames;	/* the instance's own frame count, written HERE, in
+	                           host memory, by the instance itself. Its copy of
+	                           the engine reaches the frame boundary too (every
+	                           depth patches the same Doom code), so this is how
+	                           an instance says "I am drawing" without a service
+	                           table or a report back: the host reads it as the
+	                           difference between an instance that booted and one
+	                           that boots and paints. */
 } mtx_depth_params_t;
 
 #endif /* MATRYOSHKA_PARAMS_H */
