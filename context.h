@@ -26,11 +26,19 @@
 #define MTX_MAX_DEPTH   12u                                 /* live-depth ceiling */
 /*
  * Per-depth stack. Raised from 8 KiB: that was enough for the purpose-built
- * guest, but a nested ENGINE runs its whole boot on this stack, and Doom's own
- * boot stack is far larger than 8 KiB. The cost is one block of
- * depth * MTX_STACK_SIZE in the arena, so it is cheap next to a depth's zone.
+ * guest, but a nested ENGINE runs its whole boot and its game loop on this stack.
+ *
+ * MEASURED, not guessed, so the figure can be defended: the slot is painted before
+ * a depth is first entered and the high-water mark read back from the paint. A real
+ * nested instance - its whole ACE boot, Z_Init, its renderer and its game loop -
+ * uses 9,428 B, with the bottom of the slot intact. This is therefore a 7x margin
+ * over a number, and the margin is deliberate: the deepest point is the depth's
+ * own startup, and a deeper chain in a busier map would appear as memory
+ * corruption rather than as a clean failure. What the nesting REQUIRED was that
+ * this stack be PRIVATE per depth; the size was never the bug (see mtx_engine_stack
+ * in the engine, which stopped a depth from being handed Doom's own stack).
  */
-#define MTX_STACK_SIZE  262144u                             /* per-depth stack, bytes */
+#define MTX_STACK_SIZE  65536u                              /* per-depth stack, bytes */
 #define MTX_STACK_WORDS (MTX_STACK_SIZE / 4u)
 
 #define MTX_ROOT_DEPTH  0u
