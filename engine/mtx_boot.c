@@ -53,6 +53,14 @@
 #define MTX_RAW_PER_DEPTH   (2u * 1024u * 1024u)
 #define MTX_DEMO_INTERVAL   30u
 
+/* Frames at the start of a slice during which the switch key is ignored, on both
+   sides. Doom's key array lives in Doom's data, so it is snapshot state: a
+   switched-in depth restores the value it last saw, and without this window that
+   restored value reads as a press on the first frame of every slice (measured:
+   one held key toggling the inset once per slice). 3 frames is a fraction of the
+   shortest human press and a small fraction of a slice. */
+#define MTX_KEY_GUARD_FRAMES 3u
+
 /* Which code image depth 1 runs.
  *
  *  0 = the purpose-built guest. Proves the loader, the zone, the screen and the
@@ -1605,16 +1613,36 @@ void mtx_host_take_frame(void)
  * depth's buffer and before the status bar is drawn at the bottom - so the inset
  * lands in the frame that gets blitted and nothing paints over it.
  */
+/* Host-side state of the key guard: how many frames of the current slice are
+   still ignored, and the depth's slice stamp this host has already acted on. */
+static uint32_t mtx_key_guard;
+static uint32_t mtx_slice_seen;
+
 static void mtx_engine_switch(void)
 {
 	uint8_t *src = (uint8_t *)mtx_hs.screens[1];
 	uint8_t *dst = (uint8_t *)screen_buffer;
 	uint32_t y, x;
 	const uint32_t ix = 8u, iy = 8u, iw = 160u, ih = 100u;
+	/* The key, from either side: the root's own leading edge, or a press the DEPTH
+	   saw while it was the active one and recorded in its parameter block.
+	   ONE shared tracker, in the depth's block: a physical press that spans a
+	   depth slice and a root slice is seen by BOTH sides here (each one runs a
+	   copy of this code), and with a tracker per side that was one press toggling
+	   twice - measured: inset ON at frame 384, OFF at frame 391, from a single
+	   held key. The block is host memory that both sides already read and write,
+	   so it is the natural place for the one flag that says "the key was down
+	   when I last looked". */
+	if(mtx_slice_seen != mtx_hs.params[1].slice_gen)
+	{
+		mtx_slice_seen = mtx_hs.params[1].slice_gen;
+		mtx_key_guard  = MTX_KEY_GUARD_FRAMES;
+	}
 
-	/* the key, from either side: the root's own leading edge, or a press the DEPTH
-	   saw while it was the active one and recorded in its parameter block */
-	if((gamekeydown[MTX_SWITCH_KEY] && !mtx_hs.key_down) || mtx_hs.params[1].switch_req)
+	if(mtx_key_guard)
+		mtx_key_guard--;
+	else if((gamekeydown[MTX_SWITCH_KEY] && !mtx_hs.params[1].key_down)
+	        || mtx_hs.params[1].switch_req)
 	{
 		mtx_hs.params[1].switch_req = 0;
 		mtx_hs.inset_on = mtx_hs.inset_on ? 0u : 1u;
@@ -1628,7 +1656,7 @@ static void mtx_engine_switch(void)
 			mtx_log((const char *)buf);
 		}
 	}
-	mtx_hs.key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+	mtx_hs.params[1].key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
 
 	if(!mtx_hs.inset_on || !src || !dst || !mtx_hs.params[1].frames)
 		return;
@@ -1761,10 +1789,23 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		/* The switch key: Doom's key state is per-depth, so a press that lands
 		   during THIS depth's slice is invisible to the host. Record it here, in
 		   host memory, for the host to apply - and track this depth's own previous
-		   state so one press is one switch, not one per frame it is held. */
-		if(gamekeydown[MTX_SWITCH_KEY] && !me->key_down)
+		   state so one press is one switch, not one per frame it is held.
+
+		   The guard is not decoration. Doom's key array is Doom's DATA, so it is
+		   part of every depth's snapshot and the switch restores it: the first
+		   frames of each slice therefore show whatever this depth last saw, which
+		   reads as a fresh press - measured, one held key toggling the inset once
+		   per slice (ON 372, OFF 391, ON 421, OFF 451...), i.e. a flicker instead
+		   of a switch. A real press lasts far longer than the guard window. */
+		if(gamekeydown[MTX_SWITCH_KEY] && !me->key_down
+		   && ((me->frames - 1u) % MTX_DEMO_INTERVAL) >= MTX_KEY_GUARD_FRAMES)
 			me->switch_req = 1u;
 		me->key_down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+
+		/* This depth's slice begins when its own frame count starts a new run -
+		   the host reads this to apply the same guard to its own first frames. */
+		if((me->frames % MTX_DEMO_INTERVAL) == 1u)
+			me->slice_gen++;
 
 		/* Hand the frame back, every MTX_DEMO_INTERVAL frames, through the HOST's
 		   own service (see the parameter block). This is what makes the two
