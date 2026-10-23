@@ -618,10 +618,21 @@ than guessed — see the video section — and it is the third largest item per 
 * `.data` is still not in the snapshot region list — it needs a
   `PROVIDE(_data_start/_data_end)` pair in `engine/linker.ld`. `mod_config` lives
   there, and when it is added it needs the same split that keeps `mtx_hs` out.
-* Nothing sets a switch request from the game yet: there is no key bound to
-  `mtx_request_yield()` / `mtx_request_switch()`, so the policy is a frame counter.
+* **The depth ceiling is a reservation policy, not a wall.** The arena is requested
+  at 3 MiB (`mtx_engine_reserve`, sizes `{3, 2, 0}`) and a depth costs 1,451,228 B,
+  so the live run reports 2. The arithmetic, against ~60 MiB of DPMI RAM: 8 MiB → 5
+  depths, 12 MiB → 8, 16 MiB → 11, 20 MiB → 12. What that costs is the ROOT's zone,
+  which gets whatever is left — so this is a trade to measure, not a limit. Nothing
+  has been tried above 3 MiB yet.
 * Hook registration is manual and nothing registers anything yet (`nhok` is 0).
   The per-depth hook save/restore exists and is tested; it has no occupants.
-* The guest is a purpose-built 45-byte payload, not a second Doom. It proves the
-  loader works; it is not an instance.
-* `screen_per_depth` and `zone_per_depth` still need measuring on hardware.
+* Nothing sets a switch request from the game yet: there is no key bound to
+  `mtx_request_yield()` / `mtx_request_switch()`, so the policy is a frame counter.
+  (And see the input-routing item below — a key alone would not be enough.)
+* The guest is a purpose-built 96-byte payload, not a second Doom. It proves the
+  loader, the zone, the screen and the pin work; it is not an instance.
+* `zone_per_depth` (256 KiB) is still a policy number rather than a measurement of a
+  real level's working set. `screen_per_depth` is no longer a guess — it is derived
+  from the engine's own use of the pointer (above).
+* Input is not routed per depth at all: the keyboard belongs to the root, and a
+  nested instance has no way to be the one that receives keys.
