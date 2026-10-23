@@ -34,6 +34,12 @@
  *                             At a depth, `screen_buffer` is that depth's own
  *                             buffer, so the drawing lands there and not in the
  *                             root's - which is what makes the screens separate.
+ *   [20] void *  (*doomscreen)()  write a marker through DOOM's own screen pointer
+ *                             (`screens[0]`) and return where it landed, or 0 if
+ *                             the engine refused because it did not point at this
+ *                             depth's own buffer. ACE's `screen_buffer` is only a
+ *                             copy taken at init; the renderer uses Doom's
+ *                             variable, so that is the one that must follow.
  *
  * It yields TWICE, so the depth stays alive across two frame boundaries rather
  * than completing at the first one: a nested instance that exists for exactly one
@@ -80,6 +86,15 @@ mtx_guest:
 	mov	(%esp), %edx
 	mov	(%edx), %edx
 	mov	%eax, 8(%edx)		/* report[2]: this depth's own screen */
+
+	/* Now through DOOM's own pointer (`screens[0]`), not ACE's copy of it: that
+	   is the variable the renderer writes through, so it is the one that has to
+	   follow the depth. Refused by the engine if it does not point at our buffer. */
+	mov	(%esp), %eax
+	call	*20(%eax)
+	mov	(%esp), %edx
+	mov	(%edx), %edx
+	mov	%eax, 16(%edx)		/* report[4]: where that write landed */
 
 	/* Yield: the parent runs a frame, we come back here. Twice, so this depth is
 	   alive across two boundaries instead of completing at the first one. */

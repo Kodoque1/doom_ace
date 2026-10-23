@@ -190,8 +190,10 @@ must stay after `build:` or make takes its first target as the default goal.
 [4] `save_state`/`load_state` fire in the right order at each crossing.
 [5] each depth runs on a genuinely distinct stack (ESP values differ).
 [6] three-deep state isolation: child2 sees child1's globals and hook bytes but
-    its *own* heap and framebuffer; after it returns child1's values are intact;
-    after that returns the root's values are intact. No leak in either direction.
+    its *own* heap, framebuffer and Doom-screen pointer; after it returns child1's
+    values are intact; after that returns the root's values are intact. No leak in
+    either direction. Three pins, not two: the third is the one Doom's renderer
+    actually writes through.
 [7] planner arithmetic against hand figures; arena alignment, no overlap,
     overflow refused; an arena too small to nest is refused; the full boot
     carves distinct per-depth zones/screens and a non-overlapping stack and
@@ -259,10 +261,12 @@ because stdout capture stops once the engine takes over:
     [MTX] first frame
     [MTX] host up: depths 2 snap 529468 img 353984
     [MTX] screen region 297472 B/depth (frame 64000 + loader 69632 + parse 163840)
+    [MTX] doom screens[0] at 2572228 = 36528; ace screen_buffer = 36528
     [MTX] ace image: 353952 B at 3634508 entry 3634516 bss 22312
     [MTX] depth1 entered
     [MTX] depth1: guest alloc 114 B at 4548116, entering
     [MTX] depth1 zone 262144 B at 3988832 build 0 alloc 3988888 probe 0
+    [MTX] doom screens[0] -> 4251936: marker in depth1 buffer YES, in root buffer NO
     [MTX] frame 1 child=1
     ...
     [MTX] frame 30 child=1
@@ -529,6 +533,38 @@ depth's zone. The region is now the sum of those three parts (297472 B), and tes
 asserts the total against the engine's measured appetite as a **literal**, so shrinking
 it fails the tests instead of silently corrupting a neighbour.
 
+### Doom's OWN screen pointer, not just ACE's copy
+
+Pinning ACE's `screen_buffer` was not enough. ACE reads Doom's `screens[0]` exactly
+once, at init (main.c's hook list: `0x00074FC4 -> screen_buffer`); after that the two
+are separate variables, and Doom's RENDERER keeps writing through ITS own — so a
+nested depth would still paint over the root's frame. Both are pinned now
+(`MTX_PIN_DOOMSCREEN`, registered in `dos_wire.c` against
+`doom_data_segment + 0x74FC4`).
+
+The address is ACE's own, not a guess: it sits between `usegamma` (0x74FC0) and
+`mainzone` (0x74FE0), where vanilla Doom keeps `byte *screens[5]`, and `textpars.c`
+says outright that "memory used for text is in `screens[]`". Nothing in the engine
+ever reassigns it — Doom allocates the screen once at startup — which is what makes
+forcing a depth's value on every switch-in safe. Measured at boot, before pinning:
+
+    [MTX] doom screens[0] at 2572228 = 36528; ace screen_buffer = 36528
+
+Same address, same value: the pin is aimed at the variable the renderer uses.
+
+**Checked by where the marker lands, not by intent.** The guest writes a marker
+through Doom's own pointer, and the engine refuses that write unless the variable
+already points at the depth's own buffer — a wrong write there would land in the
+root's *visible* frame, which is the exact failure the pin prevents. Then both
+buffers are read straight out of the arena:
+
+    [MTX] doom screens[0] -> 4251936: marker in depth1 buffer YES, in root buffer NO
+
+4251936 is depth 1's own region. So a write through Doom's `screens[0]` at depth 1
+lands in depth 1's memory and nowhere near the root's frame. The marker is
+`0x4D545853` ('MTXS'), which is also why the next screen check reads
+`vga 1297373267 vs buffer 1297373267` — the thing on screen is that write.
+
 ## State footprint and the zone-sizing decision (measured)
 
 From `engine/doom_vars.S` (416 variables, 0x1A84 `finetangent` … 0x75CA0
@@ -571,14 +607,14 @@ than guessed — see the video section — and it is the third largest item per 
   uninitialised memory — what is left is video (below), plus the fact that
   `ace_main` re-patches Doom's *shared* code at run time, which the per-depth hook
   snapshots exist for but which nothing exercises yet (`nhok` is still 0).
-* **Video is only half virtualised.** The presentation source is now the host's
-  decision and each depth's screen region is sized for the engine's real appetite,
-  so a depth's frames can reach the screen and the visible one is chosen. What is
-  NOT per-depth: Doom's own screen pointer variable (the dword at `data + 0x74FC4`
-  that ACE copies into `screen_buffer` at init). ACE's own code and the blit follow
-  the depth; Doom's renderer still targets the root's buffer unless that variable is
-  pinned too. And VESA mode is a different presentation path entirely
-  (`swap_buffers` page-flip) which this does not touch.
+* **Video: the remaining gap is VESA and mode set.** Both screen pointers now follow
+  the depth (ACE's `screen_buffer` and Doom's `screens[0]`), each depth's screen
+  region is sized for the engine's real appetite, and the presentation source is the
+  host's decision — so a depth's frames reach the screen and the visible one is
+  chosen. Not covered: VESA mode is a different presentation path entirely
+  (`swap_buffers` page-flip, and `R_InitBuffer`'s framebuffer patch); and entering a
+  real engine image re-runs `I_InitGraphics`, i.e. a real mode set at a depth, which
+  is not virtualised.
 * `.data` is still not in the snapshot region list — it needs a
   `PROVIDE(_data_start/_data_end)` pair in `engine/linker.ld`. `mod_config` lives
   there, and when it is added it needs the same split that keeps `mtx_hs` out.

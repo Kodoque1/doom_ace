@@ -21,6 +21,16 @@
 #define DOOM_VAR_HI  0x00075CA0u
 #define DOOM_REGION  (DOOM_VAR_HI - DOOM_VAR_LO)	/* 475676 bytes */
 
+/* Doom's OWN screen pointer - `screens[0]`, the variable the renderer writes
+   through. ACE reads it exactly once at init into its `screen_buffer` (main.c's
+   hook list: 0x00074FC4 -> screen_buffer), so pinning ACE's copy alone still
+   leaves Doom's renderer drawing into the ROOT's frame. Both are pinned now.
+   The address is ACE's own, not a guess: it sits between `usegamma` (0x74FC0) and
+   `mainzone` (0x74FE0), where vanilla Doom keeps `byte *screens[5]`. Nothing in
+   the engine ever reassigns it (Doom allocates the screen once at startup), which
+   is what makes forcing a depth's value on every switch-in safe. */
+#define DOOM_SCREEN_VAR 0x00074FC4u
+
 extern uint32_t doom_data_segment;	/* engine/utils.h     */
 extern void    *mainzone;		/* engine/doom_vars.h */
 extern uint8_t *screen_buffer;		/* engine/doom_vars.h */
@@ -80,9 +90,12 @@ uint32_t mtx_dos_wire_register(void)
 		return 0;
 	}
 
-	/* 3. The two pointer globals each depth must own. */
+	/* 3. The pointer globals each depth must own: its heap, ACE's screen, and
+	   Doom's OWN screen pointer. The last one is the one that matters for video:
+	   Doom's renderer writes through `screens[0]`, not through ACE's copy. */
 	mtx_dos_set_pin(&mainzone, MTX_PIN_MAINZONE);
 	mtx_dos_set_pin(&screen_buffer, MTX_PIN_SCREEN);
+	mtx_dos_set_pin((void *)(doom_data_segment + DOOM_SCREEN_VAR), MTX_PIN_DOOMSCREEN);
 
 	return mtx_dos_snapshot_bytes();
 }
@@ -95,6 +108,7 @@ void mtx_dos_wire_values(uint8_t max_depth, void **heaps, void **screens)
 	{
 		mtx_dos_set_value(d, MTX_PIN_MAINZONE, heaps[d]);
 		mtx_dos_set_value(d, MTX_PIN_SCREEN, screens[d]);
+		mtx_dos_set_value(d, MTX_PIN_DOOMSCREEN, screens[d]);
 	}
 }
 

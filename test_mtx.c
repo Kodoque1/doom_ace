@@ -166,10 +166,12 @@ static int test5(void)
 static uint8_t  fake_doomdata[64];
 static void    *fake_mainzone;
 static void    *fake_screen;
+static void    *fake_doomscreen;	/* Doom's own screens[0]: a THIRD pin */
 static uint32_t fake_hookA, fake_hookB;
 
 static uint8_t heap_root[16], heap_1[16], heap_2[16];
 static uint8_t fb_root[16],   fb_1[16],   fb_2[16];
+static uint8_t ds_root[16],   ds_1[16],   ds_2[16];
 
 static int s6_fail;
 static void chk(int cond, char tag)
@@ -183,6 +185,7 @@ static void t6_child2(void *a)
 	chk(fake_doomdata[0] == 0xB1, 'a');	/* clone of parent (child1) */
 	chk(fake_mainzone   == heap_2, 'b');	/* but its OWN heap ... */
 	chk(fake_screen     == fb_2,   'c');	/* ... and its OWN framebuffer */
+	chk(fake_doomscreen == ds_2,   'q');	/* ... and its own Doom screen */
 	chk(fake_hookA      == 0xBBBB, 'd');	/* cloned patch bytes */
 	fake_doomdata[0] = 0xC2;
 	fake_hookA = 0xCCCC;
@@ -195,6 +198,7 @@ static void t6_child1(void *a)
 	chk(fake_doomdata[0] == 0xA0, 'e');
 	chk(fake_mainzone   == heap_1, 'f');
 	chk(fake_screen     == fb_1,   'g');
+	chk(fake_doomscreen == ds_1,   'r');
 	chk(fake_hookA      == 0xAAAA, 'h');
 	fake_doomdata[0] = 0xB1;
 	fake_hookA = 0xBBBB;
@@ -205,6 +209,7 @@ static void t6_child1(void *a)
 	chk(fake_doomdata[0] == 0xB1, 'i');
 	chk(fake_mainzone   == heap_1, 'j');
 	chk(fake_screen     == fb_1,   'k');
+	chk(fake_doomscreen == ds_1,   's');
 	chk(fake_hookA      == 0xBBBB, 'l');
 	mtx_finish();
 }
@@ -222,18 +227,23 @@ static int test6(void)
 	mtx_dos_add_hook(&fake_hookB, 4);
 	mtx_dos_set_pin(&fake_mainzone, MTX_PIN_MAINZONE);
 	mtx_dos_set_pin(&fake_screen,   MTX_PIN_SCREEN);
+	mtx_dos_set_pin(&fake_doomscreen, MTX_PIN_DOOMSCREEN);
 	mtx_dos_set_value(0, MTX_PIN_MAINZONE, heap_root);
 	mtx_dos_set_value(1, MTX_PIN_MAINZONE, heap_1);
 	mtx_dos_set_value(2, MTX_PIN_MAINZONE, heap_2);
 	mtx_dos_set_value(0, MTX_PIN_SCREEN, fb_root);
 	mtx_dos_set_value(1, MTX_PIN_SCREEN, fb_1);
 	mtx_dos_set_value(2, MTX_PIN_SCREEN, fb_2);
+	mtx_dos_set_value(0, MTX_PIN_DOOMSCREEN, ds_root);
+	mtx_dos_set_value(1, MTX_PIN_DOOMSCREEN, ds_1);
+	mtx_dos_set_value(2, MTX_PIN_DOOMSCREEN, ds_2);
 
 	/* root establishes the state the children will inherit */
 	fake_doomdata[0] = 0xA0;
 	fake_hookA   = 0xAAAA;
 	fake_mainzone = heap_root;
 	fake_screen   = fb_root;
+	fake_doomscreen = ds_root;
 
 	ops.save_state = mtx_dos_save_state;
 	ops.load_state = mtx_dos_load_state;
@@ -245,6 +255,7 @@ static int test6(void)
 	chk(fake_doomdata[0] == 0xA0, 'm');
 	chk(fake_mainzone   == heap_root, 'n');
 	chk(fake_screen     == fb_root,   'o');
+	chk(fake_doomscreen == ds_root,   't');
 	chk(fake_hookA      == 0xAAAA, 'p');
 
 	return s6_fail == 0;

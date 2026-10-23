@@ -111,6 +111,9 @@ int mtx_dos_boot(void *arena_mem, uint32_t arena_bytes, uint32_t zone_per_depth,
 	{
 		mtx_dos_set_value((uint8_t)i, MTX_PIN_MAINZONE, heaps[i]);
 		mtx_dos_set_value((uint8_t)i, MTX_PIN_SCREEN, screens[i]);
+		/* Doom's own screen pointer gets the same region: at a depth the RENDERER
+		   must draw into that depth's memory, not into the root's frame. */
+		mtx_dos_set_value((uint8_t)i, MTX_PIN_DOOMSCREEN, screens[i]);
 	}
 
 	out->depth = b.depth;

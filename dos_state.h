@@ -34,7 +34,11 @@
 /* pinned pointer globals we know about */
 enum {
 	MTX_PIN_MAINZONE = 0,	/* void ** / memzone_t ** - the depth's zone heap */
-	MTX_PIN_SCREEN   = 1,	/* uint8_t ** - the depth's framebuffer */
+	MTX_PIN_SCREEN   = 1,	/* uint8_t ** - ACE's own screen_buffer */
+	MTX_PIN_DOOMSCREEN = 2,	/* uint8_t ** - Doom's OWN screen pointer
+	                           (`screens[0]`), which the renderer writes through.
+	                           ACE copies it once at init, so pinning only ACE's
+	                           copy leaves Doom drawing into the root's frame. */
 	MTX_PIN_COUNT
 };
 

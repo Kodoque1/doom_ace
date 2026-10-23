@@ -88,6 +88,7 @@ typedef struct mtx_host_state {
 	uint8_t               booted, boot_failed, child_live;
 	uint8_t               present_depth;	/* depth the screen currently shows */
 	uint32_t              present_frame;	/* frame the source changed (0 = none) */
+	uint8_t               doom_screen_ok;	/* Doom's screens[0] pin verified */
 	uint32_t              frame_no;
 	int32_t               log_fd;
 	void                 *arena;
@@ -101,8 +102,8 @@ typedef struct mtx_host_state {
 	uint32_t              image_bytes;
 	mtx_ldr1n_ops_t       ldr_ops;
 	mtx_ldr0n_desc_t      ldr0_desc;
-	uint32_t              ldr_svc[5];	/* the guest's service table */
-	uint32_t              ldr_report[4];	/* what the loaded image reported */
+	uint32_t              ldr_svc[6];	/* the guest's service table */
+	uint32_t              ldr_report[5];	/* what the loaded image reported */
 	uint32_t              ldr_guest_entry;
 	uint32_t              ldr_guest_total;
 	uint32_t              ldr_ace_total;
