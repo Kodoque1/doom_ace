@@ -282,6 +282,63 @@ static void *mtx_engine_screen_fill(void)
 	return buf;
 }
 
+/*
+ * Doom's OWN screen pointer, `screens[0]`. ACE copies it once at init into
+ * `screen_buffer`, but Doom's RENDERER keeps writing through this variable - so
+ * pinning only ACE's copy leaves a nested depth painting over the root's frame.
+ * Both are pinned now (see dos_wire.c), and this is where the claim gets checked
+ * instead of assumed.
+ */
+#define MTX_DOOM_SCREEN_VAR  0x00074FC4u
+#define MTX_DOOM_SCREEN_MARK 0x4D545853u	/* 'MTXS' */
+
+/*
+ * Write a marker THROUGH Doom's own pointer, at the calling depth.
+ *
+ * Not on trust: the variable is read back first and the write is REFUSED unless it
+ * points at this depth's own screen region. The guard is not decoration - a wrong
+ * write here lands in the root's visible frame, which is the exact failure this pin
+ * exists to prevent. Returns where the write landed, or 0 if it was refused.
+ */
+static void *mtx_engine_doom_screen(void)
+{
+	uint32_t *var = (uint32_t *)(uintptr_t)(doom_data_segment + MTX_DOOM_SCREEN_VAR);
+	uint8_t *mine = screen_buffer;
+	uint8_t *doom = (uint8_t *)(uintptr_t)*var;
+
+	if(!mine || doom != mine)
+		return 0;
+
+	*(uint32_t *)doom = MTX_DOOM_SCREEN_MARK;
+	return doom;
+}
+
+/*
+ * Check the pin by where the marker LANDED, not by intent: it must be in the
+ * depth's memory and must NOT be in the root's frame. Both are read straight out
+ * of the arena, so this cannot be satisfied by the variable merely looking right.
+ */
+static void mtx_engine_doom_screen_check(void)
+{
+	uint8_t buf[176];
+	uint32_t root, deep;
+
+	if(!mtx_hs.ldr_report[4] || mtx_hs.doom_screen_ok)
+		return;
+
+	mtx_hs.doom_screen_ok = 1;
+	root = *(uint32_t *)mtx_hs.screens[0];
+	deep = *(uint32_t *)mtx_hs.screens[1];
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] doom screens[0] -> %u: marker in depth1 buffer %s, "
+	             "in root buffer %s\n",
+	             mtx_hs.ldr_report[4],
+	             (deep == MTX_DOOM_SCREEN_MARK) ? "YES" : "NO",
+	             (root == MTX_DOOM_SCREEN_MARK) ? "YES" : "NO");
+	mtx_log((const char *)buf);
+}
+
 // Depth 1's entry. It loads a code image of its own out of the WAD and runs it.
 //
 // The image is a real WAD lump, read through the engine's WAD layer, and it lands
@@ -317,6 +374,7 @@ static void mtx_demo_child(void *arg)
 	mtx_hs.ldr_report[1] = 0;
 	mtx_hs.ldr_report[2] = 0;
 	mtx_hs.ldr_report[3] = 0;
+	mtx_hs.ldr_report[4] = 0;
 
 	/* The whole authority the loaded image has over the machine: leave evidence,
 	   ask for a zone of its own, draw on its OWN screen, yield, finish. No free,
@@ -330,6 +388,7 @@ static void mtx_demo_child(void *arg)
 	mtx_hs.ldr_svc[2] = (uint32_t)(uintptr_t)mtx_finish;
 	mtx_hs.ldr_svc[3] = (uint32_t)(uintptr_t)mtx_engine_zone_init;
 	mtx_hs.ldr_svc[4] = (uint32_t)(uintptr_t)mtx_engine_screen_fill;
+	mtx_hs.ldr_svc[5] = (uint32_t)(uintptr_t)mtx_engine_doom_screen;
 
 	mtx_ldr_enter(entry);		// hands off through ldr0N; never returns
 
@@ -391,6 +450,19 @@ static void mtx_engine_boot(void)
 	             MTX_SCREEN_BYTES, MTX_SCREEN_FRAME_BYTES,
 	             MTX_SCREEN_LOADER_BYTES, MTX_SCREEN_PARSE_BYTES);
 	mtx_log((const char *)buf);
+
+	/* Measure, before pinning: Doom's own screen pointer and the copy ACE took of
+	   it at init must be the same address. If they are not, the pin is aimed at
+	   the wrong variable and this says so at boot rather than at the first
+	   corrupted frame. */
+	{
+		uint32_t *var = (uint32_t *)(uintptr_t)(doom_data_segment + MTX_DOOM_SCREEN_VAR);
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] doom screens[0] at %u = %u; ace screen_buffer = %u\n",
+		             (uint32_t)(uintptr_t)var, *var,
+		             (uint32_t)(uintptr_t)screen_buffer);
+		mtx_log((const char *)buf);
+	}
 
 	/* The same loader path, against the REAL engine image. A depth can fetch,
 	   allocate for and prepare its own copy of ACE - verified by the version
@@ -460,6 +532,7 @@ static void mtx_engine_policy(void)
 
 	mtx_engine_video();
 	mtx_present_confirm();
+	mtx_engine_doom_screen_check();
 
 	// instrumentation: prove the frame path keeps running after the first switch
 	if(mtx_frame_no <= 40u || (mtx_frame_no % 50u) == 0u)
