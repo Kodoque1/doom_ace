@@ -51,7 +51,7 @@
    half. 2 MiB against a measured 209,184 B single request - the pool logs its
    peak and the size of any refusal, so the figure is checked by a live run. */
 #define MTX_RAW_PER_DEPTH   (2u * 1024u * 1024u)
-#define MTX_DEMO_INTERVAL   4u
+#define MTX_DEMO_INTERVAL   1u
 
 /* Frames at the start of a slice during which the switch key is ignored, on both
    sides. Doom's key array lives in Doom's data, so it is snapshot state: a
@@ -1529,6 +1529,23 @@ static void mtx_engine_depth_check(void)
 	             (vga == *(uint32_t *)mtx_hs.screens[0]) ? "= root frame" :
 	             (vga == deep[0]) ? "= depth1 frame" : "matches neither");
 	mtx_log((const char *)buf);
+
+	/* How much of the snapshot a switch actually copies, and whether the cold set
+	   held up. Reported here because it is the whole point of the copyless path:
+	   the warm-up is judged from these numbers, not trusted. */
+	{
+		uint32_t sv = 0, ld = 0, ever = 0, sw = 0, bad = 0;
+		uint32_t snap = mtx_dos_snapshot_bytes();
+		mtx_dos_copyless(&sv, &ld, &ever, &sw, &bad);
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] copyless: last save copied %u B, last load %u B, of a %u B "
+		             "snapshot (%u.%u%%); hot set %u B over %u switches; %u promoted\n",
+		             sv, ld, snap,
+		             snap ? (sv * 1000u) / snap / 10u : 0u,
+		             snap ? (sv * 1000u) / snap % 10u : 0u,
+		             ever, sw, bad);
+		mtx_log((const char *)buf);
+	}
 }
 
 static void mtx_engine_switch(void);	/* the key and the inset, further down */
@@ -1819,37 +1836,22 @@ static void mtx_engine_switch(void)
 }
 
 /*
- * Paint a RUNNING depth's own live view into the canvas.
+ * WHY A DEPTH DOES NOT PAINT THE MAIN VIEW (measured, and it is a trade-off with
+ * only one good answer at fine slices).
  *
- * Both depths present the root's framebuffer, so whichever one is running is the one
- * that has to keep the screen up to date - and while a depth runs, the root is
- * suspended and its buffer holds the frame it left behind. Measured before this:
- * the picture froze for 3.90 s at a time and the nested view changed 1.1 times a
- * second, because the screen showed the root's still frame for the whole of every
- * depth slice.
+ * The main area of the canvas has to come from ONE instance. With a depth painting
+ * its own view there, the picture alternates between the two instances every time
+ * control does - which was fine at 30-frame slices and wrong at 1-frame slices:
+ * measured on adjacent captured frames (0.05 s apart), 50% of the main view and 67%
+ * of the status bar differed, i.e. the numbers on the status bar were switching
+ * between two sessions faster than anyone can read them.
  *
- * The inset rectangle (and its border) is deliberately SKIPPED: it belongs to the
- * host's composite, and it is the one part of the canvas a depth must not paint over,
- * or the inset would blink out for the duration of every one of its own slices.
+ * What that function was fixing - the screen freezing for the whole of a depth's
+ * slice - is 3.90 s at 30-frame slices and ONE FRAME at 1-frame slices, i.e.
+ * invisible. So: fine slices make the freeze irrelevant, the main view stays the
+ * root's, and the depth's frames reach the screen through the host's inset, which
+ * composites the depth's newest frame on every root frame.
  */
-static void mtx_paint_view(uint8_t *canvas, const uint8_t *mine)
-{
-	uint32_t y, x;
-
-	if(!canvas || !mine || canvas == mine)
-		return;
-
-	for(y = 0; y < 200u; y++)
-		for(x = 0; x < 320u; x++)
-		{
-			if(y >= MTX_INSET_Y - MTX_INSET_BORDER
-			   && y < MTX_INSET_Y + MTX_INSET_H + MTX_INSET_BORDER
-			   && x >= MTX_INSET_X - MTX_INSET_BORDER
-			   && x < MTX_INSET_X + MTX_INSET_W + MTX_INSET_BORDER)
-				continue;
-			canvas[y * 320u + x] = mine[y * 320u + x];
-		}
-}
 
 /*
  * Is the depth really painting, and whose pixels are on the screen?
@@ -1952,14 +1954,6 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		   host puts it - in the inset. */
 		if(me->present_src)
 			*((uint32_t *)((uint8_t *)(void *)I_FinishUpdate + 4)) = me->present_src;
-
-		/* ...and keep the SCREEN live from this side. While this depth runs the root
-		   is suspended, so without this the picture on screen is the root's last
-		   frame for the whole slice - measured as 3.9 s of a still screen and a
-		   nested view changing 1.1 times a second. The host's inset is preserved
-		   (see mtx_paint_view). */
-		if(me->inset_on && me->canvas && me->screen)
-			mtx_paint_view((uint8_t *)(uintptr_t)me->canvas, (uint8_t *)me->screen);
 
 		/* The switch key: Doom's key state is per-depth, so a press that lands
 		   during THIS depth's slice is invisible to the host. Record it here, in
