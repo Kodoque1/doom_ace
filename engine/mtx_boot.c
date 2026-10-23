@@ -2072,7 +2072,18 @@ static void mtx_engine_switch(void)
 			   its window is how the ring lost the key entirely: measured, three
 			   levels, not one switch line in a 30 s run, with the host's window up
 			   on one frame in four - the one frame the child's edge landed on. */
-			if(req || (!mtx_hs.key_guard && pressed && !mtx_hs.key_down))
+			/* INPUT-FREE TOUR: the trigger is the frame counter, not a key. The key
+			   turned out to be a channel that must be visible to a SUSPENDED
+			   instance, and that is exactly what does not hold up in a ring - so a
+			   clip needs a trigger the host owns outright. 90 frames is a few
+			   seconds at the measured rate: long enough to see a state, short
+			   enough that a 20 s clip shows the whole cycle (off, level 1, level 2).
+			   The key condition stays in place: that is the clean way, once the
+			   input path is understood. */
+			uint32_t tour = (mtx_frame_no && (mtx_frame_no % 90u) == 0u) ? 1u : 0u;
+			uint32_t key  = (req || (!mtx_hs.key_guard && pressed && !mtx_hs.key_down)) ? 1u : 0u;
+
+			if(tour || key)
 			{
 				mtx_hs.key_guard = MTX_KEY_DEBOUNCE_FRAMES;
 				mtx_hs.inset_frame = mtx_frame_no;
@@ -2096,9 +2107,9 @@ static void mtx_engine_switch(void)
 				{
 					uint8_t buf[160];
 					doom_sprintf(buf, (const uint8_t *)
-					             "[MTX] switch: key '%c' -> inset depth %u at frame %u\n",
-					             (uint32_t)MTX_SWITCH_KEY,
-					             (uint32_t)mtx_hs.inset_depth, mtx_frame_no);
+					             "[MTX] inset -> depth %u at frame %u (trigger: %s)\n",
+					             (uint32_t)mtx_hs.inset_depth, mtx_frame_no,
+					             tour ? "TOUR" : "key");
 					mtx_log((const char *)buf);
 				}
 
