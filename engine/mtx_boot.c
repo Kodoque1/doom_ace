@@ -61,6 +61,12 @@
    shortest human press and a small fraction of a slice. */
 #define MTX_KEY_GUARD_FRAMES 3u
 
+/* TEMPORARY (measurement): stack painting, to size MTX_STACK_SIZE from a number.
+   See the code that paints and the code that scans it, further down. */
+#define MTX_STACK_PAINT 0xC5C5C5C5u
+static uint32_t mtx_stack_lo, mtx_stack_hi;
+static uint32_t mtx_stack_painted;
+
 /* Which code image depth 1 runs.
  *
  *  0 = the purpose-built guest. Proves the loader, the zone, the screen and the
@@ -1288,6 +1294,11 @@ static void mtx_engine_boot(void)
 	ops.load_state = mtx_dos_load_state;
 	mtx_init(bt.depth, &ops, bt.stack_base, bt.stack_bytes);
 
+	/* Depth 1's own stack slot, for the high-water measurement below and in the
+	   policy: slot d is [base + d*MTX_STACK_SIZE, base + (d+1)*MTX_STACK_SIZE). */
+	mtx_stack_lo = (uint32_t)(uintptr_t)bt.stack_base + MTX_STACK_SIZE;
+	mtx_stack_hi = mtx_stack_lo + MTX_STACK_SIZE;
+
 	doom_sprintf(buf, (const uint8_t *)"[MTX] host up: depths %u snap %u img %u\n",
 	             (uint32_t)bt.depth, bt.snapshot_per_depth, mtx_hs.image_bytes);
 	mtx_log((const char *)buf);
@@ -1429,6 +1440,25 @@ static void mtx_engine_boot(void)
 		mtx_log((const char *)buf);
 	}
 
+	/* TEMPORARY (measurement): how much of a depth's reserved stack does a real
+	   nested Doom instance actually use?
+	   The slot is painted with a pattern before the depth is first entered, and
+	   the first word from the top that is no longer the pattern is the high-water
+	   mark. This is what should size MTX_STACK_SIZE with a number instead of a
+	   guess: that a depth's stack had to become PRIVATE is a separate fact from
+	   how big it has to be, and the 64 KiB -> 256 KiB rise was precautionary. */
+	if(mtx_stack_lo)
+	{
+		uint32_t i;
+		for(i = 0; i < MTX_STACK_SIZE / 4u; i++)
+			((uint32_t *)(uintptr_t)mtx_stack_lo)[i] = MTX_STACK_PAINT;
+		mtx_stack_painted = 1;
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] depth1 stack slot [%u, %u) painted %u B for a high-water read\n",
+		             mtx_stack_lo, mtx_stack_hi, MTX_STACK_SIZE);
+		mtx_log((const char *)buf);
+	}
+
 	if(mtx_push(mtx_demo_child, 0) == MTX_OK)
 		mtx_child_live = 1;
 	else
@@ -1494,6 +1524,48 @@ static void mtx_dump_words(const uint8_t *what, uint32_t addr);	/* TEMPORARY */
 static void mtx_engine_switch(void);	/* the key and the inset, further down */
 static void mtx_dump_words(const uint8_t *what, uint32_t addr);	/* TEMPORARY */
 
+/*
+ * TEMPORARY (measurement): the depth's stack high-water mark, read from the paint.
+ *
+ * The slot is painted before the depth is entered, so the highest word that is no
+ * longer the pattern is the deepest this depth's own frames have reached. Frames
+ * are never un-written as the stack unwinds, so everything between the deepest
+ * point and the top has been written at some time - which is what makes a
+ * single downward scan enough. The bottom word is reported separately: if the
+ * depth had run off the end of its slot, the word below it would be painted over,
+ * and that is the case the number must not be silent about.
+ */
+static void mtx_engine_stack_water(void)
+{
+	uint32_t *slot = (uint32_t *)(uintptr_t)mtx_stack_lo;
+	uint32_t n = MTX_STACK_SIZE / 4u, i, used;
+	uint8_t buf[192];
+
+	if(!mtx_stack_painted || !mtx_stack_lo || (mtx_frame_no % 50u))
+		return;
+
+	/* Scan UP from the bottom, not down from the top: the top of the slot is
+	   written by the SEED before the depth ever runs (edi/esi/ebx/ebp, the
+	   trampoline address, the entry argument), so a downward scan stops on its
+	   first word and reports 0 - measured, and it looked like the depth had not
+	   touched its stack at all. The lowest word that is no longer the pattern is
+	   the high-water mark; everything below it has never been written. */
+	i = 0;
+	while(i < n && slot[i] == MTX_STACK_PAINT)
+		i++;
+	used = (n - i) * 4u;
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth1 stack: used %u B of %u (%u.%u%%), low-water at %u; "
+	             "slot bottom %s\n",
+	             used, MTX_STACK_SIZE,
+	             (used * 1000u) / MTX_STACK_SIZE / 10u,
+	             (used * 1000u) / MTX_STACK_SIZE % 10u,
+	             mtx_stack_hi - used,
+	             (slot[0] == MTX_STACK_PAINT) ? "intact" : "OVERWRITTEN");
+	mtx_log((const char *)buf);
+}
+
 static void mtx_engine_policy(void)
 {
 	uint8_t buf[144];
@@ -1502,6 +1574,7 @@ static void mtx_engine_policy(void)
 
 	mtx_engine_video();
 	mtx_engine_switch();
+	mtx_engine_stack_water();
 	mtx_present_confirm();
 	mtx_engine_depth_check();
 	mtx_engine_doom_screen_check();
