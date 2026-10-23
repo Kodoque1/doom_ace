@@ -46,6 +46,18 @@ mtx_raw_t *mtx_engine_raw_pool(void);
 // TEMPORARY diagnostic: report an absurd allocation request, with its caller.
 void mtx_alloc_probe(uint32_t size, uint32_t caller, uint32_t self);
 
+// TEMPORARY diagnostic: the stack an error screen was reached from. Called from
+// the I_Error hook in asm.S, which pushes its arguments - so this is a plain C
+// function and must not carry MTX_FRAME_TICK_ABI.
+void mtx_error_probe(uint32_t esp, uint32_t ret, uint32_t fmt, uint32_t value);
+
+// TEMPORARY diagnostic: the first index the texture loop processes, per depth.
+void MTX_FRAME_TICK_ABI mtx_tex_probe(uint32_t first, uint32_t count);
+
+// TEMPORARY diagnostic: what the texture count was derived from, per depth.
+void MTX_FRAME_TICK_ABI mtx_texcount_probe(uint32_t t1, uint32_t t2, uint32_t idx1,
+                                           uint32_t idx2);
+
 // TEMPORARY diagnostic: report a lump-cache call whose index cannot be valid.
 // Same call convention as the ACE hook functions that call it.
 void MTX_FRAME_TICK_ABI mtx_lump_probe(uint32_t site, uint32_t idx, uint32_t value,

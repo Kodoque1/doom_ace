@@ -289,7 +289,19 @@ uint32_t ace_main()
 	// count EVERYTHING
 
 	// count textures
-	loading->count_texture += count_textures();
+	// NOT '+=' - and the difference is the whole reason a nested depth used to
+	// render garbage and then die. This counter lives in Doom's data segment, so a
+	// depth inherits it through its snapshot: the snapshot is CLONED from the
+	// parent's LIVE state (that is what makes a depth start as a copy of the root),
+	// and the parent had already counted its own textures. Measured: the root
+	// counted 428, the depth added 428 more to the inherited 428, and
+	// init_textures() was handed 856. The texture arrays were then allocated for
+	// 856 entries while only 428 were filled, and the loop that initialises them
+	// (tex_init_data) walked the unfilled half - R_GenerateLookup() on blocks that
+	// hold no texture, which is where the out-of-range lump index on the error
+	// screen came from. Counting is not accumulating: what is wanted is the number
+	// of textures THIS depth has.
+	loading->count_texture = count_textures();
 	loading->counter_value = 0;
 	wad_handle_range(0x5854, cb_counter);
 	loading->count_texture += loading->counter_value;

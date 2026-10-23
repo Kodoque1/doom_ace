@@ -286,6 +286,24 @@ hook_masked_range_draw:
 // I_Error hook
 .global hook_bluescreen
 hook_bluescreen:
+	push	%eax
+	push	%ecx
+	push	%edx
+	push	%ebx
+	lea	16(%esp),%eax		// the stack as I_Error's caller left it
+	mov	(%eax),%ecx			// where I_Error was called from
+	mov	4(%eax),%edx		// the message it was given
+	mov	8(%eax),%ebx		// and its argument
+	push	%ebx
+	push	%edx
+	push	%ecx
+	push	%eax
+	call	mtx_error_probe
+	add	$16,%esp
+	pop	%ebx
+	pop	%edx
+	pop	%ecx
+	pop	%eax
 	add	$8,%esp
 	movl	$d_drawsegs,(%esp)
 	call	doom_sprintf

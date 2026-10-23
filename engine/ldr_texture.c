@@ -361,6 +361,7 @@ uint32_t count_textures()
 	uint32_t temp;
 	int32_t idx;
 	uint32_t count = 0;
+	uint32_t idx1 = -1, idx2 = -1, t1 = 0, t2 = 0;	/* TEMPORARY */
 
 	//
 	// check what the loader changed first
@@ -401,6 +402,7 @@ uint32_t count_textures()
 		wad_read_lump(&temp, idx, 4);
 		count += temp;
 		have_doomtex = 1;
+		idx1 = (uint32_t)idx; t1 = temp;	/* TEMPORARY */
 	}
 
 	idx = wad_check_lump(dtxt_texture2);
@@ -409,7 +411,10 @@ uint32_t count_textures()
 		wad_read_lump(&temp, idx, 4);
 		count += temp;
 		have_doomtex = 1;
+		idx2 = (uint32_t)idx; t2 = temp;	/* TEMPORARY */
 	}
+
+	mtx_texcount_probe(t1, t2, idx1, idx2);		/* TEMPORARY */
 
 	return count;
 }
@@ -531,6 +536,7 @@ void tex_init_data()
 {
 	for(uint32_t i; i < tmp_count; i++)
 	{
+		mtx_tex_probe(i, tmp_count);	/* TEMPORARY: where this starts */
 		R_GenerateLookup(i);
 		gfx_progress(1);
 	}

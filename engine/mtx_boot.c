@@ -37,7 +37,15 @@
 #include "mtx_params.h"
 #include "mtx_boot.h"		// own declarations: the diagnostics below take &mtx_engine_alloc
 
-#define MTX_ZONE_PER_DEPTH  (256u * 1024u)
+/* A depth's ZONE. Was 256 KiB, and that is why a nested instance died in
+   Z_Malloc with "failed on allocation of 29164 bytes" the moment its texture
+   lookups started really reading lumps: Doom's own V_Init allocates its screens
+   (192 KB of the 256 right there), and after that a 28 KB patch lump has nowhere
+   to go. The root's own zone is ~8 MiB (Doom's default request), so a depth that
+   is meant to run a real instance cannot be two orders of magnitude smaller.
+   4 MiB is the starting figure; the host reports what the depth actually uses,
+   so it gets confirmed or corrected from a live run. */
+#define MTX_ZONE_PER_DEPTH  (4u * 1024u * 1024u)
 /* A child's raw (non-zone) pool. See mtx_raw.h and the raw-allocation block
    further down: the zone was half of what a depth needs, this is the other
    half. 2 MiB against a measured 209,184 B single request - the pool logs its
@@ -277,6 +285,128 @@ uint8_t mtx_engine_depth(void)
 	return mtx_glue_depth();
 }
 
+/* TEMPORARY: what led to the error screen. hook_bluescreen jumps here with
+   I_Error's own arguments still on the stack, so the words above them are the
+   frames of whoever called I_Error - which is exactly what is not known: the
+   screen says an index was out of range, not who passed it.
+   A plain C function on purpose: the asm caller pushes its arguments, so this
+   must NOT carry MTX_FRAME_TICK_ABI (that is regparm(2), i.e. arguments in
+   eax/edx). Addresses are resolved offline - an ACE address against the engine
+   ELF, a Doom address as an offset from doom_code_segment, which is why both
+   bases are recorded. */
+void mtx_error_probe(uint32_t esp, uint32_t ret, uint32_t fmt, uint32_t value)
+{
+	uint32_t v[32];
+	int32_t fd;
+	uint32_t i;
+
+	v[0] = 0x4D545853u;			/* 'MTXS' */
+	v[1] = esp;
+	v[2] = ret;					/* where I_Error was called from */
+	v[3] = fmt;					/* the message the caller passed */
+	v[4] = value;				/* its first argument */
+	v[5] = (uint32_t)mtx_engine_depth();
+	v[6] = numlumps;
+	v[7] = doom_code_segment;
+	v[8] = doom_data_segment;
+	v[9] = ace_segment;
+	v[10] = (uint32_t)(uintptr_t)lumpinfo;
+	v[11] = (uint32_t)(uintptr_t)mainzone;
+	for(i = 0; i < 20; i++)
+		v[12 + i] = ((const uint32_t *)(uintptr_t)esp)[i];
+
+	fd = doom_open_WR("MTXS.LOG");
+	if(fd >= 0)
+	{
+		doom_write(fd, v, sizeof(v));
+		doom_close(fd);
+	}
+}
+
+/* TEMPORARY: where the texture loop STARTS. Upstream ACE's tex_init_data()
+   declares its loop counter uninitialised (`for(uint32_t i; i < tmp_count; i++)`,
+   commit "new texture loading"), so where it starts is whatever the register
+   happened to hold. That is the difference between a depth that renders and one
+   that does not: a start index past the end skips every texture's lookup, and a
+   start index inside garbage calls R_GenerateLookup on a texture that is not
+   there. One line per engine copy, into a file named for the depth. */
+void MTX_FRAME_TICK_ABI mtx_tex_probe(uint32_t first, uint32_t count)
+{
+	static uint8_t done;
+	uint32_t v[8];
+	int32_t fd;
+	char name[12] = "MTXT0.LOG";
+	uint8_t d = mtx_glue_depth();
+
+	if(done)
+		return;
+	done = 1;
+
+	name[4] = (char)('0' + (d % 10));
+	v[0] = 0x4D545854u;			/* 'MTXT' */
+	v[1] = first;
+	v[2] = count;
+	v[3] = numtextures;
+	v[4] = (uint32_t)d;
+	v[5] = (uint32_t)(uintptr_t)textures;
+	v[6] = (uint32_t)(uintptr_t)mtx_self();
+	v[7] = 0x4D545854u;
+	fd = doom_open_WR(name);
+	if(fd >= 0)
+	{
+		doom_write(fd, v, sizeof(v));
+		doom_close(fd);
+	}
+}
+
+/* TEMPORARY: what count_textures() actually read. A nested instance's snapshot
+   starts as a clone of the root's finished state, so anything the loader does not
+   reset can carry over; and if the texture COUNT doubles, the loop in
+   tex_init_data walks past the end of textures[] and hands R_GenerateLookup
+   memory that is not a texture - which is the out-of-range lump index seen on the
+   error screen. Records the two lumps it looked up, their headers, the names it
+   looked up them BY, and the two counts it added. */
+void MTX_FRAME_TICK_ABI mtx_texcount_probe(uint32_t t1, uint32_t t2, uint32_t idx1, uint32_t idx2)
+{
+	uint32_t v[24];
+	int32_t fd;
+	char name[12] = "MTXC0.LOG";
+	uint8_t d = mtx_glue_depth();
+
+	name[4] = (char)('0' + (d % 10));
+	v[0] = 0x4D545843u;			/* 'MTXC' */
+	v[1] = (uint32_t)d;
+	v[2] = t1;
+	v[3] = t2;
+	v[4] = idx1;
+	v[5] = idx2;
+	v[6] = (idx1 >= 0) ? lumpinfo[idx1].size : 0;
+	v[7] = (idx1 >= 0) ? lumpinfo[idx1].offset : 0;
+	v[8] = (idx1 >= 0) ? (uint32_t)lumpinfo[idx1].fd : 0;
+	v[9] = (idx2 >= 0) ? lumpinfo[idx2].size : 0;
+	v[10] = (idx2 >= 0) ? lumpinfo[idx2].offset : 0;
+	v[11] = (idx2 >= 0) ? (uint32_t)lumpinfo[idx2].fd : 0;
+	v[12] = *((const uint32_t *)dtxt_texture1);
+	v[13] = *((const uint32_t *)(dtxt_texture1 + 4));
+	v[14] = *((const uint32_t *)dtxt_texture2);
+	v[15] = *((const uint32_t *)(dtxt_texture2 + 4));
+	v[16] = *((const uint32_t *)dtxt_pnames);
+	v[17] = *((const uint32_t *)(dtxt_pnames + 4));
+	v[18] = (uint32_t)numlumps;
+	v[19] = (uint32_t)(uintptr_t)lumpinfo;
+	v[20] = 0;					/* reserved */
+	v[21] = 0;					/* reserved */
+	v[22] = (uint32_t)(uintptr_t)mtx_self();
+	v[23] = 0x4D545843u;
+
+	fd = doom_open_WR(name);
+	if(fd >= 0)
+	{
+		doom_write(fd, v, sizeof(v));
+		doom_close(fd);
+	}
+}
+
 /*
  * Reserve the arena for the nested instances. MUST run before ACE's Z_Init takes
  * the rest of RAM: Z_Init walks dpmi_get_ram() down until malloc succeeds, i.e.
@@ -286,13 +416,14 @@ uint8_t mtx_engine_depth(void)
 void MTX_FRAME_TICK_ABI mtx_engine_reserve(void)
 {
 	/* Sized for what is actually wanted - the root plus ONE nested instance -
-	   rather than for the depth ceiling. Two depths need
-	   snapshot + zone + screen + stack + image + raw each (MTX_RAW_PER_DEPTH is
-	   the biggest term), so ~7 MiB covers the pair with room to spare, and the
-	   fallbacks cover a machine where the single 8 MiB block will not come
-	   loose. Asking for the ceiling instead would take ~40 MiB away from the
-	   root's zone for depths nothing is going to run. */
-	static const uint32_t sizes[] = {8u, 7u, 0u};	// MiB
+	   rather than for the depth ceiling. A depth costs
+	   snapshot + zone + screen + stack + image + raw (MTX_ZONE_PER_DEPTH and
+	   MTX_RAW_PER_DEPTH are the two biggest terms), i.e. ~7.2 MiB each, so two
+	   depths need ~14.5 MiB and 20 leaves the pair room to spare while the root
+	   still gets the rest of DPMI for its own zone. The 16 MiB fallback still
+	   fits the pair (2.2); anything smaller would not, and a refusal is reported
+	   rather than quietly booting a depth with less than the planner promised. */
+	static const uint32_t sizes[] = {20u, 16u, 0u};	// MiB
 	uint32_t i;
 
 	/* A nested depth reaches this too: its ACE image runs ace_main, which calls
@@ -680,6 +811,11 @@ void mtx_engine_apply_params(void)
    short window is a coin flip on which depth a given capture catches. */
 #define MTX_PRESENT_FROM   10u
 #define MTX_PRESENT_UNTIL  200u
+
+/* How often a depth reads video memory back and compares it with its own frame
+   (see mtx_engine_self_check): often enough to catch a depth that stops being
+   presented, rare enough that scanning 64000 bytes does not show up in a frame. */
+#define MTX_SELF_CHECK_EVERY  300u
 
 /*
  * Point the presentation at `depth`. Returns whether the screen ALREADY agrees.
@@ -1153,10 +1289,13 @@ static void mtx_engine_boot(void)
 static void mtx_engine_video(void)
 {
 	uint8_t want;
-	uint8_t buf[144];
+	uint8_t buf[176];
 
-	/* nothing to show until the guest has drawn on its own screen */
-	if(!mtx_hs.ldr_report[2])
+	/* What gates the presentation is no longer a guest's report: an engine
+	   instance reports by counting its frames into the parameter block it was
+	   entered with (see mtx_engine_frame). Until it has drawn one, presenting it
+	   would show uninitialised arena memory. */
+	if(!mtx_hs.params[1].frames)
 		return;
 
 	want = (mtx_frame_no >= MTX_PRESENT_FROM && mtx_frame_no < MTX_PRESENT_UNTIL)
@@ -1166,9 +1305,42 @@ static void mtx_engine_video(void)
 
 	mtx_present(want);
 	doom_sprintf(buf, (const uint8_t *)
-	             "[MTX] present -> depth %u, buffer %u (blit runs this frame; "
-	             "checked next frame)\n",
-	             (uint32_t)want, (uint32_t)(uintptr_t)mtx_hs.screens[want]);
+	             "[MTX] present -> depth %u, buffer %u (depth1 frames %u; blit runs "
+	             "this frame, checked next frame)\\n",
+	             (uint32_t)want, (uint32_t)(uintptr_t)mtx_hs.screens[want],
+	             mtx_hs.params[1].frames);
+	mtx_log((const char *)buf);
+}
+
+/*
+ * TEMPORARY: is the depth really painting, and whose pixels are on the screen?
+ *
+ * The engine's frame count says the depth reached its frame boundary; this says
+ * whether its frame buffer holds a picture and whether what the VGA shows is
+ * that picture. Read straight out of the arena and out of video memory, so it
+ * cannot be satisfied by a counter that merely increments.
+ */
+static void mtx_engine_depth_check(void)
+{
+	uint8_t buf[192];
+	uint32_t *deep = (uint32_t *)mtx_hs.screens[1];
+	uint32_t nz = 0, i;
+	uint32_t vga = *(uint32_t *)(uintptr_t)0xA0000;
+
+	if(!mtx_hs.params[1].frames || !deep || (mtx_frame_no % 50u))
+		return;
+
+	for(i = 0; i < MTX_SCREEN_FRAME_BYTES / 4u; i++)
+		if(deep[i])
+			nz++;
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth1 frames %u, frame[0..1] %u %u, non-zero %u/%u, "
+	             "vga %u %s\n",
+	             mtx_hs.params[1].frames, deep[0], deep[1], nz,
+	             (uint32_t)(MTX_SCREEN_FRAME_BYTES / 4u), vga,
+	             (vga == *(uint32_t *)mtx_hs.screens[0]) ? "= root frame" :
+	             (vga == deep[0]) ? "= depth1 frame" : "matches neither");
 	mtx_log((const char *)buf);
 }
 
@@ -1180,6 +1352,7 @@ static void mtx_engine_policy(void)
 
 	mtx_engine_video();
 	mtx_present_confirm();
+	mtx_engine_depth_check();
 	mtx_engine_doom_screen_check();
 	mtx_engine_probe_check();
 
@@ -1225,10 +1398,68 @@ static void mtx_engine_policy(void)
 	}
 }
 
+/*
+ * Is the depth really painting, and whose pixels are on the screen?
+ *
+ * Runs in the instance's own copy of the engine (its frame boundary reaches here),
+ * so it compares what video memory holds with the very buffer this depth draws
+ * into - and counts how many of the 16000 dwords agree. Nothing roundabout: if the
+ * screen were showing the root's frame instead, the count would be small, and it is
+ * the instance's own memory being compared either way.
+ *
+ * The three addresses say the same thing from the other side: the region the HOST
+ * set aside, the engine's own screen_buffer as pinned for this depth, and Doom's
+ * own screens[0] - the renderer writes through the last one. If they ever disagree,
+ * the picture on the screen is not coming from where the host thinks it is.
+ */
+static void MTX_FRAME_TICK_ABI mtx_engine_self_check(mtx_depth_params_t *me)
+{
+	uint8_t buf[256];
+	uint32_t *mine = (uint32_t *)me->screen;
+	uint32_t *sb = (uint32_t *)screen_buffer;
+	uint32_t *dv = (uint32_t *)(uintptr_t)(doom_data_segment + MTX_DOOM_SCREEN_VAR);
+	uint32_t same = 0, i;
+
+	if(!mine || (me->frames % MTX_SELF_CHECK_EVERY) != 0u)
+		return;
+
+	for(i = 0; i < MTX_SCREEN_FRAME_BYTES / 4u; i++)
+		if(mine[i] == ((const uint32_t *)(uintptr_t)0xA0000)[i])
+			same++;
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth %u frame %u: screen region %u, engine screen_buffer %u, "
+	             "doom screens[0] %u; video memory equals this depth's frame in "
+	             "%u/%u dwords\n",
+	             (uint32_t)me->depth, me->frames,
+	             (uint32_t)(uintptr_t)mine, (uint32_t)(uintptr_t)sb,
+	             (uint32_t)(uintptr_t)*dv, same,
+	             (uint32_t)(MTX_SCREEN_FRAME_BYTES / 4u));
+	mtx_log((const char *)buf);
+}
+
 /* Single entry point for the frame path (engine/vesa.c). Same call convention as
    the function that calls it, so it is safe inside swap_buffers(). */
 void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 {
+	/* An INSTANCE is not a host, and it reaches this same line every frame: a
+	   depth installs the same Doom patches, so Doom's frame boundary calls the
+	   depth's own copy of this function. Booting a host from in there is
+	   nonsense - it has no arena and must never claim one (its own boot said so:
+	   "no reserved arena; host disabled").
+	   What it can do instead is count its frames where the host can see them.
+	   The parameter block it was entered with lives in the HOST's memory, so one
+	   increment here is the host's evidence that this depth is not merely
+	   booted: it is drawing. */
+	mtx_depth_params_t *me = mtx_self();
+
+	if(me)
+	{
+		me->frames++;
+		mtx_engine_self_check(me);
+		return;
+	}
+
 	if(!mtx_booted)
 		mtx_engine_boot();
 
