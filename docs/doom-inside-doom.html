@@ -58,6 +58,8 @@ h1{font-family:var(--f-display);font-weight:900;text-transform:uppercase;line-he
   filter:drop-shadow(0 3px 0 #2a0904) drop-shadow(0 6px 0 #160502) drop-shadow(0 14px 22px rgba(0,0,0,.7))}
 h1 .nest{display:block;font-size:.62em;opacity:.92}
 h1 .nest2{display:block;font-size:.38em;opacity:.85}
+h1 .nest3{display:block;font-size:.26em;opacity:.8;margin-top:.12em}
+h1 .nest3 b{font-weight:900;color:#ffd27a;-webkit-text-fill-color:#ffd27a}
 .dek{font-size:22px;line-height:1.5;color:var(--dim);max-width:640px;margin:0}
 .dek strong{color:var(--fg)}
 
@@ -250,8 +252,8 @@ footer h2{font-size:34px}
 
 <header class="hero wrap">
   <div class="wide">
-    <p class="eyebrow">A field report from inside one DOOM2.EXE process</p>
-    <h1>Doom<span class="nest">inside Doom</span><span class="nest2">inside Doom</span></h1>
+    <p class="eyebrow">Doomatryoshka · a field report from inside one DOOM2.EXE process</p>
+    <h1 aria-label="Doomatryoshka: Doom inside Doom inside Doom inside the first Doom">Doom<span class="nest">inside Doom</span><span class="nest2">inside Doom</span><span class="nest3">inside the <b>first</b> Doom ↺</span></h1>
     <p class="dek">Three copies of a game engine run inside one DOS process, and none of them was written to share it. This article explains how the <strong>matryoshka</strong> host makes them take turns, what each copy has to own, and the seven times something turned out to belong to the wrong owner.</p>
   </div>
 </header>
