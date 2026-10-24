@@ -33,6 +33,7 @@
   --f-hud:"VT323","IBM Plex Mono","Consolas",monospace;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:19px;line-height:1.62;
   background-image:radial-gradient(1200px 500px at 50% -120px,rgba(209,52,31,.20),transparent 70%),
                    radial-gradient(900px 400px at 100% 40%,rgba(255,123,34,.05),transparent 70%);
@@ -244,6 +245,47 @@ input[type=checkbox]{accent-color:var(--blood)}
 footer{padding-block:60px 30px;color:var(--dim);font-size:16px}
 footer h2{font-size:34px}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+/* progressive pieces */
+.stages{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.stages button{font-size:18px;background:#221a15}
+.stages button[aria-pressed="true"]{background:#5b160c;color:#ffe2c4;border-color:#a2311d}
+.stages button:disabled{opacity:.35;cursor:not-allowed}
+.stages button.ghost{background:transparent;border-color:#4a372b;color:var(--dim)}
+.stage-narr{border-top:0;padding-top:0;margin:0 0 12px;min-height:2.6em}
+.ring.solo{grid-template-columns:minmax(0,1fr)}
+.ring.solo .screen{max-width:760px;width:100%;margin:0 auto}
+.sort-tray{display:flex;flex-wrap:wrap;gap:8px;min-height:44px;padding:10px;background:#0b0807;border:1px dashed var(--line);border-radius:3px}
+.sort-tray button{font-family:var(--f-mono);font-size:13px;text-align:left;line-height:1.3;padding:6px 10px 5px;background:#2a1f19}
+.sort-tray button span{display:block;font-family:var(--f-body);font-size:13px;color:var(--dim)}
+.sort-tray button[aria-pressed="true"]{background:#5b160c;border-color:var(--hud);color:#fff}
+.sort-tray .done{font-family:var(--f-hud);font-size:19px;color:var(--nukage);padding:4px}
+.bins{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}
+@media (max-width:900px){.bins{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.bins{grid-template-columns:minmax(0,1fr)}}
+.bin{display:flex;flex-direction:column;align-items:stretch;text-align:left;background:#0b0807;border:1px solid var(--line);border-bottom-width:1px;border-radius:3px;padding:8px 10px;min-width:0;cursor:pointer;font-family:var(--f-body);font-size:14px;color:var(--fg);line-height:1.4}
+.bin:hover{background:#161009;border-color:#7a5a43}
+.bin.armed{border-color:var(--hud);box-shadow:0 0 0 1px var(--hud)}
+.bin.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.bin b{font-family:var(--f-display);font-size:22px;text-transform:uppercase;letter-spacing:.03em;color:var(--hud);font-weight:700}
+.bin .bw{color:var(--dim);font-size:13px;margin-bottom:6px}
+.bin ul{list-style:none;padding:0;margin:4px 0 0}
+.bin li{border-top:1px dotted var(--line);padding:5px 0 2px;margin:0;font-size:13px;color:var(--dim)}
+.bin li code{font-size:12px;display:inline-block;margin-bottom:2px}
+.sort-msg{margin-top:12px;min-height:3em;font-size:17px;line-height:1.5;border-top:1px dashed var(--line);padding-top:10px}
+.sort-msg.bad{color:#ffc3b8}
+.sort-msg.good{color:#d9f3c4}
+.stats.five{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:760px){.stats.five{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cost{margin-top:14px;background:#0b0807;border:1px solid var(--line);border-radius:3px;padding:10px 12px}
+.cost h4{margin:0 0 8px;font-family:var(--f-hud);font-weight:400;font-size:19px;color:var(--hud);letter-spacing:.04em}
+.cost-row{display:grid;grid-template-columns:minmax(0,13em) minmax(0,1fr) 9em;gap:10px;align-items:center;margin:6px 0;font-size:14px}
+@media (max-width:620px){.cost-row{grid-template-columns:minmax(0,1fr) 7.5em}.cost-row .track{grid-column:1/-1;order:3}}
+.cost-row .track{position:relative;height:16px;background:#1a1310;border-radius:2px;overflow:hidden}
+.cost-row .bar{position:absolute;top:0;bottom:0;left:0;background:var(--blood)}
+.cost-row .bar.rng{background:repeating-linear-gradient(90deg,rgba(127,210,62,.55) 0 4px,rgba(127,210,62,.25) 4px 8px)}
+.cost-row .bar.solid{background:var(--nukage)}
+.cost-row .n{font-family:var(--f-mono);font-size:13px;text-align:right;color:var(--fg);font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -259,40 +301,7 @@ footer h2{font-size:34px}
 </header>
 
 <div class="wrap">
-  <div class="wide console" id="ringDemo">
-    <div class="console-head">
-      <h2 class="console-title">The ring, re-enacted</h2>
-      <span class="badge b-sim">Simulation</span>
-    </div>
-    <div class="ring">
-      <div>
-        <div class="screen"><canvas id="ringMain" width="160" height="100" aria-label="The depth you are viewing"></canvas><span class="tag" id="ringTag">VIEWING DEPTH 0</span></div>
-        <canvas class="strip" id="ringStrip" width="480" height="22" aria-label="Who held the machine, frame by frame"></canvas>
-        <div class="legend" style="margin-top:6px">
-          <span><i class="sw" style="background:var(--d0)"></i>depth 0 rendered</span>
-          <span><i class="sw" style="background:var(--d1)"></i>depth 1</span>
-          <span><i class="sw" style="background:var(--d2)"></i>depth 2</span>
-          <span><i class="sw" style="background:#000;border:1px solid #555"></i>switch cost</span>
-          <span>newest frame on the right</span>
-        </div>
-      </div>
-      <div class="monitors" id="ringMons"></div>
-    </div>
-    <div class="controls">
-      <button class="primary" id="ringTele" title="Shortcut: Y">Teleport to next depth <kbd>Y</kbd></button>
-      <span class="seg" role="group" aria-label="Scheduler">
-        <button id="polRR" aria-pressed="false">Round robin</button>
-        <button id="polVW" aria-pressed="true">Viewer first</button>
-      </span>
-      <label class="rng">Slice <input type="range" id="ringSlice" min="1" max="16" value="4"> <output id="ringSliceOut">4</output> frames</label>
-      <button id="ringPause">Pause</button>
-    </div>
-    <p class="hudtxt" id="ringStat">…</p>
-    <figcaption>
-      Each instance renders its own world into its own 160×100 framebuffer. The TV in each world shows the newest frame of the <em>next</em> instance, and the last instance wraps back to the first, so each picture contains the whole ring, one lap older at every step inward. <strong>Only one instance runs at a time.</strong> The small monitors show each instance's framebuffer, and a picture only changes while its instance holds the machine. Try this: choose <em>Round robin</em> and the viewed picture freezes for two slices out of every three. Choose <em>Viewer first</em> and it runs every other slice. Then drag the slice to 1 and watch the switch cost eat the gain.
-      <br><span class="badge b-inf">Model</span> The simulated machine renders 48 instance-frames per second, which is the measured aggregate across three real instances before the scheduler change. Each switch costs 0.6 of a frame. Each world advances one game tic per frame it renders, as Doom's does. The real thing runs in DOSBox with the real engine. Its numbers are in <a href="#price">The price of a turn</a>.
-    </figcaption>
-  </div>
+  <div class="wide console" data-ring="hero"></div>
 </div>
 
 <main class="wrap">
@@ -407,17 +416,24 @@ footer h2{font-size:34px}
   <p class="sec-tag">Map 04</p>
   <h2>What an instance is made of</h2>
   <p>Control flow is solved. Two depths now run on two stacks, but they still share every global variable, and a global that one depth writes is a global the other depth reads. The real work of nesting is the inventory: which bytes belong to a depth, and what has to happen to them on a switch.</p>
-  <p>The answer comes in four kinds. They are registered by a wiring layer (<code>dos_wire.c</code>), so the save/load code itself knows nothing about Doom.</p>
-  <div class="tbl"><table>
-    <thead><tr><th>Kind</th><th>What</th><th>What a switch does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Regions</strong></td><td>Doom's data range (475,676 B); the engine's <code>.bss</code>, split around the host's own state; the engine's <code>.data</code> (9,056 B)</td><td>Saved from live memory into the outgoing depth's slot, then restored from the incoming depth's slot</td></tr>
-      <tr><td><strong>Patches</strong></td><td>Every location in Doom's memory that ACE rewrote: 405 patches, 1,517 bytes</td><td>Saved and restored as raw bytes</td></tr>
-      <tr><td><strong>Pins</strong></td><td><code>mainzone</code>, ACE's <code>screen_buffer</code>, Doom's own <code>screens[0]</code></td><td>Restored with the snapshot, then <em>overwritten</em> with this depth's own value</td></tr>
-      <tr><td><strong>Private memory</strong></td><td>The depth's heap, raw pool, screen region, stack and code image</td><td>Nothing. They live at different addresses, so they are per-depth for free</td></tr>
-    </tbody>
-  </table></div>
-  <p>A depth's snapshot is seeded by cloning the parent's <em>live</em> state the first time the depth is entered. A child starts as a copy of its parent and then diverges, which is what a nested instance should do.</p>
+  <p>The answer comes in four kinds, plus a fifth that belongs to no depth at all. Try sorting them yourself before reading on. Pick a card, then pick the bin you think it belongs in.</p>
+</section>
+
+<div class="wide console" id="sorter">
+  <div class="console-head"><h2 class="console-title">Sort the bytes</h2><span class="badge b-sim">Exercise</span></div>
+  <div class="sort-tray" id="sortTray" aria-label="Cards to sort"></div>
+  <div class="bins" id="sortBins"></div>
+  <div class="sort-msg" id="sortMsg" aria-live="polite">Pick a card above.</div>
+  <div class="controls">
+    <span class="hudtxt" id="sortProg"></span>
+    <button id="sortShow">Show the answers</button>
+    <button id="sortReset">Start over</button>
+  </div>
+  <figcaption>The bins are the real categories in <code>dos_state.c</code> and <code>mtx_host.h</code>, and the cards are real variables and patches. A wrong pick tells you what would break, and most of those failures really happened.</figcaption>
+</div>
+
+<section class="col" style="padding-top:8px">
+  <p>The first four kinds are registered by a wiring layer (<code>dos_wire.c</code>), so the save/load code itself knows nothing about Doom. The fifth gets its own section, <a href="#host">Map 05</a>. A depth's snapshot is seeded by cloning the parent's <em>live</em> state the first time the depth is entered. A child starts as a copy of its parent and then diverges, which is what a nested instance should do.</p>
 
   <h3>The patches nobody snapshots</h3>
   <p>Regions cover data, and Doom's code segment is not data. ACE does not patch its own code. It patches <em>Doom's</em>: calls redirected into ACE, constants changed, instructions overwritten with NOPs. A second instance's <code>ace_main</code> re-patches that shared code while the root is executing it. Without a fix, a patch made by any depth is visible to every depth.</p>
@@ -597,10 +613,12 @@ footer h2{font-size:34px}
 	}
 	return d;                       /* nothing else live: nothing to show */
 }</pre>
-  <p>The modulo is the wrap. Without it, the deepest level's TV would have nothing to show and the chain would be a ladder. With it, the levels close into a cycle and every picture contains the whole nest. Each step inward is one lap older, because the frame on a TV is whatever that instance drew the last time it ran. The demo at the top applies this same rule.</p>
+  <p>The modulo is the wrap. Without it, the deepest level's TV would have nothing to show and the chain would be a ladder. With it, the levels close into a cycle and every picture contains the whole nest. Each step inward is one lap older, because the frame on a TV is whatever that instance drew the last time it ran. The console below runs the same rule, and lets you take the wrap away.</p>
   <p>Painting happens in two phases. During Doom's wall loop the engine only <em>records</em>, for each screen column, where that column falls on the TV. After the frame is finished, it fills those columns from the other instance's framebuffer. The first version drew directly inside the wall loop, where Doom's clipping state is mid-calculation, and produced 112 writes outside video memory and a black screen. The picture is placed in wall space, so perspective and occlusion are Doom's own. It is drawn without Doom's distance darkening, because a screen gives off light, and a darkened screen looks like a texture rather than a picture.</p>
   <p>The switch key no longer toggles an overlay. It moves the viewer: the screen shows one instance full-size, and each press transports you to the next instance in the ring, with a short sweep and Doom's own teleport sound, looked up by name in the engine's sound table.</p>
 </section>
+
+<div class="wide console" data-ring="wrap"></div>
 
 <!-- ============================================================ 8 -->
 <section id="keys" data-hud="One keyboard for three worlds" class="col">
@@ -649,42 +667,52 @@ footer h2{font-size:34px}
       <tr><td>Viewer first, slice 1: viewed</td><td class="num">8.3</td><td>same</td></tr>
     </tbody>
   </table></div>
-  <p>The last two rows are the ones the demo at the top lets you feel. Shorter slices give the viewed instance more frequent turns but pay for more switches, and a switch is not free. Its cost is mostly the state copy from <a href="#state">Map 04</a>, which is roughly 573 KB registered per depth.</p>
+  <p>The last two rows are a trade you can try in the console below. Shorter slices give the viewed instance more frequent turns but pay for more switches, and a switch is not free. Its cost is mostly the state copy from <a href="#state">Map 04</a>, which is roughly 573 KB registered per depth.</p>
+</section>
+
+<div class="wide console" data-ring="full"></div>
+
+<section class="col" style="padding-top:8px">
   <h3>Copy less by comparing everything</h3>
   <p>A naive switch copies the whole registered set twice: about 1.1 MB of memory traffic. A measurement on every switch shows that only <strong>about 4,000 of 572,945 bytes (0.6%) actually differ</strong>. Most of Doom's data segment is tables that are written once and then only read. That suggests caching which blocks are hot and copying only those. The project tried exactly that, and the widget below lets you watch why it was taken out.</p>
 </section>
 
 <div class="wide console" id="cl">
-  <div class="console-head"><h2 class="console-title">Three ways to switch</h2><span class="badge b-sim">Simulation</span></div>
+  <div class="console-head"><h2 class="console-title">Four ways to learn what a switch costs</h2><span class="badge b-sim">Simulation</span></div>
+  <div class="stages" id="clStages" role="group" aria-label="Steps"></div>
+  <div class="narr stage-narr" id="clPrompt"></div>
   <div class="controls" style="margin-top:0">
     <span class="seg" role="group" aria-label="Switch strategy">
-      <button id="clAll" aria-pressed="false">Copy everything</button>
-      <button id="clCache" aria-pressed="true">Cache the hot set</button>
+      <button id="clAll" aria-pressed="true">Copy everything</button>
+      <button id="clCache" aria-pressed="false">Cache the hot set</button>
       <button id="clCmp" aria-pressed="false">Compare every switch</button>
     </span>
   </div>
   <canvas class="cl-grid" id="clGrid" width="1024" height="320" aria-label="Snapshot blocks"></canvas>
-  <div class="legend" style="margin-top:8px">
-    <span><i class="sw" style="background:#2a201b"></i>block never differed</span>
-    <span><i class="sw" style="background:#7a5a22"></i>known hot</span>
-    <span><i class="sw" style="background:var(--hud)"></i>copied on this switch</span>
-    <span><i class="sw" style="background:#fff"></i>late write</span>
-    <span><i class="sw" style="background:#ff4a32"></i>a depth reads another depth's bytes</span>
-  </div>
+  <div class="legend" style="margin-top:8px" id="clLegend"></div>
   <div class="controls">
     <button class="primary" id="clRun">Pause</button>
     <button id="clStep">One switch</button>
     <button id="clLate">Late write: touch a cold block now</button>
     <button id="clReset">Reset</button>
+    <button id="clNext" class="primary">Next ▸</button>
   </div>
-  <div class="stats">
+  <div class="stats five">
     <div class="stat"><span>Switches</span><b id="clSw">0</b></div>
     <div class="stat"><span>Read per switch</span><b id="clRd">0</b></div>
     <div class="stat"><span>Written per switch</span><b id="clWr">0</b></div>
+    <div class="stat"><span>Actually differed</span><b id="clDf">?</b></div>
     <div class="stat bad" id="clBadBox"><span>Corrupt reads</span><b id="clBad">0</b></div>
   </div>
   <p class="hudtxt" id="clNote" style="margin-top:10px"></p>
-  <figcaption>A scale model: 1,280 blocks of 32 bytes, two depths taking turns, each writing a small hot set every slice. The real set is about 18,000 blocks. In the caching mode, the first six switches are a warm-up that compares and records which blocks differ. After that only known-hot blocks are copied, and a canary pass over the cold blocks runs every eighth switch. At switch 12 after a reset, the model performs one late write, a write to a block that stayed cold through the warm-up. You can add more with the button.</figcaption>
+  <div class="cost" id="clCost" hidden>
+    <h4>One switch's compare, in thousands of emulated cycles <span class="badge b-meas">Measured</span></h4>
+    <div class="cost-row"><span>Compare-and-branch loop in C</span><span class="track"><i class="bar" style="width:100%"></i></span><span class="n">~6,500</span></div>
+    <div class="cost-row"><span><code>repe cmpsl</code>, at the change</span><span class="track"><i class="bar rng" style="left:7.5%;width:7.9%"></i><i class="bar solid" style="width:7.5%"></i></span><span class="n">490–1,000</span></div>
+    <div class="cost-row"><span><code>repe cmpsl</code>, a later run</span><span class="track"><i class="bar rng" style="left:12.3%;width:16.9%"></i><i class="bar solid" style="width:12.3%"></i></span><span class="n">800–1,900</span></div>
+    <p class="hudtxt" style="margin:8px 0 0;font-size:17px">The C loop cost more than two of a depth's own Doom frames per switch. The later range is from the scheduler notes in <code>mtx_boot.c</code>, where a switch still costs more than half a frame. That is why one-frame slices lose.</p>
+  </div>
+  <figcaption>A scale model: 1,280 blocks of 32 bytes and two depths taking turns, each writing a small hot set every slice. The real set is about 18,000 blocks. In the caching mode, the first six switches are a warm-up that compares and records which blocks differ. After that only known-hot blocks are copied, and a canary pass checks the cold blocks every eighth switch.</figcaption>
 </div>
 
 <section class="col" style="padding-top:8px">
@@ -773,7 +801,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
 })();
 
 /* =====================================================================
-   RING DEMO: three tiny raycasters, one machine, a scheduler
+   RING: one simulation of three tiny raycasters, three consoles
    ===================================================================== */
 (function(){
   var RW=160,RH=100,R=48,SW_COST=0.6;
@@ -800,27 +828,21 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     ["############","#..........#","#..#....#..#","#.....T....#","#..........#","#..........#","#..........#","#..........#","#..#....#..#","#..........#","#..........#","############"],
     ["############","#....##....#","#..........#","#.#...T..#.#","#..........#","#..........#","##........##","#..........#","#..........#","#.##....##.#","#..........#","############"],
     ["############","#..........#","#.#......#.#","#.....T....#","#..........#","#..#....#..#","#..........#","#..........#","#..........#","#....##....#","#..........#","############"]
-  ];
+  ].map(function(m){return m.map(function(r){return r.split("").map(function(c){return c==="#"?1:c==="T"?2:0;});});});
+  var TEX=[makeTex(0),makeTex(1),makeTex(2)];
   var DCOL=[[224,85,60],[127,210,62],[108,156,240]];
   var CEIL=[[44,16,12],[26,32,30],[18,20,40]],FLOOR=[[78,42,28],[54,60,50],[40,46,70]];
   var FONT={"D":[6,5,5,5,6],"E":[7,4,6,4,7],"P":[6,5,6,4,4],"T":[7,2,2,2,2],"H":[5,5,7,5,5],"0":[7,5,5,5,7],"1":[2,6,2,2,7],"2":[7,1,7,4,7]," ":[0,0,0,0,0]};
-  var inst=[];
-  for(var d=0;d<3;d++){
-    var map=MAPS[d].map(function(r){return r.split("").map(function(c){return c==="#"?1:c==="T"?2:0;});});
-    var fb=new Uint32Array(RW*RH);
-    inst.push({d:d,map:map,tex:makeTex(d),fb:fb,img:new ImageData(new Uint8ClampedArray(fb.buffer),RW,RH),
-      frames:0,worldT:d*3.1,times:[],has:false,x:6.5,y:7,a:-Math.PI/2});
-  }
-  function cellAt(m,x,y){if(y<0||y>=12||x<0||x>=12)return 1;return m[y][x];}
   var TU0=0.08,TU1=0.92,TV0=0.17,TV1=0.80,BEZ=rgb(27,27,27);
+  function cellAt(m,x,y){if(y<0||y>=12||x<0||x>=12)return 1;return m[y][x];}
   function choreo(I){
     var t=I.worldT,ph=I.d*2.1;
     I.a=-Math.PI/2+0.3*Math.sin(t*0.55+ph);
     I.x=6.5+0.55*Math.sin(t*0.31+ph*1.3);
     I.y=7.0+0.75*Math.sin(t*0.23+ph);
   }
-  function render(I,src){
-    var fb=I.fb,map=I.map,tex=I.tex,half=RH/2,y,x;
+  function render(I,src,n){
+    var fb=I.fb,map=MAPS[I.d],tex=TEX[I.d],half=RH/2,y,x;
     var c=CEIL[I.d],f=FLOOR[I.d];
     for(y=0;y<RH;y++){var t=y<half?(half-y)/half:(y-half)/half,cc=y<half?c:f,k=0.22+0.78*t;
       fb.fill(rgb(cc[0]*k|0,cc[1]*k|0,cc[2]*k|0),y*RW,y*RW+RW);}
@@ -847,91 +869,171 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
           fb[y*RW+x]=rgb((p&255)*sh|0,((p>>>8)&255)*sh|0,((p>>>16)&255)*sh|0);}
       }
     }
-    badge(I);
+    badge(I,n);
   }
-  function badge(I){
-    var fb=I.fb,s="DEPTH "+I.d,x,y,i,bx=3,by=3,w=s.length*8+30,h=14,col=rgb(241,178,60),dc=DCOL[I.d];
+  function badge(I,n){
+    var fb=I.fb,s="DEPTH "+I.d,x,y,i,bx=3,by=3,w=s.length*8+30,h=14,col=rgb(241,178,60);
     for(y=by;y<by+h;y++)for(x=bx;x<bx+w;x++)fb[y*RW+x]=rgb(0,0,0);
     for(i=0;i<s.length;i++){var gl=FONT[s[i]];for(y=0;y<5;y++)for(x=0;x<3;x++)if(gl[y]&(4>>x)){
       var X=bx+3+i*8+x*2,Y=by+2+y*2;fb[Y*RW+X]=fb[Y*RW+X+1]=fb[(Y+1)*RW+X]=fb[(Y+1)*RW+X+1]=col;}}
-    for(i=0;i<3;i++){var ox=bx+w-24+i*7,c2=DCOL[i];
+    for(i=0;i<n;i++){var ox=bx+w-24+i*7,c2=DCOL[i];
       for(y=by+5;y<by+9;y++)for(x=ox;x<ox+4;x++){var edge=(y===by+5||y===by+8||x===ox||x===ox+3);
         fb[y*RW+x]=(i===I.d||edge)?rgb(c2[0],c2[1],c2[2]):rgb(0,0,0);}}
   }
-  var cur=0,sliceLeft=4,slice=4,policy="viewer",V=0,schedOther=0,acc=0,simT=0,strip=[],paused=false;
-  var fx=null;
-  function nextDepth(c){
-    if(policy==="rr")return (c+1)%3;
-    if(c!==V)return V;
-    var o=(schedOther+1)%3;if(o===V)o=(o+1)%3;schedOther=o;return o;
-  }
-  function renderFrame(d){
-    var I=inst[d],n=inst[(d+1)%3];
-    choreo(I);render(I,n.has?n.fb:null);I.has=true;I.frames++;I.worldT+=1/35;I.times.push(simT);
-    while(I.times.length&&I.times[0]<simT-2)I.times.shift();
-  }
-  function advance(dt){
-    acc+=dt;simT+=dt;var ft=1/R;
-    while(acc>=ft){
-      acc-=ft;renderFrame(cur);strip.push(cur);
-      if(--sliceLeft<=0){var n=nextDepth(cur);if(n!==cur){acc-=SW_COST*ft;strip.push(-1);}cur=n;sliceLeft=slice;}
+
+  var STAGES=[
+    {label:"One Doom",n:1,wrap:false,txt:"<b>One Doom.</b> A single instance renders its world into its own 160×100 framebuffer. The TV on the far wall has nothing to show yet, so it shows only its dark bezel."},
+    {label:"A second",n:2,wrap:false,txt:"<b>A second Doom.</b> Depth 0's TV now shows the newest frame of depth 1, a separate instance with its own world. Press <b>Teleport</b> to step into depth 1: its own TV is blank, because nothing comes after it."},
+    {label:"A third",n:3,wrap:false,txt:"<b>A third Doom.</b> Depth 1's TV now shows depth 2, and depth 2's TV is blank. This is a ladder, and its last rung has nothing to show. Teleport down to check."},
+    {label:"Close the ring",n:3,wrap:true,txt:"<b>Close the ring.</b> The deepest TV now wraps back to depth 0, so every picture contains the whole ring, one lap older at each step inward. That wrap is one modulo in the real code, shown in <a href=\"#screen\">Map 07</a>. How three instances share one machine comes in <a href=\"#price\">Map 09</a>."}
+  ];
+  var CFG={
+    hero:{title:"The ring, built up",stages:true,monitors:false,strip:false,sched:false,wrapCtl:false,stage:1,
+      caption:"Each step adds one instance. In the real project each one is a full copy of the ACE engine inside the same DOOM2.EXE. This page re-enacts them with three small raycasters, and the TV in each world shows another instance's newest frame, as the real screen-walls do. <b>All controls</b> skips ahead and shows everything at once."},
+    wrap:{title:"Open the ring, close the ring",monitors:true,strip:false,sched:false,wrapCtl:true,n:3,wrap:true,
+      caption:"The three monitors are the three framebuffers. Untick the wrap and depth 2's TV goes to its bezel, as it did before the modulo existed: the chain becomes a ladder. Tick it and the last TV shows the first instance again."},
+    full:{title:"One machine, three worlds",monitors:true,strip:true,sched:true,wrapCtl:true,n:3,wrap:true,
+      caption:"<span class=\"badge b-inf\">Model</span> The simulated machine renders 48 instance-frames per second, which is the measured aggregate across three real instances before the scheduler change. Each switch costs 0.6 of a frame, and each world advances one game tic per frame it renders, as Doom's does. Try this: choose <em>Round robin</em> and the viewed picture freezes for two slices out of every three. Choose <em>Viewer first</em> and it runs every other slice. Drag the slice to 1 and the switch cost eats the gain. The monitor with the amber border is the instance that holds the machine."}
+  };
+  var rings=[];
+  function Ring(host,key){
+    var cfg=CFG[key],self=this,id="r"+key;
+    self.visible=true;
+    var n=cfg.n||1,wrap=!!cfg.wrap,inst=[],cur=0,slice=4,sliceLeft=4,policy="viewer",V=0,schedOther=0,acc=0,simT=0,strip=[],paused=false,fx=null,last=null,stage=cfg.stage||0;
+    var show={monitors:cfg.monitors,strip:cfg.strip,sched:cfg.sched,wrapCtl:cfg.wrapCtl};
+    for(var d=0;d<3;d++){var fb=new Uint32Array(RW*RH);
+      inst.push({d:d,fb:fb,img:new ImageData(new Uint8ClampedArray(fb.buffer),RW,RH),times:[],has:false,worldT:d*3.1,x:6.5,y:7,a:-Math.PI/2});}
+    var h='<div class="console-head"><h2 class="console-title">'+cfg.title+'</h2><span class="badge b-sim">Simulation</span></div>';
+    if(cfg.stages){
+      h+='<div class="stages" role="group" aria-label="Build the ring">';
+      STAGES.forEach(function(s,i){h+='<button data-stage="'+(i+1)+'">'+(i+1)+' · '+s.label+'</button>';});
+      h+='<button class="ghost" data-r="all">All controls</button></div><div class="narr stage-narr" data-r="snarr" aria-live="polite"></div>';
     }
-    if(strip.length>200)strip.splice(0,strip.length-200);
-  }
-  /* monitors */
-  var mons=$("ringMons"),monC=[],monT=[],monBox=[];
-  for(var m=0;m<3;m++){
-    var box=document.createElement("div");box.className="mon";
-    var cv=document.createElement("canvas");cv.width=RW;cv.height=RH;cv.setAttribute("aria-label","Depth "+m+" framebuffer");
-    var tx=document.createElement("div");tx.className="hudtxt";
-    box.appendChild(cv);box.appendChild(tx);mons.appendChild(box);
-    monC.push(cv.getContext("2d"));monT.push(tx);monBox.push(box);
-  }
-  var mainC=$("ringMain").getContext("2d"),stripC=$("ringStrip").getContext("2d");
-  var fxBuf=new Uint32Array(RW*RH),fxImg=new ImageData(new Uint8ClampedArray(fxBuf.buffer),RW,RH);
-  function fps(d){var I=inst[d];return I.times.length/Math.min(2,Math.max(0.001,simT));}
-  function draw(now){
-    if(fx){var p=(now-fx.t0)/550;if(p>=1){fx=null;}else{
-      var a=inst[fx.from].fb,b=inst[fx.to].fb,bx=Math.floor(p*RW),x,y;
-      for(y=0;y<RH;y++)for(x=0;x<RW;x++){var i=y*RW+x;fxBuf[i]=x<bx?b[i]:a[i];}
-      for(y=0;y<RH;y++){fxBuf[y*RW+Math.min(RW-1,bx)]=rgb(190,255,140);if(bx>0)fxBuf[y*RW+bx-1]=rgb(127,210,62);}
-      mainC.putImageData(fxImg,0,0);}}
-    if(!fx)mainC.putImageData(inst[V].img,0,0);
-    for(var d=0;d<3;d++){
-      monC[d].putImageData(inst[d].img,0,0);
-      monBox[d].classList.toggle("run",d===cur);
-      monT[d].innerHTML="<span>DEPTH <b>"+d+"</b>"+(d===V?" · viewed":"")+"</span><span><b>"+fps(d).toFixed(1)+"</b> fps</span>";
+    h+='<div class="ring" data-r="ring"><div><div class="screen"><canvas data-r="main" width="160" height="100" aria-label="The depth you are viewing"></canvas><span class="tag" data-r="tag"></span></div>'+
+      '<div data-r="stripbox"><canvas class="strip" data-r="strip" width="480" height="22" aria-label="Who held the machine, frame by frame"></canvas>'+
+      '<div class="legend" style="margin-top:6px"><span><i class="sw" style="background:var(--d0)"></i>depth 0 rendered</span><span><i class="sw" style="background:var(--d1)"></i>depth 1</span><span><i class="sw" style="background:var(--d2)"></i>depth 2</span><span><i class="sw" style="background:#000;border:1px solid #555"></i>switch cost</span><span>newest frame on the right</span></div></div></div>'+
+      '<div class="monitors" data-r="mons"></div></div>'+
+      '<div class="controls"><button class="primary" data-r="tele">Teleport to next depth <kbd>Y</kbd></button>'+
+      '<label class="rng" data-r="wrapbox"><input type="checkbox" id="'+id+'Wrap" data-r="wrap"> Wrap the last TV back to depth 0</label>'+
+      '<span data-r="schedbox" style="display:contents"><span class="seg" role="group" aria-label="Scheduler"><button data-r="rr" aria-pressed="false">Round robin</button><button data-r="vw" aria-pressed="true">Viewer first</button></span>'+
+      '<label class="rng">Slice <input type="range" id="'+id+'Slice" data-r="slice" min="1" max="16" value="4"> <output data-r="sliceOut">4</output> frames</label></span>'+
+      '<button data-r="pause">Pause</button></div>'+
+      '<p class="hudtxt" data-r="stat"></p><figcaption>'+cfg.caption+'</figcaption>';
+    host.innerHTML=h;
+    function q(r){return host.querySelector('[data-r="'+r+'"]');}
+    var mainC=q("main").getContext("2d"),stripC=q("strip").getContext("2d"),mons=q("mons"),monC=[],monT=[],monBox=[];
+    for(var m=0;m<3;m++){
+      var box=document.createElement("div");box.className="mon";
+      var cv=document.createElement("canvas");cv.width=RW;cv.height=RH;cv.setAttribute("aria-label","Depth "+m+" framebuffer");
+      var tx=document.createElement("div");tx.className="hudtxt";
+      box.appendChild(cv);box.appendChild(tx);mons.appendChild(box);
+      monC.push(cv.getContext("2d"));monT.push(tx);monBox.push(box);
     }
-    var W=stripC.canvas.width,H=stripC.canvas.height,n=96,cw=W/n,s=strip.slice(-n),i2;
-    stripC.fillStyle="#0b0807";stripC.fillRect(0,0,W,H);
-    for(i2=0;i2<s.length;i2++){var v=s[i2],X2=W-(s.length-i2)*cw;
-      if(v<0){stripC.fillStyle="#000";stripC.fillRect(X2,0,cw,H);}
-      else{var c=DCOL[v];stripC.fillStyle="rgb("+c[0]+","+c[1]+","+c[2]+")";stripC.fillRect(X2+0.5,3,cw-1,H-6);}}
-    $("ringTag").textContent="VIEWING DEPTH "+V;
-    $("ringStat").innerHTML="The picture you are viewing changes <b>"+fps(V).toFixed(1)+"</b> times/s. "+
-      "Depth "+cur+" holds the machine. Policy: <b>"+(policy==="rr"?"round robin":"viewer first")+"</b>, slice <b>"+slice+"</b>.";
+    var fxBuf=new Uint32Array(RW*RH),fxImg=new ImageData(new Uint8ClampedArray(fxBuf.buffer),RW,RH);
+    function srcFor(d){
+      if(n<2)return null;var nx=d+1;
+      if(nx>=n){if(!wrap)return null;nx=0;}
+      return inst[nx].has?inst[nx].fb:null;
+    }
+    function nextDepth(c){
+      if(n<2)return 0;
+      if(policy==="rr")return (c+1)%n;
+      if(c!==V)return V;
+      var o=schedOther,k;for(k=0;k<n;k++){o=(o+1)%n;if(o!==V)break;}
+      schedOther=o;return o;
+    }
+    function renderFrame(d){
+      var I=inst[d];choreo(I);render(I,srcFor(d),n);I.has=true;I.worldT+=1/35;I.times.push(simT);
+      while(I.times.length&&I.times[0]<simT-2)I.times.shift();
+    }
+    function advance(dt){
+      acc+=dt;simT+=dt;var ft=1/R;
+      while(acc>=ft){
+        acc-=ft;renderFrame(cur);strip.push(cur);
+        if(--sliceLeft<=0){var nx=nextDepth(cur);if(nx!==cur){acc-=SW_COST*ft;strip.push(-1);}cur=nx;sliceLeft=slice;}
+      }
+      if(strip.length>200)strip.splice(0,strip.length-200);
+    }
+    function warm(){for(var k=0;k<60;k++)advance(1/60);}
+    function fps(d){return inst[d].times.length/Math.min(2,Math.max(0.001,simT));}
+    function setN(nn,ww){
+      n=nn;wrap=ww;
+      for(var d=n;d<3;d++){inst[d].has=false;inst[d].times=[];inst[d].fb.fill(0);}
+      if(V>=n)V=0;if(cur>=n)cur=0;if(schedOther>=n)schedOther=0;sliceLeft=slice;
+      q("wrap").checked=wrap;warm();sync();
+    }
+    function sync(){
+      q("ring").classList.toggle("solo",!show.monitors);
+      q("mons").hidden=!show.monitors;q("stripbox").hidden=!show.strip;
+      q("schedbox").hidden=!show.sched;q("wrapbox").hidden=!show.wrapCtl;
+      q("tele").disabled=n<2;
+      for(var d=0;d<3;d++)monBox[d].hidden=d>=n;
+      if(cfg.stages){
+        host.querySelectorAll("[data-stage]").forEach(function(b){b.setAttribute("aria-pressed",+b.getAttribute("data-stage")===stage);});
+        q("snarr").innerHTML=stage?STAGES[stage-1].txt:"";
+      }
+    }
+    self.draw=function(now){
+      if(fx){var p=(now-fx.t0)/550;if(p>=1){fx=null;}else{
+        var a=inst[fx.from].fb,b=inst[fx.to].fb,bx=Math.floor(p*RW),x,y;
+        for(y=0;y<RH;y++)for(x=0;x<RW;x++){var i=y*RW+x;fxBuf[i]=x<bx?b[i]:a[i];}
+        for(y=0;y<RH;y++){fxBuf[y*RW+Math.min(RW-1,bx)]=rgb(190,255,140);if(bx>0)fxBuf[y*RW+bx-1]=rgb(127,210,62);}
+        mainC.putImageData(fxImg,0,0);}}
+      if(!fx)mainC.putImageData(inst[V].img,0,0);
+      q("tag").textContent="VIEWING DEPTH "+V;
+      if(show.monitors)for(var d=0;d<n;d++){
+        monC[d].putImageData(inst[d].img,0,0);
+        monBox[d].classList.toggle("run",d===cur&&show.strip);
+        monT[d].innerHTML="<span>DEPTH <b>"+d+"</b>"+(d===V?" · viewed":"")+"</span><span>TV shows <b>"+(n<2?"—":(d+1<n?d+1:(wrap?0:"—")))+"</b>"+(show.strip?" · <b>"+fps(d).toFixed(1)+"</b> fps":"")+"</span>";
+      }
+      if(show.strip){
+        var W=stripC.canvas.width,H=stripC.canvas.height,cnt=96,cw=W/cnt,s=strip.slice(-cnt),i2;
+        stripC.fillStyle="#0b0807";stripC.fillRect(0,0,W,H);
+        for(i2=0;i2<s.length;i2++){var v=s[i2],X2=W-(s.length-i2)*cw;
+          if(v<0){stripC.fillStyle="#000";stripC.fillRect(X2,0,cw,H);}
+          else{var c=DCOL[v];stripC.fillStyle="rgb("+c[0]+","+c[1]+","+c[2]+")";stripC.fillRect(X2+0.5,3,cw-1,H-6);}}
+      }
+      var st="Viewing depth <b>"+V+"</b> of <b>"+n+"</b>";
+      if(n>1)st+=". Its TV shows "+(V+1<n?"depth <b>"+(V+1)+"</b>":(wrap?"depth <b>0</b>, the wrap":"<b>nothing</b>, the end of the ladder"));
+      if(show.strip)st+=". The viewed picture changes <b>"+fps(V).toFixed(1)+"</b> times/s. Depth <b>"+cur+"</b> holds the machine";
+      q("stat").innerHTML=st+".";
+    };
+    self.tick=function(now){
+      if(last===null)last=now;var dt=Math.min(0.1,(now-last)/1000);last=now;
+      if(!self.visible)return;
+      if(!paused)advance(dt);
+      self.draw(now);
+    };
+    self.teleport=function(){if(n<2)return;var from=V;V=(V+1)%n;if(!RM)fx={from:from,to:V,t0:performance.now()};};
+    q("tele").addEventListener("click",self.teleport);
+    q("wrap").addEventListener("change",function(){wrap=this.checked;if(cfg.stages&&stage>=3)stage=wrap?4:3;sync();});
+    function setPol(p){policy=p;q("rr").setAttribute("aria-pressed",p==="rr");q("vw").setAttribute("aria-pressed",p==="viewer");}
+    q("rr").addEventListener("click",function(){setPol("rr");});
+    q("vw").addEventListener("click",function(){setPol("viewer");});
+    q("slice").addEventListener("input",function(){slice=+this.value;q("sliceOut").textContent=slice;if(sliceLeft>slice)sliceLeft=slice;});
+    q("pause").addEventListener("click",function(){paused=!paused;this.textContent=paused?"Play":"Pause";});
+    if(cfg.stages){
+      host.querySelectorAll("[data-stage]").forEach(function(b){b.addEventListener("click",function(){
+        stage=+b.getAttribute("data-stage");var S=STAGES[stage-1];setN(S.n,S.wrap);});});
+      q("all").addEventListener("click",function(){show={monitors:true,strip:true,sched:true,wrapCtl:true};stage=4;setN(3,true);this.hidden=true;});
+      var S0=STAGES[stage-1];n=S0.n;wrap=S0.wrap;
+    }
+    q("wrap").checked=wrap;
+    warm();sync();self.draw(0);
+    if(RM){paused=true;q("pause").textContent="Play";}
+    if("IntersectionObserver" in window){
+      new IntersectionObserver(function(es){es.forEach(function(e){self.visible=e.isIntersecting;self.ratio=e.intersectionRatio;if(e.isIntersecting)last=null;});},{threshold:[0,0.25,0.5,0.75,1]}).observe(host);
+    }
   }
-  var last=null;
-  function loop(now){
-    if(last===null)last=now;var dt=Math.min(0.1,(now-last)/1000);last=now;
-    if(!paused)advance(dt);
-    draw(now);requestAnimationFrame(loop);
-  }
-  for(var k=0;k<90;k++)advance(1/60);
-  draw(0);
-  if(RM){paused=true;$("ringPause").textContent="Play";}
+  document.querySelectorAll("[data-ring]").forEach(function(el){rings.push(new Ring(el,el.getAttribute("data-ring")));});
+  function loop(now){rings.forEach(function(r){r.tick(now);});requestAnimationFrame(loop);}
   requestAnimationFrame(loop);
-  function teleport(){var from=V;V=(V+1)%3;if(!RM)fx={from:from,to:V,t0:performance.now()};}
-  $("ringTele").addEventListener("click",teleport);
   document.addEventListener("keydown",function(e){
     if((e.key==="y"||e.key==="Y")&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
-      var t=e.target&&e.target.tagName;if(t==="INPUT"&&e.target.type==="text")return;teleport();}
+      var t=e.target;if(t&&t.tagName==="INPUT"&&t.type==="text")return;
+      var best=null;rings.forEach(function(r){if(r.visible&&(!best||(r.ratio||1)>(best.ratio||1)))best=r;});
+      if(best)best.teleport();}
   });
-  function setPol(p){policy=p;$("polRR").setAttribute("aria-pressed",p==="rr");$("polVW").setAttribute("aria-pressed",p==="viewer");}
-  $("polRR").addEventListener("click",function(){setPol("rr");});
-  $("polVW").addEventListener("click",function(){setPol("viewer");});
-  $("ringSlice").addEventListener("input",function(){slice=+this.value;$("ringSliceOut").textContent=slice;if(sliceLeft>slice)sliceLeft=slice;});
-  $("ringPause").addEventListener("click",function(){paused=!paused;this.textContent=paused?"Play":"Pause";});
 })();
 
 /* =====================================================================
@@ -1203,11 +1305,18 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
 })();
 
 /* =====================================================================
-   COPYLESS GRID
+   COPYLESS: unlocked in the order the project found things out
    ===================================================================== */
 (function(){
   var COLS=64,ROWS=20,N=COLS*ROWS,BLK=32,WARM=6,CAN=8;
-  var mode="cache",L,S,T,hot,flash,late,bad,promoted,sw,cur,ctr,lastRd,lastWr,totBad,canary,autoLate,running=!RM,timer=null,note="";
+  var STG=[
+    {label:"Copy everything",mode:"all",diff:false,txt:"<b>Copy everything.</b> On every switch the outgoing depth's whole registered set is copied out and the incoming depth's is copied in. This is always correct. Watch the written-bytes counter: 80 KB per switch in this model, and about 1.1 MB in the real one."},
+    {label:"What actually differs",mode:"all",diff:true,txt:"<b>What actually differs.</b> Same strategy, but now the grid shows which blocks were really different between live memory and the snapshot. It is a handful. In the real engine, about 4,000 of 572,945 bytes (0.6%) differ, so nearly every copied byte is copied for nothing."},
+    {label:"Cache the hot set",mode:"cache",diff:true,txt:"<b>Cache the hot set.</b> Learn which blocks differ during a warm-up, then copy only those. It looks perfect. <b>Can you break it?</b> Once the warm-up is over, press <b>Late write</b>: a depth writes a block that stayed cold the whole time."},
+    {label:"Compare every switch",mode:"cmp",diff:true,txt:"<b>Compare every switch.</b> Compare every block on every switch and copy only the ones that differ. Nothing is predicted, so a late write is caught by the very next comparison. Try to break this one too."},
+    {label:"What the compare costs",mode:"cmp",diff:true,txt:"<b>What the compare costs.</b> The writes are nearly gone, but every switch now <em>reads</em> the whole set twice. Inside an emulator, the instruction doing that reading matters more than you would expect."}
+  ];
+  var stage=1,unlocked=1,mode="all",L,S,T,hot,flash,late,bad,promoted,sw,cur,ctr,lastRd,lastWr,lastDf,totBad,canary,lates,running=!RM,note="";
   var HOT=[[],[]];
   (function(){var shared=[40,41,42,300,301,302,640,641,903,904],i;for(i=0;i<shared.length;i++){HOT[0].push(shared[i]);HOT[1].push(shared[i]);}
     HOT[0].push(77,78,1100);HOT[1].push(512,513,1201);})();
@@ -1215,53 +1324,55 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   function reset(){
     L=new Int32Array(N);for(var i=0;i<N;i++)L[i]=rnd(i);
     S=[Int32Array.from(L),Int32Array.from(L)];T=[Int32Array.from(L),Int32Array.from(L)];
-    hot=new Uint8Array(N);flash=new Float32Array(N);late=new Float32Array(N);bad=new Float32Array(N);promoted=new Uint8Array(N);
-    sw=0;cur=0;ctr=1000000;lastRd=0;lastWr=0;totBad=0;canary=0;autoLate=12;note="";
-    if(mode==="all"||mode==="cmp"||mode==="cache"){}
+    hot=new Uint8Array(N);flash=new Uint8Array(N);late=new Float32Array(N);bad=new Float32Array(N);promoted=new Uint8Array(N);
+    sw=0;cur=0;ctr=1000000;lastRd=0;lastWr=0;lastDf=0;totBad=0;canary=0;lates=0;note="";
     draw();stats();
   }
   function isHotSet(k){return HOT[0].indexOf(k)>=0||HOT[1].indexOf(k)>=0;}
-  function lateWrite(){
+  function lateWrite(auto){
     var k,g=0;do{k=(Math.random()*N)|0;g++;}while((hot[k]||isHotSet(k))&&g<500);
-    ctr++;L[k]=ctr;T[cur][k]=ctr;late[k]=1;
-    note="Depth "+cur+" wrote block "+k+", which had never differed before. ";
+    ctr++;L[k]=ctr;T[cur][k]=ctr;late[k]=1;lates++;
+    note=(auto?"No late write yet, so the model made one. ":"")+"Depth "+cur+" wrote block "+k+", which had never differed before. ";
   }
+  /* flash: 0 idle, 1 copied but identical, 2 copied and differed */
   function step(){
-    var i,k,rd=0,wr=0,inn=1-cur;
+    var i,k,rd=0,wr=0,df=0,inn=1-cur;
     for(i=0;i<HOT[cur].length;i++){k=HOT[cur][i];ctr++;L[k]=ctr;T[cur][k]=ctr;}
-    if(sw===autoLate){lateWrite();}
+    if(stage===3&&!lates&&sw===18)lateWrite(true);
     for(i=0;i<N;i++)flash[i]=0;
     if(mode==="all"){
-      for(i=0;i<N;i++){S[cur][i]=L[i];}for(i=0;i<N;i++){L[i]=S[inn][i];flash[i]=0.35;}
+      for(i=0;i<N;i++){if(L[i]!==S[cur][i]){df+=BLK;flash[i]=2;}S[cur][i]=L[i];}
+      for(i=0;i<N;i++){if(S[inn][i]!==L[i]){df+=BLK;flash[i]=2;}L[i]=S[inn][i];if(!flash[i])flash[i]=1;}
       wr=2*N*BLK;rd=2*N*BLK;
     }else if(mode==="cmp"||(mode==="cache"&&sw<WARM)){
-      for(i=0;i<N;i++){if(L[i]!==S[cur][i]){S[cur][i]=L[i];wr+=BLK;flash[i]=1;hot[i]=1;}}
-      for(i=0;i<N;i++){if(S[inn][i]!==L[i]){L[i]=S[inn][i];wr+=BLK;flash[i]=1;hot[i]=1;}}
-      rd=2*2*N*BLK;
+      for(i=0;i<N;i++){if(L[i]!==S[cur][i]){S[cur][i]=L[i];wr+=BLK;flash[i]=2;hot[i]=1;}}
+      for(i=0;i<N;i++){if(S[inn][i]!==L[i]){L[i]=S[inn][i];wr+=BLK;flash[i]=2;hot[i]=1;}}
+      rd=2*2*N*BLK;df=wr;
     }else{
-      for(i=0;i<N;i++)if(hot[i]){S[cur][i]=L[i];wr+=BLK;rd+=BLK;}
-      for(i=0;i<N;i++)if(hot[i]){L[i]=S[inn][i];wr+=BLK;rd+=BLK;flash[i]=1;}
+      for(i=0;i<N;i++)if(hot[i]){if(L[i]!==S[cur][i])df+=BLK;S[cur][i]=L[i];wr+=BLK;rd+=BLK;}
+      for(i=0;i<N;i++)if(hot[i]){if(S[inn][i]!==L[i])df+=BLK;L[i]=S[inn][i];wr+=BLK;rd+=BLK;flash[i]=2;}
       if((++canary%CAN)===0){
         var pr=0;
-        for(i=0;i<N;i++)if(!hot[i]){rd+=2*BLK;if(S[inn][i]!==L[i]){hot[i]=1;promoted[i]=1;pr++;L[i]=S[inn][i];wr+=BLK;flash[i]=1;}}
-        if(pr)note+="Canary promoted "+pr+" block"+(pr>1?"s":"")+", too late. ";
+        for(i=0;i<N;i++)if(!hot[i]){rd+=2*BLK;if(S[inn][i]!==L[i]){hot[i]=1;promoted[i]=1;pr++;L[i]=S[inn][i];wr+=BLK;df+=BLK;flash[i]=2;}}
+        if(pr)note+="The canary promoted "+pr+" block"+(pr>1?"s":"")+", too late. ";
       }
     }
     cur=inn;sw++;
     var nb=0;for(i=0;i<N;i++)if(L[i]!==T[cur][i]){bad[i]=1;nb++;}
     totBad+=nb;if(nb)note+="Depth "+cur+" is now reading "+nb+" block"+(nb>1?"s":"")+" written by the other depth. ";
-    lastRd=rd;lastWr=wr;
+    lastRd=rd;lastWr=wr;lastDf=df;
     for(i=0;i<N;i++){late[i]*=0.85;if(L[i]===T[cur][i])bad[i]*=0.6;}
     draw();stats();
   }
   var cv=$("clGrid"),cx=cv.getContext("2d");
   function draw(){
-    var W=cv.width,H=cv.height,cw=W/COLS,ch=H/ROWS,i,x,y;
+    var W=cv.width,H=cv.height,cw=W/COLS,ch=H/ROWS,i,x,y,dv=STG[stage-1].diff;
     cx.fillStyle="#0b0807";cx.fillRect(0,0,W,H);
     for(i=0;i<N;i++){x=(i%COLS)*cw;y=Math.floor(i/COLS)*ch;
       var c="#2a201b";
-      if(hot[i])c="#7a5a22";
-      if(flash[i]>0.5)c="#f1b23c";else if(flash[i]>0)c="#5a4630";
+      if(hot[i]&&mode!=="all")c="#7a5a22";
+      if(flash[i]===1)c="#5a4630";
+      if(flash[i]===2)c=dv?"#f1b23c":"#5a4630";
       if(late[i]>0.3)c="#ffffff";
       if(bad[i]>0.2)c="#ff4a32";
       cx.fillStyle=c;cx.fillRect(x+1,y+1,cw-2,ch-2);
@@ -1270,24 +1381,130 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   }
   function fmt(b){return b>=1024*1024?(b/1048576).toFixed(2)+" MB":b>=1024?(b/1024).toFixed(1)+" KB":b+" B";}
   function stats(){
-    $("clSw").textContent=sw;$("clRd").textContent=fmt(lastRd);$("clWr").textContent=fmt(lastWr);$("clBad").textContent=totBad;
-    $("clBadBox").className="stat "+(totBad?"bad":"good");
-    var m=mode==="all"?"Copy everything: always correct. Every switch writes the whole set twice.":mode==="cmp"?"Compare every switch: always correct. Reads everything twice and writes only what differs.":(sw<WARM?"Cache the hot set: warm-up ("+sw+"/"+WARM+"), comparing and recording.":"Cache the hot set: copying known-hot blocks only. Canary every "+CAN+" switches.");
-    $("clNote").textContent=m+" "+note;
-    if(sw>0)note=note.length>220?"":note;
+    $("clSw").textContent=sw;$("clRd").textContent=fmt(lastRd);$("clWr").textContent=fmt(lastWr);
+    $("clDf").textContent=STG[stage-1].diff?fmt(lastDf):"?";
+    $("clBad").textContent=totBad;$("clBadBox").className="stat "+(totBad?"bad":"good");
+    var m=mode==="cache"?(sw<WARM?"Warm-up: "+sw+" of "+WARM+" switches, comparing and recording.":"Copying known-hot blocks only. Canary every "+CAN+" switches."):"";
+    $("clNote").textContent=(m+" "+note).trim();
   }
-  function tick(){if(running)step();}
-  function setMode(m){mode=m;["clAll","clCache","clCmp"].forEach(function(id){$(id).setAttribute("aria-pressed",(id==="clAll"&&m==="all")||(id==="clCache"&&m==="cache")||(id==="clCmp"&&m==="cmp"));});reset();}
-  $("clAll").addEventListener("click",function(){setMode("all");});
-  $("clCache").addEventListener("click",function(){setMode("cache");});
-  $("clCmp").addEventListener("click",function(){setMode("cmp");});
+  function legend(){
+    var dv=STG[stage-1].diff,h='<span><i class="sw" style="background:#2a201b"></i>not copied</span>';
+    h+='<span><i class="sw" style="background:#5a4630"></i>copied'+(dv?", and identical":"")+'</span>';
+    if(dv)h+='<span><i class="sw" style="background:var(--hud)"></i>actually differed</span>';
+    if(unlocked>=3)h+='<span><i class="sw" style="background:#7a5a22"></i>known hot</span><span><i class="sw" style="background:#fff"></i>late write</span><span><i class="sw" style="background:#ff4a32"></i>a depth reads another depth\'s bytes</span><span><i class="sw" style="background:transparent;border:2px solid #7fd23e"></i>promoted by the canary</span>';
+    $("clLegend").innerHTML=h;
+  }
+  function setStage(s){
+    stage=s;if(s>unlocked)unlocked=s;mode=STG[s-1].mode;
+    var st=$("clStages");st.innerHTML="";
+    STG.forEach(function(g,i){var b=document.createElement("button");b.textContent=(i+1)+" · "+g.label;b.disabled=i+1>unlocked;
+      b.setAttribute("aria-pressed",i+1===stage);b.addEventListener("click",function(){setStage(i+1);});st.appendChild(b);});
+    if(unlocked<STG.length){var a=document.createElement("button");a.className="ghost";a.textContent="Show all";
+      a.addEventListener("click",function(){unlocked=STG.length;setStage(stage);});st.appendChild(a);}
+    $("clPrompt").innerHTML=STG[s-1].txt;
+    $("clAll").hidden=false;$("clCache").hidden=unlocked<3;$("clCmp").hidden=unlocked<4;
+    $("clAll").setAttribute("aria-pressed",mode==="all");$("clCache").setAttribute("aria-pressed",mode==="cache");$("clCmp").setAttribute("aria-pressed",mode==="cmp");
+    $("clLate").hidden=unlocked<3;
+    $("clNext").hidden=s>=STG.length;if(s<STG.length)$("clNext").textContent="Next: "+STG[s].label+" ▸";
+    $("clCost").hidden=s<5;
+    legend();reset();
+  }
+  function pickMode(m){mode=m;
+    $("clAll").setAttribute("aria-pressed",m==="all");$("clCache").setAttribute("aria-pressed",m==="cache");$("clCmp").setAttribute("aria-pressed",m==="cmp");reset();}
+  $("clAll").addEventListener("click",function(){pickMode("all");});
+  $("clCache").addEventListener("click",function(){pickMode("cache");});
+  $("clCmp").addEventListener("click",function(){pickMode("cmp");});
   $("clRun").addEventListener("click",function(){running=!running;this.textContent=running?"Pause":"Run";});
   $("clStep").addEventListener("click",function(){note="";step();});
-  $("clLate").addEventListener("click",function(){note="";lateWrite();draw();stats();});
+  $("clLate").addEventListener("click",function(){note="";lateWrite(false);draw();stats();});
   $("clReset").addEventListener("click",reset);
+  $("clNext").addEventListener("click",function(){if(stage<STG.length)setStage(stage+1);});
   if(!running)$("clRun").textContent="Run";
-  reset();
-  timer=setInterval(function(){if(running){note="";step();}},420);
+  setStage(1);
+  for(var w=0;w<3;w++){note="";step();}
+  setInterval(function(){if(running){note="";step();}},420);
+})();
+
+/* =====================================================================
+   SORT THE BYTES
+   ===================================================================== */
+(function(){
+  var BINS=[
+    {k:"region",name:"Region",what:"Snapshotted data",does:"Saved into the outgoing depth's slot and restored from the incoming depth's slot."},
+    {k:"patch",name:"Patch",what:"Bytes ACE rewrote in Doom",does:"Saved and restored byte for byte. No region covers Doom's code."},
+    {k:"pin",name:"Pin",what:"A pointer to per-depth memory",does:"Restored with the snapshot, then overwritten with this depth's own value."},
+    {k:"private",name:"Private",what:"Separate memory",does:"Nothing happens. It sits at a different address for each depth."},
+    {k:"host",name:"Host",what:"The scheduler's own state",does:"Never saved or restored. It lives in mtx_hs, outside every snapshot."}
+  ];
+  var CARDS=[
+    {t:"gametic",d:"Doom's tic counter",a:"region",why:"Ordinary Doom data at a fixed address. Each depth has its own game clock, so it follows the depth's snapshot."},
+    {t:"gamekeydown[]",d:"Doom's key array",a:"region",why:"It is Doom data, so each depth gets its own copy. That causes the trouble in Map 08: a key press lands in whichever copy is loaded."},
+    {t:"mod_config",d:"in the engine's .data",a:"region",why:"Initialised writable engine data. The engine's .data became its own snapshot region (9,056 B)."},
+    {t:"E8 xx xx xx xx",d:"a CALL ACE wrote into Doom's code",a:"patch",why:"Five bytes in Doom's code segment. The host reads ACE's hook table at boot and saves and restores every patch as raw bytes."},
+    {t:"90 90 90 90",d:"NOPs ACE wrote over Doom code",a:"patch",why:"A SET_NOPS hook. Like any patch, a second instance's ace_main would write it again into code the root is running."},
+    {t:"mainzone",d:"pointer to the heap",a:"pin",why:"A child's snapshot starts as a clone of its parent's. Without the pin, the child would allocate from its parent's heap."},
+    {t:"screens[0]",d:"Doom's own screen pointer",a:"pin",why:"The third pin. ACE's screen_buffer is a copy taken at init, and Doom's renderer keeps drawing through this one."},
+    {t:"heap blocks",d:"the depth's 4 MiB zone",a:"private",why:"They sit at a different address in each depth's arena slot. Copying megabytes on every switch would gain nothing."},
+    {t:"the stack",d:"64 KiB per depth",a:"private",why:"Each depth runs on its own stack slot, and a switch only swaps ESP (Map 02)."},
+    {t:"ctx[0].esp",d:"a suspended depth's stack pointer",a:"host",why:"The scheduler writes it during the switch itself. A snapshot restore would put back a stale value: the ESP = 0 crash in Map 05."},
+    {t:"key_state",d:"one word: is the switch key down?",a:"host",why:"One answer for the whole machine, kept where no restore can rewind it (Map 08)."}
+  ];
+  var WRONG={
+    region:{patch:"Regions cover data. These bytes are in Doom's code segment, which no region covers, so they would leak between depths.",
+      pin:"Restored from the snapshot, a child cloned from its parent would keep the parent's pointer and use the parent's memory.",
+      "private":"Regions are compared and copied on every switch. This is a lot of memory that already sits at a separate address per depth.",
+      host:"If a snapshot covered it, load_state would rewind it in the middle of a switch. That really happened: see the ESP = 0 crash in Map 05."},
+    patch:{region:"Patches are bytes ACE rewrote inside Doom's memory. This is ordinary data, and a region already moves it.",
+      pin:"Restoring the bytes would only bring back whatever pointer the snapshot holds. A pointer to per-depth memory has to be forced to this depth's value.",
+      "private":"Saving and restoring this would copy memory that already sits at a separate address per depth.",
+      host:"A patch is still restored on every switch. This must never be restored at all."},
+    pin:{region:"A pin forces a fixed value per depth. This value changes as the game runs, so it has to follow the depth's snapshot.",
+      patch:"These are code bytes, not a pointer. They need their own bytes put back.",
+      "private":"A pin is the pointer to private memory. This card is the memory itself.",
+      host:"A pin is still rewritten on every switch-in. This must not change during a switch."},
+    "private":{region:"It lives at one address that every depth shares. Nothing makes it separate unless it is copied.",
+      patch:"These bytes are in Doom's code segment, and there is only one copy of it for every depth.",
+      pin:"This pointer is one variable at one shared address. Without a pin every depth would read the same value.",
+      host:"There is exactly one copy and every depth must see that same one, which makes it the host's, not private."},
+    host:{region:"If the host owned it, every depth would see the same value. Each depth needs its own.",
+      patch:"If the host owned it, the root's patch set would leak into every depth.",
+      pin:"If the host owned it, every depth would share one heap or one screen.",
+      "private":"If the host owned it, every depth would share it, and these must be separate."}
+  };
+  var tray=$("sortTray"),bins=$("sortBins"),msg=$("sortMsg"),prog=$("sortProg"),sel=null,placed={},misses=0;
+  function binHTML(b){
+    var items=CARDS.filter(function(c,i){return placed[i]&&c.a===b.k;});
+    return '<b>'+b.name+'</b><span class="bw">'+b.what+'. '+b.does+'</span><ul>'+items.map(function(c){return '<li><code>'+esc(c.t)+'</code><br>'+esc(c.why)+'</li>';}).join("")+'</ul>';
+  }
+  function draw(){
+    tray.innerHTML="";
+    var left=0;
+    CARDS.forEach(function(c,i){if(placed[i])return;left++;
+      var b=document.createElement("button");b.innerHTML=esc(c.t)+"<span>"+esc(c.d)+"</span>";
+      b.setAttribute("aria-pressed",sel===i);
+      b.addEventListener("click",function(){sel=sel===i?null:i;msg.className="sort-msg";msg.textContent=sel===null?"Pick a card above.":"Where does "+c.t+" ("+c.d+") belong?";draw();});
+      tray.appendChild(b);});
+    if(!left){var d=document.createElement("span");d.className="done";d.textContent="All sorted. Each bin now lists what it holds and why.";tray.appendChild(d);}
+    bins.innerHTML="";
+    BINS.forEach(function(b){
+      var el=document.createElement("button");el.className="bin"+(sel!==null?" armed":"");el.innerHTML=binHTML(b);
+      el.setAttribute("aria-label","Bin: "+b.name);
+      el.addEventListener("click",function(){drop(b.k,el);});
+      bins.appendChild(el);});
+    var n=Object.keys(placed).length;
+    prog.textContent=n+" / "+CARDS.length+" sorted"+(misses?" · "+misses+" wrong pick"+(misses>1?"s":""):"");
+  }
+  function drop(k,el){
+    if(sel===null){msg.className="sort-msg";msg.textContent="Pick a card first, then a bin.";return;}
+    var c=CARDS[sel];
+    if(c.a===k){placed[sel]=1;msg.className="sort-msg good";msg.innerHTML="<b>Right.</b> "+esc(c.why);sel=null;draw();}
+    else{misses++;msg.className="sort-msg bad";msg.innerHTML="<b>Not "+BINS.filter(function(b){return b.k===k;})[0].name+".</b> "+esc(WRONG[k][c.a]);
+      el.classList.remove("shake");void el.offsetWidth;el.classList.add("shake");
+      prog.textContent=Object.keys(placed).length+" / "+CARDS.length+" sorted · "+misses+" wrong pick"+(misses>1?"s":"");}
+  }
+  $("sortShow").addEventListener("click",function(){CARDS.forEach(function(c,i){placed[i]=1;});sel=null;msg.className="sort-msg";msg.textContent="Answers shown. Each bin lists its cards and the reason.";draw();});
+  $("sortReset").addEventListener("click",function(){placed={};misses=0;sel=null;msg.className="sort-msg";msg.textContent="Pick a card above.";draw();});
+  draw();
 })();
 
 })();
