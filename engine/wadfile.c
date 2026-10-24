@@ -20,7 +20,26 @@ uint32_t wad_dir_hidden;
 //
 // funcs
 
-static void wad_add(uint8_t *name)
+/*
+ * Add a WAD - or any file that is not one, which becomes a single lump - to the
+ * lump table by APPENDING to it: `wad_check_lump` searches backward, so the
+ * newest copy of a name wins, and that is what lets a file added at run time
+ * bring its own map under its own name (see mtx_level_wad_add in mtx_boot.c).
+ *
+ * It was `static` while the only caller was `wad_init`'s command-line loop.
+ * MATRYOSHKA's option B has a nested INSTANCE add its own level WAD from inside
+ * the level-load path, so the add is an API now.
+ *
+ * WHO MUST TOUCH `lumpcache` AFTERWARDS. Doom's `lumpcache` is indexed by lump
+ * number and is sized from `numlumps` by the caller, never here: during
+ * `wad_init` it does not exist yet (it is allocated after the loop), so this
+ * function has no business resizing it. An add that happens LATER does, and the
+ * caller that knows it is post-init does it - `mtx_level_wad_add`, and only when
+ * the running depth's own pool owns the cache. Growing the table without growing
+ * the cache would be a write past its end the first time a patch from the new
+ * file went through the cache (font.c, stbar.c read it by index).
+ */
+void wad_add(uint8_t *name)
 {
 	int32_t fd;
 	uint32_t tmp;

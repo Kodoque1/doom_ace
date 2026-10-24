@@ -1198,6 +1198,13 @@ uint32_t map_load_setup(uint32_t new_game)
 	Z_FreeTags(PU_LEVEL, PU_PURGELEVEL-1);
 	zone_info();
 
+	/* matryoshka OPTION B: the depth opens its OWN level WAD before anything
+	   about the level is read. It has to be here - after `map_lump.name` is
+	   known (it is what says which MAPnn to look for) and BEFORE the marker read
+	   and the map lump lookup just below, because both of those must find what
+	   THIS add brought in. A no-op at the root. */
+	mtx_level_wad_add(map_lump.name);
+
 	/* matryoshka: this depth's own screen surface. The level WAD planted it and
 	   named it in this level's marker; resolving it here means the renderer
 	   compares against a texture that really exists in THIS map. */

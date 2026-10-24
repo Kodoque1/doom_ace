@@ -428,6 +428,307 @@ static uint32_t mtx_marker_field(const uint8_t *txt, uint32_t len,
 }
 
 /*
+ * OPTION B: THE INSTANCE EXPLOITS ITSELF.
+ *
+ * Called from the level-load path (map.c), inside the level setup, BEFORE the
+ * marker is read and before the map lump is looked up - so the WAD this call
+ * appends can supply BOTH: the depth's own MTXLEV0d marker and the depth's own
+ * MAPnn. Called from the DEPTH'S OWN copy of the engine, like the marker read
+ * below it, so the file is opened, parsed and owned by the instance.
+ *
+ * What this changes, in one sentence: in option A the ROOT loaded every level
+ * WAD once, from the command line (`-file level0.wad level1.wad level2.wad`), so
+ * the levels existed as soon as the exploit did. Here the command line carries
+ * only the WAD that bootstraps ACE, and a depth reaches its level by opening a
+ * WAD ITSELF at its first level load - and every level WAD carries the exploit
+ * lumps byte-identical (asserted by verify/mkwadlevels.py), so "depth 2 levels up"
+ * means "depth 2 loaded the exploit again".
+ *
+ * THE RULE, AND WHY IT IS A TEST RATHER THAN A MODE. The depth adds its own WAD
+ * only when its OWN marker is not in its lump table. With the level WADs on the
+ * command line (option A) every depth's marker is already there, so this does
+ * nothing and option A stays exactly what was measured; with only the bootstrap
+ * WAD on the command line (option B) each depth finds its marker missing and
+ * opens the file that has it. One command line is therefore the whole difference
+ * between the two versions, and that is what makes their measurements
+ * comparable.
+ *
+ * WHY THE TEST IS THE MARKER AND NOT THE MAP. It was the map first, and it was
+ * wrong in a way worth recording: `MAP02` and `MAP03` are REAL MAPS IN
+ * DOOM2.WAD, so "the map is already in the lump table" is true whether the depth
+ * has anything of its own or not. Measured with `-file level0.wad` alone: every
+ * depth answered "map MAP02 is already in the lump table", loaded the IWAD's own
+ * MAP02 (lump index 17), reported "no MTXLEV01 marker", and painted 0 pixels -
+ * the map name is not evidence that the level is the depth's. The marker is:
+ * MTXLEV0d exists ONLY in level<d>.wad (verify/mkwadlevels.py asserts no WAD
+ * carries a shared marker name), so it is the one name whose presence in the
+ * table means "this depth's own file is loaded".
+ *
+ * And the map still has to be checked, from the other side: because the IWAD's
+ * MAP02 is real, the level load would happily use IT unless the added copy wins
+ * the backward search. So the add reports the map's index BEFORE and AFTER, and
+ * a level whose map index did not move into the added range did not get its own
+ * level even though the marker resolved.
+ *
+ * WHY THE FILENAME IS DERIVED AND NOT PASSED. `level<d>.wad` is the naming
+ * convention `verify/mkwadlevels.py` writes and the command line used to carry,
+ * and the depth can work it out from its own number exactly as it works out
+ * `MAP%02u` from its own `startmap` - which is what it already does one line
+ * further down in this file. A field in the parameter block would be a second
+ * copy of the same convention, in a struct whose every field exists because the
+ * instance CANNOT work the value out for itself. One digit on purpose: the
+ * convention is `level0.wad`, not `level00.wad`, and a depth of 10 or more is
+ * refused with a line in the log rather than silently asking for a file that
+ * does not exist.
+ *
+ * WHAT AN ADD AT RUN TIME COSTS, AND IT IS NOT ONE THING. Adding a file at boot
+ * is free for the engine: nothing has been built from the table yet. Adding one
+ * in the middle of a level start has to catch up with three things that were
+ * resolved while the table was smaller. All three were MEASURED as failures
+ * before being handled, and each is documented where it is handled:
+ *
+ *   1. `lumpcache` (Doom's, indexed by lump number) has to grow with the table.
+ *      `wad_add` documents that it never touches the cache, because during
+ *      `wad_init` the cache does not exist yet; here it does. And the growth is
+ *      guarded by PROVENANCE rather than by believing this code knows which
+ *      context it is in: only the running depth's own pool may resize the array.
+ *      Measured reason: Doom's data segment is shared through the per-depth
+ *      snapshots, so `lumpcache` is a variable a DIFFERENT depth's pointer can be
+ *      sitting in. Reaching it through the wrong pool would move or free another
+ *      depth's memory. (This guard passed; the cache was the right array.)
+ *   2. THE BACK-POINTERS. A moved cache is not a moved array: Doom caches a lump
+ *      as `Z_Malloc(size, tag, &lumpcache[lump])`, so every cached block holds the
+ *      ADDRESS OF ITS OWN ENTRY, and Z_Free uses it to clear that entry when the
+ *      block dies. Moving the array without repointing leaves every block's
+ *      back-pointer aimed at the old array, and the failure is not a crash in
+ *      this function - it is `Z_CT at w_wad.c:510` several calls later, in Doom's
+ *      W_CacheLumpNum, with a healthy-looking table and no lump-read failure. The
+ *      repair and its two counts are in the code below; measured 536 entries, all
+ *      536 repointed, 0 needing to be cleared.
+ *   3. `map_info`. The level table is built at BOOT and each entry stores the lump
+ *      NUMBER its map resolved to then, so the depth's own map is still recorded
+ *      as the IWAD's copy of it and `map_get_info` falls through to the unnamed
+ *      default. Measured as the difference nobody would look for: the same map,
+ *      the same walls, but `gamemap 1` instead of `gamemap 2` - which carries the
+ *      level number, the title lump, the sky, the music and the par time. So the
+ *      table is re-resolved by name after the add.
+ *
+ * Everything else in the level start is index-free or re-read per level, which is
+ * why the list stops at three: the marker, the map lump, the texture index and
+ * the level's own data are all resolved AFTER this call.
+ */
+static uint32_t mtx_level_wad_depth;	/* the depth whose WAD question is settled */
+
+void mtx_level_wad_add(const uint8_t *map_name)
+{
+	uint8_t file[16];
+	uint8_t mark[12];
+	uint8_t buf[240];
+	uint32_t d = mtx_engine_depth();
+	uint32_t before, lumps;
+	mtx_raw_t *pool;
+	int32_t ace, midx;
+	int32_t map_before, map_after;
+
+	/* The root's WAD came from the command line at boot - the exploit has to be
+	   loaded before ACE exists at all - so the root adds nothing here, and its
+	   level stays exactly what option A measured. */
+	if(d == MTX_ROOT_DEPTH || d >= MTX_MAX_DEPTH)
+		return;
+
+	/* One answer per depth image: a level load is not a reason to ask again, and
+	   a second copy of the same file would only shadow the first. */
+	if(mtx_level_wad_depth == d)
+		return;
+
+	if(d > 9u)
+	{
+		mtx_log((const char *)
+		        "[MTX] depth level: no own-WAD convention above depth 9\n");
+		mtx_level_wad_depth = d;
+		return;
+	}
+
+	doom_sprintf(file, (const uint8_t *)"level%u.wad", d);
+	doom_sprintf(mark, (const uint8_t *)"MTXLEV0%u", d);
+
+	/* THE TEST: this depth's own marker, which lives only in this depth's file
+	   (see the block comment for why the MAP name is not the test). */
+	if(wad_check_lump(mark) >= 0)
+	{
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] depth %u level: own marker %s is already in the lump "
+		             "table (command line); no own WAD added\n", d, mark);
+		mtx_log((const char *)buf);
+		mtx_level_wad_depth = d;
+		return;
+	}
+
+	/* The file that should have it, added by THIS depth, from THIS depth. The
+	   map's index is read on BOTH sides of the add: `map_before` is usually the
+	   IWAD's own MAPnn - a real map, which is exactly why this has to be shown
+	   rather than assumed. */
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth %u level: own marker %s is NOT in the lump table; "
+	             "adding its own WAD\n", d, mark);
+	mtx_log((const char *)buf);
+
+	map_before = map_name ? wad_check_lump(map_name) : -1;
+
+	before = numlumps;
+	wad_add(file);
+	lumps = numlumps - before;
+
+	/* THE CACHE IS NOT JUST AN ARRAY: it has INBOUND POINTERS.
+	 *
+	 * Doom caches a lump with `Z_Malloc(size, tag, &lumpcache[lump])`, and that
+	 * third argument makes Z_Malloc store the block's own back-pointer in the
+	 * entry (`block->user = &lumpcache[lump]`). Z_Free then uses it to CLEAR the
+	 * entry when the block dies. So a cache that MOVES leaves every back-pointer
+	 * aimed at the OLD array: the next free clears the old copy, the new copy
+	 * keeps naming a dead block, and the next cache hit on that lump calls
+	 * `Z_ChangeTag` on it.
+	 *
+	 * Measured, exactly that, and it is worth writing down what it looked like:
+	 * the screen said `Z_CT at w_wad.c:510` with module idtech1, there was NO
+	 * lump-read failure (no MTXW.LOG), the cache table was healthy (own pool,
+	 * right size, the appended range zeroed) and `numlumps` was correct in the
+	 * error probe's own record. `Z_ChangeTag` is the CACHE-HIT branch of Doom's
+	 * W_CacheLumpNum - the failure is entirely about the back-pointers, and
+	 * nothing about the add looks wrong from the table's side.
+	 *
+	 * So the move is repaired, and both halves are counted:
+	 *   - a block whose back-pointer named the old array AT THE SAME INDEX is
+	 *     re-pointed at the new one. The test is the pointer's VALUE, so a block
+	 *     cached against somebody else's storage is left alone.
+	 *   - an entry that names a block the zone no longer owns (id != ZONEID) is
+	 *     CLEARED, because that is what Z_Free would have done for it had the
+	 *     back-pointer still been valid - and it is the only outcome that is not
+	 *     a guaranteed I_Error the next time that lump is asked for.
+	 * The counts go in the log: "repaired 0, cleared 0" is the honest statement
+	 * that the move happened to be harmless for this depth's cache.
+	 */
+	pool = mtx_engine_raw_pool();
+	if(lumps && lumpcache && pool && mtx_raw_owns(pool, lumpcache))
+	{
+		void **old = lumpcache;
+		uint32_t i, repaired = 0, cleared = 0;
+
+		lumpcache = ldr_realloc(lumpcache, numlumps * sizeof(void *));
+
+		for(i = 0; i < before; i++)
+		{
+			memblock_t *b;
+
+			if(!old[i])
+				continue;
+
+			b = (memblock_t *)old[i] - 1;
+
+			if(b->id != ZONEID)
+			{
+				lumpcache[i] = NULL;
+				cleared++;
+				continue;
+			}
+
+			if(b->user == &old[i])
+			{
+				b->user = &lumpcache[i];
+				repaired++;
+			}
+		}
+
+		memset(lumpcache + before, 0, lumps * sizeof(void *));
+
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] depth %u level: lumpcache moved %u -> %u: %u entries, "
+		             "%u back-pointers repaired, %u cleared (block no longer in the zone)\n",
+		             d, (uint32_t)(uintptr_t)old, (uint32_t)(uintptr_t)lumpcache,
+		             before, repaired, cleared);
+		mtx_log((const char *)buf);
+	}
+
+	/* THE LEVEL'S OWN DEFINITION TOO, and this half is not optional: it is what
+	 * "the same level start" means.
+	 *
+	 * `map_info` is built at BOOT (setup_cluster/setup_episode for Doom 2's own
+	 * maps, the ZMAPINFO parser for anything else) and every entry stores the
+	 * lump NUMBER its map resolved to at that moment. In option A that number was
+	 * already the level WAD's copy, because the WAD was loaded at boot. Here the
+	 * WAD arrives after the table exists, so the entry still names the IWAD's
+	 * MAP02 - and `map_get_info(map_lump_idx)` then finds NOTHING and the level
+	 * falls back to `map_info_unnamed`. Measured, and it is not cosmetic: the
+	 * depths reported `gamemap 1` where option A reported `gamemap 2`/`gamemap 3`,
+	 * which is the levelhack that carries the level number, the title lump, the
+	 * sky texture, the music and the par time. So the add moves the table onto the
+	 * copy that now wins.
+	 *
+	 * The re-resolution is by NAME and uses the SAME backward search the level load
+	 * itself uses - the old index's own name is read out of the table and looked up
+	 * again - so an entry moves exactly when a later copy of its map shadows it,
+	 * and an entry nothing shadowed stays where it was. Entries that never resolved
+	 * (a Doom 1 episode name in a Doom 2 IWAD is -1) are left alone. */
+	{
+		uint32_t i, moved = 0;
+
+		for(i = 0; i < num_maps; i++)
+		{
+			map_level_t *info = map_info + i;
+			int32_t now;
+
+			if(info->lump < 0 || info->lump >= (int32_t)numlumps)
+				continue;
+
+			now = wad_check_lump(lumpinfo[info->lump].name);
+			if(now >= 0 && now != info->lump)
+			{
+				info->lump = now;
+				moved++;
+			}
+		}
+
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] depth %u level: map_info re-resolved: %u of %u entries moved "
+		             "onto the added copy (map %s now at %i)\n",
+		             d, moved, num_maps,
+		             map_name ? map_name : (const uint8_t *)"?",
+		             map_name ? wad_check_lump(map_name) : -1);
+		mtx_log((const char *)buf);
+	}
+
+	/* What the add brought in, read back through the SAME backward search the
+	   level load will use: the exploit's own code lump (so this depth really did
+	   load the exploit again), this depth's marker, and the map - whose index must
+	   have MOVED into the appended range, or the level about to load is still the
+	   IWAD's. */
+	ace = wad_check_lump((const uint8_t *)"ACE_CODE");
+	midx = wad_check_lump(mark);
+	map_after = map_name ? wad_check_lump(map_name) : -1;
+
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] depth %u level: added %s ITSELF: +%u lumps (now %u), "
+	             "map %s %i -> %i (%s), ACE_CODE at %i, %s at %i, lumpcache %u\n",
+	             d, file, lumps, numlumps,
+	             map_name ? map_name : (const uint8_t *)"?", map_before, map_after,
+	             (map_after >= (int32_t)before) ? "the added copy wins"
+	                                            : "STILL THE EARLIER COPY",
+	             ace, mark, midx, (uint32_t)(uintptr_t)lumpcache);
+
+	mtx_log((const char *)buf);
+
+	if(!lumps)
+	{
+		doom_sprintf(buf, (const uint8_t *)
+		             "[MTX] depth %u level: own-WAD add of %s brought in NO lumps; "
+		             "the level can only be what the command line loaded\n", d, file);
+		mtx_log((const char *)buf);
+	}
+
+	mtx_level_wad_depth = d;
+}
+
+/*
  * Read this depth's level marker for the map being loaded. Called from the
  * level-load path (map.c), the only place that knows a level is being loaded at
  * all - and it runs in the DEPTH'S OWN copy of the engine, so a nested instance

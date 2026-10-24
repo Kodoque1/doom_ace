@@ -5,6 +5,10 @@
 
 void wad_init();
 
+// Append a WAD (or a non-WAD file, as one lump) to the lump table. The caller
+// owns `lumpcache` afterwards - see the block comment in wadfile.c.
+void wad_add(uint8_t *name);
+
 uint64_t wad_name64(const uint8_t *name);
 
 int32_t wad_check_lump(const uint8_t *name);

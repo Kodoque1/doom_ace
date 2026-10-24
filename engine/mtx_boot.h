@@ -73,6 +73,19 @@ extern uint32_t mtx_screen_tex;
 void mtx_level_marker_read(const uint8_t *map_name);
 void mtx_level_report(void);
 
+// OPTION B: the running depth appends ITS OWN level WAD to its lump table, from
+// inside the level-load path, just before the marker is read and the map lump is
+// looked up - so the depth's map AND its marker come from a file the depth
+// opened itself. Every level WAD carries the exploit lumps byte-identical, so a
+// depth that levels up has loaded the exploit again.
+//
+// `map_name` is the map this level load is about (Doom's `map_lump.name`), and
+// it is the TEST, not decoration: the add happens only when that map is not
+// already in the table, so it is a no-op when the command line carried the level
+// WADs and the mechanism when it did not. A no-op at the root (whose WAD came
+// from the command line) and once per depth image. See mtx_boot.c.
+void mtx_level_wad_add(const uint8_t *map_name);
+
 // The seg loop RECORDS the screen rectangle of a screen-textured wall; the frame
 // hook PAINTS it from the other instance's framebuffer. Two halves so that every
 // bound lives in one place instead of inside Doom's clipping arithmetic.
