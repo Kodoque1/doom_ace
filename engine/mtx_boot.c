@@ -273,24 +273,147 @@ uint8_t *mtx_world_screen(void)
  * DIEGETIC RENDERING: one wall texture IS the other instance's screen.
  *
  * Two halves, on purpose. mtx_screen_seg_note (called from the seg loop) only
- * RECORDS the screen rectangle of a screen-textured wall; mtx_screen_paint (called
- * from the frame hook, once the frame is finished) fills it with the other
- * instance's framebuffer. The first version drew columns from inside the seg loop,
- * where Doom's clipping state is mid-flight, and a ylookup[] indexed with an
- * unclipped row is a wild address: measured, 112 writes outside video memory and a
- * black screen. Recording is one comparison per column; painting has every bound in
- * one place.
+ * RECORDS, per screen column, where in the picture that column is; mtx_screen_paint
+ * (called from the frame hook, once the frame is finished) fills the columns from
+ * the other instance's framebuffer. The first version drew columns from inside the
+ * seg loop, where Doom's clipping state is mid-flight, and a ylookup[] indexed with
+ * an unclipped row is a wild address: measured, 112 writes outside video memory and
+ * a black screen. Recording is a few multiplies per column; painting has every bound
+ * in one place.
+ *
+ * THE PICTURE IS PLACED IN WALL SPACE, like a texture. It used to be placed in
+ * SCREEN space - the frame stretched over the span of the marked columns, and each
+ * column over its own VISIBLE height - and that is wrong as soon as the wall is not
+ * one flat, fully visible rectangle: a screen made of several facets (MAP01's pipe)
+ * came out as a row of misaligned rectangles, and a wall whose foot is hidden by a
+ * step had the whole frame squeezed into what was left, so the bottom of the picture
+ * (the gun, the status bar) was never where the wall's bottom is. So each column now
+ * carries its position ALONG the linedef and, per pixel, the depth BELOW the ceiling,
+ * from Doom's own projection; perspective and occlusion are then Doom's.
+ *
+ * The picture is a 4:3 TV centred on the wall, at most MTX_TV_H tall, with a dark
+ * bezel around it - a long wall is a framed screen, not a frame stretched six times
+ * its width. One linedef, one screen.
  */
 static uint8_t  mtx_seg_top[320];
 static uint8_t  mtx_seg_bot[320];
 static uint8_t  mtx_seg_mark[320];
+static int16_t  mtx_seg_u[320];		/* source column, or -1 for the bezel */
+static int32_t  mtx_seg_v0[320];	/* source row at mtx_seg_top, 16.16 */
+static int32_t  mtx_seg_vs[320];	/* source rows per screen row, 16.16 */
 static uint32_t mtx_seg_cols;
 
-void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh)
+#define MTX_BEZEL  5u			/* PLAYPAL: (27,27,27) */
+/* The picture's largest height, and where its centre sits above the floor, in world
+   units. Measured why a cap at all: a picture as big as the wall FILLS the view when
+   the wall is big (MAP03's 768-unit wall), and then the ring's tunnel barely shrinks
+   from one lap to the next, so content from many laps ago - the title screen of the
+   boot - stays large in the middle of the picture. Twice a player's height. */
+#define MTX_TV_H       112
+#define MTX_TV_CENTER  64
+
+static uint32_t mtx_isqrt(uint32_t v)
 {
+	uint32_t r = 0, b = 1u << 30;
+
+	while(b > v)
+		b >>= 2;
+	while(b)
+	{
+		if(v >= r + b)
+		{
+			v -= r + b;
+			r = (r >> 1) + b;
+		} else
+			r >>= 1;
+		b >>= 2;
+	}
+	return r;
+}
+
+void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh, int32_t texcol)
+{
+	static const line_t *ln_c;
+	static fixed_t ceil_c, floor_c;
+	static int32_t len, u0, fw, uscale, v0, vscale;
+	const line_t *ln;
+	const sector_t *fs;
+	int32_t u;
+	int64_t d;
+
 	/* Doom's clipping arithmetic is INPUT here, not something already validated. */
-	if(x >= 320u || yl > 199u || yh > 199u || yh < yl)
+	if(x >= 320u || yl > 199u || yh > 199u || yh < yl || !curline)
 		return;
+	ln = curline->linedef;
+	fs = curline->frontsector;
+	if(!ln || !fs)
+		return;
+
+	/* the TV's geometry, once per wall (and again if a door or lift moves it) */
+	if(ln != ln_c || fs->ceilingheight != ceil_c || fs->floorheight != floor_c)
+	{
+		int32_t dx = ln->dx >> FRACBITS, dy = ln->dy >> FRACBITS;
+		int32_t h = (fs->ceilingheight - fs->floorheight) >> FRACBITS;
+		int32_t fh;
+
+		ln_c = ln;
+		ceil_c = fs->ceilingheight;
+		floor_c = fs->floorheight;
+		len = (int32_t)mtx_isqrt((uint32_t)(dx * dx + dy * dy));
+		if(len < 1 || h < 1)
+		{
+			len = 0;
+			return;
+		}
+		/* 320x200 is shown at 4:3, and Doom's pixels are 1.2 times taller than
+		   wide, so in world units the picture is 1.6 times as wide as it is tall */
+		fh = h * 86 / 100;
+		if(fh > MTX_TV_H)
+			fh = MTX_TV_H;		/* a TV, not a cinema: see MTX_TV_H */
+		fw = fh * 8 / 5;
+		if(fw > len * 92 / 100)
+		{
+			fw = len * 92 / 100;
+			fh = fw * 5 / 8;
+		}
+		if(fw < 1 || fh < 1)
+		{
+			len = 0;
+			return;
+		}
+		u0 = (len - fw) / 2;
+		/* centred at eye level or half the wall, whichever is lower, so a TV on a
+		   tall wall is not up by the ceiling (the eye is 41 units up) */
+		{
+			int32_t c = h / 2 < MTX_TV_CENTER ? h / 2 : MTX_TV_CENTER;
+
+			if(c < fh / 2)
+				c = fh / 2;
+			v0 = h - c - fh / 2;	/* from the ceiling */
+		}
+		uscale = (320 << 16) / fw;
+		vscale = (200 << 16) / fh;
+	}
+	if(!len)
+		return;
+
+	/* along the line from v1: the texture column, less the sidedef's own offset */
+	u = texcol - (curline->sidedef ? (curline->sidedef->textureoffset >> FRACBITS) : 0);
+	u %= len;
+	if(u < 0)
+		u += len;
+	u -= u0;
+	mtx_seg_u[x] = (u >= 0 && u < fw) ? (int16_t)(((int64_t)u * uscale) >> 16) : -1;
+	if(mtx_seg_u[x] > 319)
+		mtx_seg_u[x] = 319;
+
+	/* how far below the ceiling row yl is, in world units (16.16): Doom's own
+	   projection, independent of how the texture is pegged */
+	d = (int64_t)(fs->ceilingheight - viewz) + (int64_t)((int32_t)yl - centery) * (int64_t)dc_iscale;
+	d -= (int64_t)v0 << FRACBITS;
+	mtx_seg_v0[x] = (int32_t)((d * vscale) >> 16);
+	mtx_seg_vs[x] = (int32_t)(((int64_t)dc_iscale * vscale) >> 16);
+
 	mtx_seg_top[x] = (uint8_t)yl;
 	mtx_seg_bot[x] = (uint8_t)yh;
 	mtx_seg_mark[x] = 1;
@@ -298,69 +421,56 @@ void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh)
 }
 
 /*
- * Paint the recorded rectangle with the other instance's frame.
+ * Paint the recorded columns with the other instance's frame.
  *
- * The whole 320x200 frame is mapped across the wall (a screen shows its picture; it
- * does not tile its texture), with the horizontal span taken from the marked columns
- * so a wall that is partly off-screen still maps correctly. No colormap: a screen is
- * emissive, and one that darkened with distance would read as a texture rather than
- * as a picture. Writes go to THIS copy's framebuffer, so a depth's own screens show
- * up inside the inset that composites its frame - the nesting is visible from both
- * sides.
+ * No colormap: a screen is emissive, and one that darkened with distance would read
+ * as a texture rather than as a picture. Writes go to THIS copy's framebuffer, so a
+ * depth's own screens show up inside the picture that the previous depth's screen
+ * shows - the nesting is visible from both sides. The inner loop is per PIXEL and
+ * carries nothing that does not change per pixel; rows 0..199 of the column are
+ * guaranteed by mtx_screen_seg_note, so the only test left is "inside the picture
+ * or on the bezel".
  */
 void mtx_screen_paint(void)
 {
 	const uint8_t *src = mtx_world_screen();
-	uint32_t x, y, x0 = 0xFFFFFFFFu, x1 = 0u, span, done = 0;
+	uint32_t x, y, x0 = 0xFFFFFFFFu, x1 = 0u, done = 0;
 
 	if(!mtx_seg_cols)
 		return;
 
-	for(x = 0; x < 320u; x++)
-		if(mtx_seg_mark[x])
-		{
-			if(x < x0)
-				x0 = x;
-			x1 = x;
-		}
-
-	/* The inner loop is per PIXEL - ~29,000 of them per frame for a wall that fills
-	   the view - so it carries nothing that does not change per pixel. The bounds
-	   it used to test there hold by construction: mtx_screen_seg_note only records
-	   0 <= yl <= yh <= 199, so top + y <= 199, and (h - 1) * vstep < 200 << 16, so
-	   v <= 199. `screen_buffer` is read once: a byte store may alias any global, so
-	   the compiler reloaded it, null-checked it and re-derived the row address on
-	   every pixel. Measured (rdtsc, emulated time): ~50 cycles a pixel before. */
-	if(src && screen_buffer && x1 >= x0)
+	if(screen_buffer)
 	{
 		uint8_t *dst = (uint8_t *)screen_buffer;
 
-		span = x1 - x0 + 1u;
-		for(x = x0; x <= x1; x++)
+		for(x = 0; x < 320u; x++)
 		{
-			const uint8_t *col;
 			uint8_t *d;
-			uint32_t u, top, h, vstep, vfrac;
+			uint32_t h;
 
 			if(!mtx_seg_mark[x])
 				continue;
+			if(x < x0)
+				x0 = x;
+			x1 = x;
 
-			u = ((x - x0) * 320u) / span;
-			if(u > 319u)
-				u = 319u;
-
-			top = mtx_seg_top[x];
-			h = (uint32_t)mtx_seg_bot[x] - top + 1u;
-			vstep = (200u << 16) / h;
-			vfrac = 0;
-			col = src + u;
-			d = dst + top * 320u + x;
-
-			for(y = h; y; y--)
+			h = (uint32_t)mtx_seg_bot[x] - mtx_seg_top[x] + 1u;
+			d = dst + mtx_seg_top[x] * 320u + x;
+			if(!src || mtx_seg_u[x] < 0)
 			{
-				*d = col[(vfrac >> 16) * 320u];
-				d += 320u;
-				vfrac += vstep;
+				for(y = h; y; y--, d += 320u)
+					*d = MTX_BEZEL;
+			} else
+			{
+				const uint8_t *col = src + mtx_seg_u[x];
+				int32_t v = mtx_seg_v0[x], vs = mtx_seg_vs[x];
+
+				for(y = h; y; y--, d += 320u, v += vs)
+				{
+					uint32_t r = (uint32_t)(v >> 16);
+
+					*d = r < 200u ? col[r * 320u] : MTX_BEZEL;
+				}
 			}
 			done += h;
 		}

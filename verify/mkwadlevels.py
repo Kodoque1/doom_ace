@@ -200,10 +200,18 @@ def plant_screens(map_lumps, screen, count):
 # view, and MAP03 starts 36 units from one of its twelve screens, facing an
 # ordinary wall. So --demo plants ONE screen per level, the one a player at the
 # start can see whole and head-on, at a readable distance, and turns the player
-# start to face it. The root keeps the IWAD's MAP01: from its start every big wall
-# is behind one of the two pillars (measured), and its PIPE4 screen is straight
-# ahead, so the demo walks up to it instead.
-DEMO_SCREENS = {1: "BIGBRIK2", 2: "MARBFAC2"}
+# start to face it - or, where nothing big enough is in plain view of the start
+# (MAP01: every big wall is behind one of its two pillars; MAP03: the start is in a
+# recess), moves the start square in front of one. The root gets a MAP01 of its own
+# for this, overriding the IWAD's: its default screen is a six-faceted pipe.
+DEMO_SCREENS = {0: "MARBFAC3", 1: "BIGBRIK2", 2: "MARBFAC2"}
+
+
+def tv_size(length, height):
+    """The engine draws a 4:3 picture centred on the wall (mtx_screen_seg_note):
+    1.6 world units wide per unit of height, 86% of the height, 92% of the length."""
+    fh = min(height * 0.86, 112)                 # MTX_TV_H
+    return min(fh, length * 0.92 / 1.6)
 
 
 def _cross(ax, ay, bx, by):
@@ -253,25 +261,31 @@ def relocate(verts, lines, blockers, sidedefs_d, sectors_d, things, tidx):
         octant = int(round(inward / 45.0)) % 8 * 45
         if abs((inward - octant + 540) % 360 - 180) > 10:
             continue
-        for D in (320, 384, 256):
+        tvw = tv_size(length, 0x7fff) * 1.6
+        for D in (int(tvw * 1.15), int(tvw * 1.3), int(tvw * 1.0)):
             o = math.radians(octant)
             pt = (mid[0] - D * math.cos(o), mid[1] - D * math.sin(o))
             sec = sector_at(pt, verts, lines, sidedefs_d)
             if sec is None:
                 continue
             fl, ce = struct.unpack_from("<hh", sectors_d, sec * 26)
-            if ce - fl < 72:
-                continue
+            special = struct.unpack_from("<h", sectors_d, sec * 26 + 22)[0]
+            if ce - fl < 72 or special in (4, 5, 7, 9, 11, 16):
+                continue                          # too low, secret, or a damaging floor
             inner = [(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in (0.12, 0.5, 0.88)]
             if any(any(j != i and _hits(pt, q, c, d) for j, (c, d) in blockers) for q in inner):
                 continue
-            if best is None or length > best[4]:
-                best = (length / D, i, s0, D, int(length), octant, pt)
+            wf, wc = struct.unpack_from("<hh", sectors_d,
+                                        struct.unpack_from("<h", sidedefs_d, s0 * 30 + 28)[0] * 26)
+            tv = tv_size(length, wc - wf)
+            if tv < 64:
+                continue
+            if best is None or tv > best[7]:
+                best = (tv / D, i, s0, D, int(length), octant, pt, tv)
             break
     if best is None:
         return None
-    struct.pack_into("<hh", things, tidx * 10, int(best[6][0]), int(best[6][1]))
-    return best[:6]
+    return best
 
 
 def plant_demo(map_lumps, screen):
@@ -335,13 +349,16 @@ def plant_demo(map_lumps, screen):
           inner = [(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in (0.12, 0.5, 0.88)]
           if not all(visible(i, pt) for pt in inner):
               continue
-          size = length * cosf / dist           # how big it looks
+          fl, ce = struct.unpack_from("<hh", sectors_d, sector_of(s0) * 26)
+          size = tv_size(length, ce - fl) * cosf / dist   # how big the picture looks
           if best is None or size > best[0]:
               best = (size, i, s0, int(dist), int(length), octant)
+    moved = relocate(verts, lines, blockers, sidedefs_d, sectors_d, things, tidx)
+    if moved is not None:          # a TV at the distance it was made for beats any found one
+        struct.pack_into("<hh", things, tidx * 10, int(moved[6][0]), int(moved[6][1]))
+        best = moved[:6]
     if best is None:
-        best = relocate(verts, lines, blockers, sidedefs_d, sectors_d, things, tidx)
-        if best is None:
-            return None
+        return None
 
     size, i, s0, dist, length, octant = best
     off = s0 * 30 + 20
@@ -398,8 +415,9 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if args.demo:
         for spec in LEVELS:
-            if spec["idx"] in DEMO_SCREENS:
-                spec["screen"] = DEMO_SCREENS[spec["idx"]]
+            spec["screen"] = DEMO_SCREENS[spec["idx"]]
+            spec["src"] = spec["src"] or "MAP01"
+            spec["map"] = spec["map"] or "MAP01"
 
     _, loader_lumps = read_wad(args.loader)
     have = dict(loader_lumps)

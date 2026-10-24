@@ -240,7 +240,9 @@ step() {
   [ -z "$s" ] && return
   local k=${s%%:*} t=${s##*:}
   xdotool keydown --clearmodifiers "$k" 2>/dev/null; sleep "$t"
-  xdotool keyup --clearmodifiers "$k" 2>/dev/null; sleep "${MTX_LOOK:-3}"
+  xdotool keyup --clearmodifiers "$k" 2>/dev/null; sleep 0.2
+  xdotool keyup --clearmodifiers "$k" 2>/dev/null   # a lost release walks the ring into the wall
+  sleep "${MTX_LOOK:-3}"
 }
 for _s in $(seq 1 "$SWITCHES"); do
   step
