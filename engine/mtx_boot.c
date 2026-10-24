@@ -212,6 +212,49 @@ static uint8_t mtx_ring_next(uint8_t d)
 	return d;                       /* nothing else live: nothing to show */
 }
 
+/*
+ * WHO RUNS NEXT. Not the ring: the ring is what the screen-walls SHOW, and it
+ * stays the ring. Which depth gets the machine is a separate question, and the
+ * answer is weighted towards the one the viewer is in.
+ *
+ * The viewer sees one depth's frame, full screen, and that picture only changes
+ * when that depth renders. A plain round robin gives it one slice in N, followed
+ * by N - 1 slices of a frozen picture: at three depths the viewed picture changed
+ * in bursts of 4 frames with 8 frozen ones between them. So the viewed depth takes
+ * every other slice, and the others share the rest in turn - V, a, V, b, V, a ...
+ * Every depth still runs; a nested view is a screen-wall, a fraction of the
+ * picture, and it can afford the lower rate.
+ *
+ * Measured (verify/, this host, 3 depths, slice 4): the viewed depth 30.0 frames/s,
+ * each other depth 15.2/s - against 12-16/s for every depth before. Shorter slices
+ * are measured WORSE (slice 2: 18.3/s viewed, slice 1: 8.3/s): a switch still
+ * compares the whole registered set, ~800-1,900 kcycles, more than half a frame.
+ *
+ * Host code: it runs in the root, and in the host service a depth hands back
+ * through; its state is in mtx_hs, which no snapshot covers.
+ */
+static uint8_t mtx_sched_next(uint8_t cur)
+{
+	uint8_t v = mtx_hs.transport, o, k;
+
+	if(v >= MTX_MAX_DEPTH || !mtx_alive(v))
+		return mtx_ring_next(cur);
+	if(cur != v)
+		return v;
+
+	o = mtx_hs.sched_other;
+	for(k = 0; k < MTX_MAX_DEPTH; k++)
+	{
+		o = mtx_ring_next(o);
+		if(o != v)
+			break;
+	}
+	if(o == v)
+		return v;		/* nobody else live: stay */
+	mtx_hs.sched_other = o;
+	return o;
+}
+
 uint8_t *mtx_world_screen(void)
 {
 	mtx_depth_params_t *p = mtx_self();
@@ -281,11 +324,22 @@ void mtx_screen_paint(void)
 			x1 = x;
 		}
 
-	if(src && x1 >= x0)
+	/* The inner loop is per PIXEL - ~29,000 of them per frame for a wall that fills
+	   the view - so it carries nothing that does not change per pixel. The bounds
+	   it used to test there hold by construction: mtx_screen_seg_note only records
+	   0 <= yl <= yh <= 199, so top + y <= 199, and (h - 1) * vstep < 200 << 16, so
+	   v <= 199. `screen_buffer` is read once: a byte store may alias any global, so
+	   the compiler reloaded it, null-checked it and re-derived the row address on
+	   every pixel. Measured (rdtsc, emulated time): ~50 cycles a pixel before. */
+	if(src && screen_buffer && x1 >= x0)
 	{
+		uint8_t *dst = (uint8_t *)screen_buffer;
+
 		span = x1 - x0 + 1u;
 		for(x = x0; x <= x1; x++)
 		{
+			const uint8_t *col;
+			uint8_t *d;
 			uint32_t u, top, h, vstep, vfrac;
 
 			if(!mtx_seg_mark[x])
@@ -299,18 +353,16 @@ void mtx_screen_paint(void)
 			h = (uint32_t)mtx_seg_bot[x] - top + 1u;
 			vstep = (200u << 16) / h;
 			vfrac = 0;
+			col = src + u;
+			d = dst + top * 320u + x;
 
-			for(y = 0; y < h; y++)
+			for(y = h; y; y--)
 			{
-				uint32_t v = vfrac >> 16;
-
-				if(v > 199u)
-					v = 199u;
-				if(screen_buffer && (top + y) < 200u)
-					((uint8_t *)screen_buffer)[(top + y) * 320u + x] = src[v * 320u + u];
+				*d = col[(vfrac >> 16) * 320u];
+				d += 320u;
 				vfrac += vstep;
-				done++;
 			}
+			done += h;
 		}
 	}
 
@@ -2594,7 +2646,7 @@ static void mtx_engine_policy(void)
 	{
 		/* The RING turns: the root hands the frame to the next live level, exactly
 		   as every level hands it back to its own next one. */
-		mtx_request_switch(mtx_ring_next(MTX_ROOT_DEPTH));
+		mtx_request_switch(mtx_sched_next(MTX_ROOT_DEPTH));
 	}
 }
 
@@ -2636,7 +2688,7 @@ void mtx_host_take_frame(void)
 	/* The RING, from a level's side: hand the frame to the NEXT live level, which
 	   at the deepest level is the wrap back to the root. Hardcoding the root here
 	   is what made this a two-body ping-pong rather than a ring of N. */
-	mtx_request_switch(mtx_ring_next((uint8_t)mtx_depth()));
+	mtx_request_switch(mtx_sched_next((uint8_t)mtx_depth()));
 	mtx_log("[MTX] hand-back: request set, servicing\n");
 	mtx_frame_tick();
 	mtx_log("[MTX] hand-back: returned (the host handed the frame back)\n");
@@ -2972,6 +3024,104 @@ static void MTX_FRAME_TICK_ABI mtx_engine_self_check(mtx_depth_params_t *me)
 	mtx_log((const char *)buf);
 }
 
+/*
+ * EACH DEPTH'S OWN GAME CLOCK.
+ *
+ * Doom's I_GetTime (load 0x19C10, `mov eax,[0x2913c]; ret`) is redirected here by
+ * the hook below, so while the ring runs the game sees `mtx_vt_now`, and the frame
+ * boundary decides how far it moves. Each depth installs the hook from its own copy
+ * of the engine, so the patch is per-depth like every other one (hook isolation).
+ *
+ * Why. The tick counter is Doom DATA, so it was part of every snapshot: a depth's
+ * clock only moved while that depth was loaded. Measured with rdtsc in emulated
+ * time: the root, whose own work is ~1,800 kcycles a frame, spent ~4,300 a frame -
+ * one 35 Hz tic - spinning in TryRunTics for its next tic, every frame. Sharing the
+ * real counter instead was measured too, and is worse: every depth then simulates
+ * 35 tics a second of its world, catching up 4-8 tics in one frame after a slice
+ * away, and the tic logic eats the machine.
+ *
+ * So, per frame: the depth the viewer is IN follows wall time (1..4 tics), which is
+ * what makes the picture move at Doom's speed; every other depth moves exactly one
+ * tic - slow motion inside the screen-walls, with no catch-up to pay for. Either
+ * way a frame always finds a new tic, so nothing waits. Wall time is the BIOS tick
+ * (0040:006C, 18.2065 Hz, outside every snapshot): the game counter runs fast in a
+ * ring (measured ~44/s against Doom's 35), so it cannot be the reference.
+ *
+ * Between frame boundaries the clock is frozen, EXCEPT in a loop that waits on time
+ * (the level-start wipe spins on I_GetTime): a frozen clock hangs it - measured, the
+ * root stopped at its frame 2. Many reads inside one frame mean something is
+ * waiting, and then time flows, forwards only.
+ */
+__attribute__((section(".data"))) static uint32_t mtx_vt_now, mtx_vt_on, mtx_vt_real, mtx_vt_calls;
+__attribute__((section(".data"))) static uint32_t mtx_vt_bios0, mtx_vt_off, mtx_vt_was_v;
+
+uint32_t __attribute((regparm(2),no_caller_saved_registers)) mtx_i_gettime(void)
+{
+	uint32_t real = *(volatile uint32_t *)(uintptr_t)(doom_data_segment + 0x2913cu);
+
+	if(!mtx_vt_on)
+		return real;
+	if(++mtx_vt_calls > 256u)
+	{
+		uint32_t v = mtx_vt_now + (real - mtx_vt_real);
+
+		if((int32_t)(v - mtx_vt_now) > 0)
+			mtx_vt_now = v;
+		mtx_vt_real = real;
+	}
+	return mtx_vt_now;
+}
+
+static const hook_t mtx_vt_hooks[] __attribute__((used,section(".hooks"),aligned(4))) =
+{
+	{0x00019C10, CODE_HOOK | HOOK_JMP_ACE, (uint32_t)mtx_i_gettime},
+};
+
+static void mtx_vtime(mtx_depth_params_t *me)
+{
+	uint32_t real = *(volatile uint32_t *)(uintptr_t)(doom_data_segment + 0x2913cu);
+	uint32_t bios = *(volatile uint32_t *)(uintptr_t)0x46cu;
+	uint32_t is_v, d = 1;
+
+	if(me)
+		is_v = (me->transport == me->depth);
+	else
+	{
+		/* the root keeps Doom's own clock until there is a ring to share it with */
+		if(!mtx_booted || mtx_ring_next(MTX_ROOT_DEPTH) == MTX_ROOT_DEPTH)
+			return;
+		is_v = (mtx_hs.transport == MTX_ROOT_DEPTH);
+	}
+	if(!mtx_vt_on)
+	{
+		mtx_vt_now = real;
+		mtx_vt_real = real;
+		mtx_vt_bios0 = bios;
+		mtx_vt_on = 1;
+		return;
+	}
+	if(is_v)
+	{
+		/* wall time in tics: 35 / 18.2065 = 1969 / 1024 */
+		uint32_t t = ((bios - mtx_vt_bios0) * 1969u) >> 10;
+
+		if(!mtx_vt_was_v)
+			mtx_vt_off = t - mtx_vt_now;	/* just became the viewed one: no burst */
+		d = (t - mtx_vt_off) - mtx_vt_now;
+		if((int32_t)d < 1)
+			d = 1;
+		if(d > 4u)
+		{
+			d = 4u;
+			mtx_vt_off = t - (mtx_vt_now + d);	/* drop what cannot be caught up */
+		}
+	}
+	mtx_vt_was_v = is_v;
+	mtx_vt_now += d;
+	mtx_vt_real = real;
+	mtx_vt_calls = 0;
+}
+
 /* Single entry point for the frame path (engine/vesa.c). Same call convention as
    the function that calls it, so it is safe inside swap_buffers(). */
 void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
@@ -2986,6 +3136,8 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 	   increment here is the host's evidence that this depth is not merely
 	   booted: it is drawing. */
 	mtx_depth_params_t *me = mtx_self();
+
+	mtx_vtime(me);
 
 	if(me)
 	{
