@@ -30,6 +30,7 @@
    a `map_lump_name_t` that drifts from map.h is a silent miscompile. */
 #include "map.h"
 #include "wadfile.h"
+#include "sound.h"		// sfx_id_by_name: Doom's own sound table, for the teleport
 
 #include "context.h"
 #include "dos_state.h"
@@ -1576,7 +1577,7 @@ void mtx_engine_apply_params(void)
 /* How often a depth reads video memory back and compares it with its own frame
    (see mtx_engine_self_check): often enough to catch a depth that stops being
    presented, rare enough that scanning 64000 bytes does not show up in a frame. */
-#define MTX_SELF_CHECK_EVERY  100u
+#define MTX_SELF_CHECK_EVERY  50u
 
 /* The key that switches the inset on and off, in Doom's own key numbering (its
    key state is indexed by character). 'Y' is not a default binding in a level and
@@ -1594,19 +1595,25 @@ void mtx_engine_apply_params(void)
  * makes "the visible screen is this depth's" a measurement instead of a claim.
  * (The engine itself reads 0xA0000 in net.c, so this is an ordinary access here.)
  */
-static uint32_t mtx_present(uint8_t depth)
+static uint32_t mtx_present_buf(const uint8_t *buf)
 {
-	uint8_t *buf;
-
-	if(depth >= MTX_MAX_DEPTH || !mtx_hs.screens[depth])
+	if(!buf)
 		return 0;
 
-	buf = (uint8_t *)mtx_hs.screens[depth];
 	*MTX_PRESENT_SRC = (uint32_t)(uintptr_t)buf;
-	mtx_hs.present_depth = depth;
 	mtx_hs.present_frame = mtx_hs.frame_no;
 
 	return (*(uint32_t *)(uintptr_t)0xA0000 == *(uint32_t *)buf) ? 1u : 0u;
+}
+
+static uint32_t mtx_present(uint8_t depth)
+{
+	if(depth >= MTX_MAX_DEPTH || !mtx_hs.screens[depth])
+		return 0;
+
+	mtx_hs.present_depth = depth;
+
+	return mtx_present_buf((const uint8_t *)mtx_hs.screens[depth]);
 }
 
 /*
@@ -1615,24 +1622,113 @@ static uint32_t mtx_present(uint8_t depth)
  * still holds the previous depth's pixels - measured, and exactly what a
  * same-frame check reported. A frame later the blit has happened, and the answer
  * is about the screen rather than about the order of the code.
+ *
+ * WHICH buffer it compares against is the one that was named, not the transport
+ * depth's frame: during the effect the screen is the composite, and a check that
+ * insisted on a depth's own frame would report a MISMATCH for the effect working
+ * exactly as designed. Note the comparison is one dword, so it is evidence and not
+ * proof - a coincidental match is possible (measured: a uniform grey top-left
+ * corner matched three buffers at once).
  */
 static void mtx_present_confirm(void)
 {
-	uint8_t buf[144];
-	uint8_t d = mtx_hs.present_depth;
+	uint8_t buf[176];
+	uint8_t *want;
 	uint32_t vga, mine;
+	uint8_t d;
 
 	if(!mtx_hs.present_frame || mtx_frame_no <= mtx_hs.present_frame)
 		return;
 
 	mtx_hs.present_frame = 0;
-	vga  = *(uint32_t *)(uintptr_t)0xA0000;
-	mine = *(uint32_t *)mtx_hs.screens[d];
+	vga = *(uint32_t *)(uintptr_t)0xA0000;
+
+	want = mtx_hs.fx_frames ? (uint8_t *)(uintptr_t)mtx_hs.fx_buf
+	                        : (uint8_t *)mtx_hs.screens[mtx_hs.transport];
+	mine = *(uint32_t *)want;
+
+	/* Which one it looks like, named: during the effect the answer that matters is
+	   "the screen is the composite", and that has to be distinguishable from "the
+	   screen is a level". */
+	d = MTX_MAX_DEPTH;
+	for(uint8_t k = 0; k < MTX_MAX_DEPTH; k++)
+		if(mtx_hs.screens[k] && *(uint32_t *)mtx_hs.screens[k] == vga)
+			d = k;
 
 	doom_sprintf(buf, (const uint8_t *)
-	             "[MTX] screen check: depth %u %s (vga %u vs buffer %u)\n",
-	             (uint32_t)d, (vga == mine) ? "CONFIRMED" : "MISMATCH", vga, mine);
+	             "[MTX] screen check: %s (vga %u vs %s %u); vga looks like %s\n",
+	             (vga == mine) ? "CONFIRMED" : "MISMATCH", vga,
+	             mtx_hs.fx_frames ? "composite" : "transport frame", mine,
+	             (d == MTX_MAX_DEPTH)
+	                 ? (mtx_hs.fx_buf && *(uint32_t *)(uintptr_t)mtx_hs.fx_buf == vga
+	                        ? "the composite" : "neither")
+	                 : (d == mtx_hs.transport ? "the transported depth" : "another depth"));
 	mtx_log((const char *)buf);
+}
+
+/*
+ * THE TELEPORT EFFECT.
+ *
+ * A short sweep, built into a buffer of its own (`fx_buf`) and presented as the
+ * screen while it runs: rows above the sweep line come from the frame being
+ * ENTERED, rows below it from the frame being LEFT, and the sweep line itself is a
+ * bright band - so the picture is wiped into place by a moving edge of light,
+ * which is what a teleport looks like in a sprite-based game. The sound (Doom's
+ * own `telept`) plays on the first frame.
+ *
+ * WHY ITS OWN BUFFER, AND NOT THE DESTINATION. The screen during the effect is a
+ * MIX of two frames, so it cannot be either of them: compositing into the frame
+ * the viewer is entering would be overwritten by that instance's next render (it
+ * is live, and it is rendering into exactly that buffer), and compositing into the
+ * one being left would corrupt a frame the ring still shows on a wall. So the
+ * composite goes somewhere nothing else writes, and every depth's blit source is
+ * pointed at it (see mtx_engine_video) - the depths then all present the same
+ * bytes, which is also what keeps a mid-blit sample of the screen from showing two
+ * different pictures.
+ *
+ * It is built by the HOST, once per host frame: `fx_buf` is host-owned memory, and
+ * the three depths' frames interleave inside one host frame, so building it in
+ * each of them would be three builds of the same picture.
+ */
+static void mtx_fx_build(void)
+{
+	uint8_t *dst = (uint8_t *)(uintptr_t)mtx_hs.fx_buf;
+	uint8_t *from = (uint8_t *)(uintptr_t)mtx_hs.fx_from;
+	uint8_t *to   = (uint8_t *)(uintptr_t)mtx_hs.fx_to;
+	uint32_t done, line, y, x;
+
+	if(!mtx_hs.fx_frames || !dst || !from || !to)
+		return;
+
+	/* How much of the NEW frame is in place: a sweep that reaches the whole screen
+	   exactly on the effect's last frame, so the hand-over to the live frame is
+	   invisible. */
+	done = mtx_hs.fx_total - mtx_hs.fx_frames + 1u;
+	line = (SCREENHEIGHT * done) / mtx_hs.fx_total;
+	if(line > SCREENHEIGHT)
+		line = SCREENHEIGHT;
+
+	for(y = 0; y < SCREENHEIGHT; y++)
+	{
+		uint8_t *src = (y < line) ? to : from;
+
+		if(y + 2u == line)
+		{
+			/* the sweep line: a bright band, so the transition reads as an EDGE
+			   moving rather than as two pictures spliced (index 4 is the
+			   palette's white, the same one the old inset border used) */
+			for(x = 0; x < SCREENWIDTH; x++)
+				dst[y * SCREENWIDTH + x] = 4u;
+			continue;
+		}
+
+		memcpy(dst + y * SCREENWIDTH, src + y * SCREENWIDTH, SCREENWIDTH);
+	}
+
+	/* the last frame of the sweep also carries the bright line at the bottom */
+	if(line >= SCREENHEIGHT)
+		for(x = 0; x < SCREENWIDTH; x++)
+			dst[(SCREENHEIGHT - 1u) * SCREENWIDTH + x] = 4u;
 }
 
 /*
@@ -1965,6 +2061,35 @@ static void mtx_engine_boot(void)
 	mtx_heaps[0]   = mainzone;
 	mtx_screens[0] = screen_buffer;
 
+	/* WHERE THE VIEWER STARTS: in the root, which is the instance the game boots
+	   into. `transport` is the one answer every depth's blit source is set from
+	   (mtx_engine_video), so this line is what decides which frame is on screen
+	   before any key is pressed. */
+	mtx_hs.transport = MTX_ROOT_DEPTH;
+
+	/* THE TELEPORT EFFECT'S OWN BUFFER. From the ROOT's zone, because it is host
+	   memory that every depth's blit gets pointed at - and it must not be one of the
+	   depths' frames: the composite is a MIX of two of them, and the frame being
+	   entered is being rendered into while the effect runs. One frame is 64000 B
+	   against an 8 MiB zone, and the failure is reported rather than assumed
+	   (mtx_fx_build early-outs, so a missing buffer means a switch with no
+	   transition instead of a fault). */
+	mtx_hs.fx_buf = (uint32_t)(uintptr_t)Z_Malloc(SCREENSIZE, PU_STATIC, NULL);
+	if(!mtx_hs.fx_buf)
+		mtx_log("[MTX] no effect buffer: switches will have no transition\n");
+
+	/* TEMPORARY (diagnosis): is the sound device actually ON, and which sound is the
+	   teleport? `snd_sfxdevice` must be 3 (Sound Blaster) or the engine's sound path
+	   early-outs (sound.c) - so a SILENT capture has two very different causes and
+	   this line separates them: the device is off, or the device is on and the sound
+	   is not reaching the recorder. */
+	doom_sprintf(buf, (const uint8_t *)
+	             "[MTX] sound: sfx device %u, music %u, channels %u, teleport id %u\n",
+	             (uint32_t)snd_sfxdevice, (uint32_t)snd_musicdevice,
+	             (uint32_t)numChannels,
+	             (uint32_t)sfx_id_by_name((const uint8_t *)"telept"));
+	mtx_log((const char *)buf);
+
 	/* Size each depth's image slot from the image it will actually hold - the
 	   engine's own lump. Reading its .bss dword beats guessing, so the planner is
 	   handed the real requirement and the depth ceiling stays honest. */
@@ -2188,18 +2313,33 @@ static void mtx_engine_boot(void)
  */
 static void mtx_engine_video(void)
 {
-	/* The host owns which buffer both depths present - and it names the ROOT's
-	   frame for both. The root draws the inset into it; the depth, running its own
-	   copy of this code, blits from it too (mtx_params.h: present_src). So the
-	   screen shows one stable view with the nested instance inside it, instead of
-	   flickering between two views as the depths take turns over the frame. */
-	mtx_hs.params[1].present_src = (uint32_t)(uintptr_t)mtx_hs.screens[0];
+	uint8_t *src;
+	uint8_t d;
 
-	/* mtx_present() early-outs when the source already is this depth's, and it also
-	   reads the screen back, so a policy that changes this later gets the check for
-	   free. */
-	if(mtx_hs.present_depth != 0u)
-		mtx_present(0);
+	/* The effect's step FIRST: this frame's composite has to exist before anything
+	   is pointed at it. Built here, in the host's own frame path, because the three
+	   depths' frames interleave inside one host frame - building it in each of them
+	   would be three builds of the same picture. */
+	if(mtx_hs.fx_frames)
+	{
+		mtx_fx_build();
+		mtx_hs.fx_frames--;
+	}
+
+	/* ONE buffer for every depth, and it is the frame of the depth the viewer is IN
+	   - or the effect's composite while the teleport runs. Naming one buffer for
+	   all of them is what keeps the screen stable as the depths take turns over the
+	   frame, and it is also why a mid-blit sample cannot show two pictures: the
+	   three blits of one host frame copy the same bytes. */
+	src = mtx_hs.fx_frames ? (uint8_t *)(uintptr_t)mtx_hs.fx_buf
+	                       : (uint8_t *)mtx_hs.screens[mtx_hs.transport];
+
+	for(d = 1; d < MTX_MAX_DEPTH; d++)
+		if(mtx_alive(d))
+			mtx_hs.params[d].present_src = (uint32_t)(uintptr_t)src;
+
+	mtx_hs.present_depth = mtx_hs.transport;
+	mtx_present_buf(src);
 }
 
 /*
@@ -2429,14 +2569,14 @@ void mtx_host_take_frame(void)
  * depth's buffer and before the status bar is drawn at the bottom - so the inset
  * lands in the frame that gets blitted and nothing paints over it.
  */
-/* The inset box in the depth whose frame is on screen: 320x200 space, with its
-   border. Named here rather than repeated, because two functions now have to agree
-   about exactly which rectangle is the host's. */
-#define MTX_INSET_X  8u
-#define MTX_INSET_Y  8u
-#define MTX_INSET_W  160u
-#define MTX_INSET_H  100u
-#define MTX_INSET_BORDER 2u
+/* HOW LONG THE TELEPORT EFFECT LASTS, in host frames.
+ *
+ * There is no overlay any more (the screen is one instance's frame, full screen,
+ * and the key MOVES the viewer), so a switch is a change of the whole picture -
+ * which needs a transition or it reads as a jump cut. 8 host frames is a bit over
+ * half a second at the measured rate: long enough to see the sweep travel, short
+ * enough that it is a transition and not a pause. */
+#define MTX_FX_FRAMES  8u
 
 /*
  * THE SWITCH KEY, FROM ONE AUTHORITY.
@@ -2517,21 +2657,41 @@ static uint32_t mtx_key_observe(void)
 	return down;
 }
 
+/*
+ * START THE TELEPORT: the transition AND its sound, from one depth's frame to
+ * another's. `from` and `to` are DEPTHS rather than buffers, so the caller does not
+ * have to know which buffer belongs to which view.
+ *
+ * The sound is Doom's OWN teleport sound, resolved through the engine's sound table
+ * by name (`sfx_id_by_name`, sound.c) instead of written as an index - and resolved
+ * once, with the failure (0) cached too, so a name the table does not carry does not
+ * re-walk the table on every switch. Playing it from the HOST is deliberate: the
+ * host is the one that decided the switch, and the sound device is the root's.
+ */
+static void mtx_fx_start(uint8_t from, uint8_t to)
+{
+	mtx_hs.fx_from   = (uint32_t)(uintptr_t)mtx_hs.screens[from];
+	mtx_hs.fx_to     = (uint32_t)(uintptr_t)mtx_hs.screens[to];
+	mtx_hs.fx_total  = MTX_FX_FRAMES;
+	mtx_hs.fx_frames = MTX_FX_FRAMES;
+
+	if(!mtx_hs.fx_played)
+		mtx_hs.fx_played = (uint32_t)sfx_id_by_name((const uint8_t *)"telept");
+
+	if(mtx_hs.fx_played)
+		S_StartSound(0, mtx_hs.fx_played);
+}
+
 static void mtx_engine_switch(void)
 {
-	uint8_t *src = mtx_hs.inset_depth ? (uint8_t *)mtx_hs.screens[mtx_hs.inset_depth] : 0;
-
-	/* (A measurement lived here and its RESULT is what the authority below is built
+	/* (A measurement lived here and its RESULT is what the key authority is built
 	   on, so it is written down instead of the code that produced it: the BIOS
 	   keyboard ring at 0040:001A never moved while the switch key was held - head
 	   and tail stayed equal on every sampled frame of a press - so nothing
 	   machine-global carries the input. Doom 1.9 installs its own INT 9 handler and
 	   does not chain to the BIOS one, and the ring is dead. That leaves Doom's own
 	   key array as the only channel, and that array is snapshot state.) */
-	uint8_t *dst = (uint8_t *)screen_buffer;
-	uint32_t y, x;
 	uint8_t  dl;
-	const uint32_t ix = 8u, iy = 8u, iw = 160u, ih = 100u;
 	/* EVERY live depth, not one fixed child. With a ring, any of the children can
 	   have begun a slice since the host last looked, and each has its own stamp;
 	   a single shared stamp let one child's slice start consume the other's. Note
@@ -2573,113 +2733,91 @@ static void mtx_engine_switch(void)
 		{
 			/* The host's own edge, through the same authority the depths use. */
 			uint32_t edge = mtx_key_observe();
-			uint32_t key  = (req || edge) ? 1u : 0u;
 
-			/* INPUT-FREE TOUR: a second trigger, the frame counter, which the host
-			   owns outright. It is what makes a CLIP show the states reliably while
-			   the key is still being understood - 90 frames is a few seconds at the
-			   measured rate: long enough to see a state, short enough that a 20 s
-			   clip shows the whole cycle (off, level 1, level 2). It is kept now
-			   that the key works, because a recording must not depend on a key
-			   press landing in the right window. */
-			uint32_t tour = (mtx_frame_no && (mtx_frame_no % 90u) == 0u) ? 1u : 0u;
-
-			if(tour || key)
+			if(req || edge)
 			{
-				mtx_hs.inset_frame = mtx_frame_no;
+				uint8_t old = mtx_hs.transport;
+				uint8_t next = old;
+				uint8_t k;
 
-				/* CYCLE the inset through the live depths: off, then each level, then
-				   off again. The innermost level is the view worth reaching - its own
-				   walls show the level outside it - and a bool cannot say which one
-				   that is. */
+				/* THE TRANSPORT. The viewer moves INTO the next live depth, and from
+				   the deepest one back to the root - which is the ring's own order,
+				   the one its screen-walls already show (mtx_ring_next). So going one
+				   level in is going one level along the picture, and the loop closes
+				   without a special case for the deepest level. */
+				for(k = 1; k <= MTX_MAX_DEPTH; k++)
 				{
-					uint8_t next = 0, d2;
+					uint8_t cand = (uint8_t)((old + k) % MTX_MAX_DEPTH);
 
-					for(d2 = (uint8_t)(mtx_hs.inset_depth + 1u); d2 < MTX_MAX_DEPTH; d2++)
-						if(mtx_alive(d2))
-						{
-							next = d2;
-							break;
-						}
-					mtx_hs.inset_depth = next;
+					if(mtx_alive(cand))
+					{
+						next = cand;
+						break;
+					}
 				}
-				mtx_hs.inset_on = mtx_hs.inset_depth ? 1u : 0u;
+
+				mtx_hs.transport = next;
+				mtx_hs.present_depth = next;
+
+				/* The transition, and its sound. Started AFTER the transport moved,
+				   so `to` is the buffer the screen ends up on. */
+				mtx_fx_start(old, next);
+
 				{
-					uint8_t buf[192];
+					uint8_t buf[224];
 					doom_sprintf(buf, (const uint8_t *)
-					             "[MTX] inset -> depth %u at frame %u (trigger: %s; "
-					             "authority %u, child req %u, own edge %u)\n",
-					             (uint32_t)mtx_hs.inset_depth, mtx_frame_no,
-					             tour ? "TOUR" : "key",
+					             "[MTX] transport depth %u -> %u at frame %u "
+					             "(authority %u, child req %u, own edge %u, "
+					             "effect %u frames, sound %u)\n",
+					             (uint32_t)old, (uint32_t)next, mtx_frame_no,
 					             (uint32_t)mtx_hs.key_state,
-					             (uint32_t)req, (uint32_t)edge);
+					             (uint32_t)req, (uint32_t)edge,
+					             MTX_FX_FRAMES, mtx_hs.fx_played);
 					mtx_log((const char *)buf);
 				}
 			}
 		}
 	}
 
-	/* Tell every running depth what the picture is: which buffer is the canvas,
-	   whether an inset is up, and WHICH level its screen-walls show (mtx_params.h).
-	   Host memory the instances already read, so this is only the host keeping the
-	   shared description current - without it a depth cannot know that its own view
-	   is supposed to be on screen, and leaves the canvas showing the suspended
-	   root's last frame. Every live depth, because the answers now DIFFER per
-	   depth: the ring shows level d the frame of the next level, and the deepest
-	   level the root's. */
+	/* Tell every running depth what the picture is: the canvas, WHICH depth the
+	   viewer is in, and which level its screen-walls show (mtx_params.h). Host
+	   memory the instances already read, so this is only the host keeping the shared
+	   description current. Every live depth, because the answers differ per depth:
+	   the ring shows level d the frame of the next level, and the deepest level the
+	   root's.
+
+	   There is no composite here any more. The screen is ONE instance's frame, full
+	   screen, and the host has already named it for every depth (mtx_engine_video):
+	   the switch is a change of WHICH frame that is, not a rectangle drawn inside
+	   another one. */
 	for(dl = 1; dl < MTX_MAX_DEPTH; dl++)
 	{
 		if(!mtx_alive(dl))
 			continue;
 		mtx_hs.params[dl].canvas     = (uint32_t)(uintptr_t)mtx_hs.screens[0];
-		mtx_hs.params[dl].inset_on   = mtx_hs.inset_on;
+		mtx_hs.params[dl].transport  = mtx_hs.transport;
 		mtx_hs.params[dl].screen_src =
 			(uint32_t)(uintptr_t)mtx_hs.screens[mtx_ring_next(dl)];
 	}
-
-	if(!mtx_hs.inset_depth || !src || !dst || !mtx_hs.params[mtx_hs.inset_depth].frames)
-		return;
-
-	/* half scale: every other pixel of the depth's 320x200 frame */
-	for(y = 0; y < ih; y++)
-		for(x = 0; x < iw; x++)
-			dst[(iy + y) * 320u + (ix + x)] = src[(y * 2u) * 320u + (x * 2u)];
-
-	/* a border, so the inset reads as an inset and not as part of the level */
-	for(x = ix - 2u; x < ix + iw + 2u; x++)
-	{
-		dst[(iy - 2u) * 320u + x] = 4u;
-		dst[(iy - 1u) * 320u + x] = 4u;
-		dst[(iy + ih) * 320u + x] = 4u;
-		dst[(iy + ih + 1u) * 320u + x] = 4u;
-	}
-	for(y = iy - 2u; y < iy + ih + 2u; y++)
-	{
-		dst[y * 320u + (ix - 2u)] = 4u;
-		dst[y * 320u + (ix - 1u)] = 4u;
-		dst[y * 320u + (ix + iw)] = 4u;
-		dst[y * 320u + (ix + iw + 1u)] = 4u;
-	}
-
-	mtx_hs.inset_logged++;
 }
 
 /*
- * WHY A DEPTH DOES NOT PAINT THE MAIN VIEW (measured, and it is a trade-off with
- * only one good answer at fine slices).
+ * WHY THE SCREEN IS ONE INSTANCE'S FRAME AND NOT A COMPOSITE.
  *
- * The main area of the canvas has to come from ONE instance. With a depth painting
- * its own view there, the picture alternates between the two instances every time
- * control does - which was fine at 30-frame slices and wrong at 1-frame slices:
+ * The main area has to come from ONE instance, and the interesting part is that
+ * this is a measurement rather than a preference. When a depth painted its own view
+ * into the shared canvas, the picture alternated between instances every time
+ * control changed hands - tolerable at 30-frame slices and wrong at 1-frame ones:
  * measured on adjacent captured frames (0.05 s apart), 50% of the main view and 67%
- * of the status bar differed, i.e. the numbers on the status bar were switching
- * between two sessions faster than anyone can read them.
+ * of the status bar differed, i.e. the status bar's numbers switched between two
+ * sessions faster than anyone can read them.
  *
- * What that function was fixing - the screen freezing for the whole of a depth's
- * slice - is 3.90 s at 30-frame slices and ONE FRAME at 1-frame slices, i.e.
- * invisible. So: fine slices make the freeze irrelevant, the main view stays the
- * root's, and the depth's frames reach the screen through the host's inset, which
- * composites the depth's newest frame on every root frame.
+ * So the host names ONE buffer for every depth's blit (mtx_engine_video), and WHICH
+ * buffer that is, is now the thing the switch changes: the viewer is IN one instance
+ * at a time, and the key moves them to the next one round the ring. The nested views
+ * are not lost - they are the screen-textured walls inside each level, which the
+ * level WADs plant and mtx_screen_paint fills from the ring's next depth, so a level
+ * still shows the one inside it without any overlay.
  */
 
 /*
@@ -2702,32 +2840,35 @@ static void MTX_FRAME_TICK_ABI mtx_engine_self_check(mtx_depth_params_t *me)
 	uint8_t *mine = (uint8_t *)me->screen;
 	uint32_t *sb = (uint32_t *)screen_buffer;
 	uint32_t *dv = (uint32_t *)(uintptr_t)(doom_data_segment + MTX_DOOM_SCREEN_VAR);
-	const uint32_t ix = 8u, iy = 8u, iw = 160u, ih = 100u;
 	uint32_t same = 0, y, x;
 	const uint8_t *vga = (const uint8_t *)(uintptr_t)0xA0000;
 
 	if(!mine || (me->frames % MTX_SELF_CHECK_EVERY) != 0u)
 		return;
 
-	/* Where this depth's pixels are on the screen: the host composites this
-	   depth's frame into the ROOT's frame as a half-scale inset, and the host has
-	   both depths present the root's frame - so the inset is the one place the
-	   nested picture appears, and this reads it back from video memory. Every other
-	   pixel of the inset area must equal the sampled pixel of this depth's frame;
-	   if the inset were showing something else, this count would not be near-full. */
-	for(y = 0; y < ih; y++)
-		for(x = 0; x < iw; x++)
-			if(vga[(iy + y) * 320u + (ix + x)] == mine[(y * 2u) * 320u + (x * 2u)])
+	/* Is THIS depth's frame the one on the screen? Since the transport change the
+	   answer is all-or-nothing and about the WHOLE frame: when the viewer is in this
+	   depth, every pixel of video memory is this depth's frame (the host named this
+	   buffer for every depth's blit), and when the viewer is elsewhere, none of it
+	   is. Sampled as a count rather than compared whole, because the depth is
+	   rendering into its own buffer while this runs - the last rows can legitimately
+	   differ from what the screen still shows. The expected counts are therefore
+	   "nearly all" and "nearly none", and the log says which. */
+	for(y = 0; y < SCREENHEIGHT; y += 2u)
+		for(x = 0; x < SCREENWIDTH; x += 2u)
+			if(vga[y * SCREENWIDTH + x] == mine[y * SCREENWIDTH + x])
 				same++;
 
 	doom_sprintf(buf, (const uint8_t *)
 	             "[MTX] depth %u frame %u: screen region %u, engine screen_buffer %u, "
-	             "doom screens[0] %u; the host's inset shows THIS depth's frame in "
-	             "%u/%u pixels (exact while neither view moves; this depth's own "
-	             "buffer has moved on by the time it is read back)\n",
+	             "doom screens[0] %u; the screen is THIS depth's frame in %u/%u "
+	             "sampled pixels - transport %u, so it %s\n",
 	             (uint32_t)me->depth, me->frames,
 	             (uint32_t)(uintptr_t)mine, (uint32_t)(uintptr_t)sb,
-	             (uint32_t)(uintptr_t)*dv, same, iw * ih);
+	             (uint32_t)(uintptr_t)*dv, same, (SCREENHEIGHT / 2u) * (SCREENWIDTH / 2u),
+	             (uint32_t)me->transport,
+	             (me->transport == me->depth) ? "SHOULD be (this depth is the one the "
+	                                            "viewer is in)" : "should NOT be");
 	mtx_log((const char *)buf);
 }
 

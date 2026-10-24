@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "wadfile.h"
 #include "textpars.h"
+#include "mtx_boot.h"	// mtx_engine_depth: a nested instance is silent on purpose
 #include "map.h"
 #include "sound.h"
 
@@ -717,6 +718,37 @@ uint16_t sfx_by_name(uint8_t *name)
 	return sfx_by_alias(tp_hash64(name));
 }
 
+/*
+ * The DOOM-side index of one of the original sounds, found the way `init_sound`
+ * finds them: by walking Doom's own `S_sfx` table and matching the six-character
+ * name it carries there - "telept", not "DSTELEPT" and not the SNDINFO alias
+ * "misc/telept".
+ *
+ * WHY A LOOKUP AND NOT A NUMBER. The engine's `sfxinfo` KEEPS Doom's original
+ * indices: `init_sound` fills entries 1..NUMSFX-1 from `S_sfx` (that is what makes
+ * a Doom-side `S_StartSound(id)` still mean the same sound inside the engine). So
+ * the index of the teleport sound is a fixed number in the compiled Doom sound
+ * table - and writing that number here would be a magic constant that nothing
+ * checks. Asking `S_sfx` is asking the very table `init_sound` already trusts, so
+ * the two cannot disagree, and it keeps working if the table ever moves.
+ *
+ * Returns 0 (`sfx_None`) when the name is not in the table, which is a sound that
+ * does not play rather than a wrong one.
+ */
+int32_t sfx_id_by_name(const uint8_t *name)
+{
+	for(uint32_t i = 1; i < NUMSFX; i++)
+	{
+		if(S_sfx[i].link || !S_sfx[i].name)
+			continue;
+
+		if(!strncmp((const char *)S_sfx[i].name, (const char *)name, 6))
+			return (int32_t)i;
+	}
+
+	return 0;
+}
+
 void sfx_rng_fix(uint16_t *idx, uint32_t pmatch)
 {
 	for(uint32_t i = 0; i < NUMSFX_RNG; i++)
@@ -876,7 +908,26 @@ void init_sound()
 		sfx_hooks[i].value += (uint32_t)sfxinfo;
 	utils_install_hooks(sfx_hooks, NUM_SFX_HOOKS);
 
-	 *((uint32_t*)((void*)0x0003F433 + doom_code_segment)) = numsfx * sizeof(sfxinfo_t);
+	 * ((uint32_t*)((void*)0x0003F433 + doom_code_segment)) = numsfx * sizeof(sfxinfo_t);
+
+	/* A NESTED INSTANCE IS SILENT, ON PURPOSE.
+	 *
+	 * The sound DEVICE belongs to the machine and the root owns it. What a depth
+	 * would add is a second and third copy of Doom's per-tic mixer on the same
+	 * emulated CPU - and that is not a small cost, it is the difference between a
+	 * run and a crash: measured, with the sound device enabled a three-instance run
+	 * died before the children booted, with "NetUpdate: netbuffer->numtics >
+	 * BACKUPTICS" (Doom's tic buffer overflowing, which is what a frame loop that
+	 * cannot keep up looks like from inside the game), and with the device off the
+	 * same build runs for hundreds of frames.
+	 *
+	 * Zeroing the device for a depth removes that work at the SOURCE: ACE's own
+	 * sound path early-outs on it (`snd_sfxdevice != 3` in get_sfx), Doom's S_Init
+	 * finds no device to reset, and no channel is ever started - so there is nothing
+	 * to mix. The root keeps the device, which is also why the switch's teleport
+	 * sound is played by the HOST rather than by whichever depth saw the key. */
+	if(mtx_engine_depth() != MTX_ROOT_DEPTH)
+		snd_sfxdevice = 0;
 }
 
 //

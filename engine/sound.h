@@ -47,6 +47,10 @@ uint64_t sfx_alias(uint8_t*);
 uint16_t sfx_by_alias(uint64_t);
 uint16_t sfx_by_name(uint8_t*);
 
+// The DOOM-side index of an original sound, by the six-character name Doom's own
+// S_sfx table carries ("telept", "swtchn", ...). 0 when it is not in the table.
+int32_t sfx_id_by_name(const uint8_t *name);
+
 sound_seq_t *snd_seq_by_sector(sector_t*, uint32_t);
 sound_seq_t *snd_seq_by_id(uint32_t id);
 sound_seq_t *snd_seq_by_name(const uint8_t *name);
