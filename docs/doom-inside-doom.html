@@ -491,6 +491,54 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
 .knob{border-bottom:2px dashed var(--hud);color:var(--hud);cursor:ew-resize;font-family:var(--f-hud);font-size:1.2em;padding:0 3px;user-select:none;touch-action:none}
 .knob:focus-visible{outline:2px solid var(--hud)}
 @media (max-width:620px){.hudbar .parts span:not(.on){display:none}}
+.terms{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;min-height:120px}
+.term{background:#0b0807;border:1px solid var(--line);border-radius:3px;padding:8px 10px;animation:frIn .3s ease-out;min-width:0}
+.term svg{width:100%;max-width:180px;height:auto;display:block;font-family:var(--f-mono)}
+.term b{display:block;font-family:var(--f-display);font-weight:700;text-transform:uppercase;font-size:19px;color:var(--hud);letter-spacing:.03em;margin-top:4px}
+.term span{font-size:14px;color:var(--dim);line-height:1.4}
+.recall{font-family:var(--f-hud);font-size:18px;color:var(--faint);margin:0 0 6px}
+.recall b{font-weight:400;color:var(--dim)}
+.skip{font-family:var(--f-hud);font-size:18px}
+
+/* ---------- one flow: no cards, text and animation together ---------- */
+.console{background:none!important;border:0!important;box-shadow:none!important;padding:0!important;margin:40px auto 56px!important;border-radius:0}
+.console-head{margin:0 0 10px}
+.console-head .badge{display:none}
+.console-title{font-family:var(--f-hud)!important;font-weight:400!important;font-size:19px!important;letter-spacing:.08em!important;color:var(--faint)!important;text-transform:uppercase}
+.m3-stage{border:0!important;background:radial-gradient(ellipse at 50% 45%,#1f1510 0%,rgba(16,11,9,0) 72%)!important;-webkit-mask-image:radial-gradient(ellipse at 50% 50%,#000 62%,transparent 100%);mask-image:radial-gradient(ellipse at 50% 50%,#000 62%,transparent 100%)}
+.seq-say{border-top:0!important;font-family:var(--f-body);font-size:19px!important;line-height:1.55;color:var(--fg)!important;max-width:680px;padding-top:4px!important}
+.seqc button{font-size:16px;padding:3px 9px 2px;background:transparent;border-color:#4a372b;border-bottom-width:1px}
+.seqc button.primary{background:#3a140b;border-color:#7a2a18}
+.steplist{border:0!important;background:none!important;padding:0!important}
+figcaption{font-size:14px!important;color:var(--faint)!important}
+.lanesc,.cl-grid,.fb-c,.strip{border:0!important}
+.box,.lane,.mbox,.stack,.listing,.reg,.stat,.mon,.buf,.mseg,.rchip,.sp-c{border-color:#2a201b!important}
+/* scroll-driven scenes */
+.scrolly{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:28px;align-items:start;max-width:1180px!important}
+.sc-stage{position:sticky;top:calc(env(safe-area-inset-top,0px) + 10px);align-self:start;min-width:0}
+.sc-steps{min-width:0;padding-top:8vh}
+.stp{min-height:26vh;padding:10px 0 10px 14px;border-left:2px solid #2a201b;font-family:var(--f-body);font-size:19px;line-height:1.55;color:var(--faint);transition:color .25s,border-color .25s}
+.stp.on{color:var(--fg);border-left-color:var(--hud)}
+.stp b{color:inherit}
+.stp.on b{color:var(--hud)}
+.stp-q{border-left-style:dashed}
+.stp-q .pq-q{font-size:19px}
+.stp-tail{height:30vh}
+.sc-bar{opacity:.55;margin-top:6px}
+.sc-bar:hover,.sc-bar:focus-within{opacity:1}
+.sc-bar .scrub,.sc-bar [data-q=play],.sc-bar [data-q=restart]{display:none}
+@media (max-width:820px){
+  .scrolly{grid-template-columns:minmax(0,1fr);gap:0}
+  .sc-stage{top:calc(env(safe-area-inset-top,0px));z-index:3;background:var(--bg);padding-bottom:6px;max-height:62vh;overflow:hidden}
+  .sc-stage .m3-stage{height:42vh!important}
+  .stp{min-height:32vh;padding-top:24px;background:linear-gradient(var(--bg),var(--bg));}
+  .sc-steps{padding-top:0}
+}
+
+.m3-stage::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px),
+  url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0 0.3 0 0 0 .55 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+  mix-blend-mode:overlay;opacity:.55}
 </style>
 </head>
 <body>
@@ -511,20 +559,20 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
 
 <main class="wrap">
 
-<section class="ch col" data-hud="One Doom, one machine"><p class="sec-tag">Map 01</p><h2>One Doom, one machine</h2><p class="lead1">Doom assumes it is the only program running.</p></section>
-<div class="wide console" id="mc" data-parts="code data screen">
-  <div class="console-head"><h2 class="console-title">One loop, one set of addresses</h2><span class="badge b-sim">Animation</span></div>
-  <div class="mach">
-    <svg class="loops" id="mcSvg" viewBox="0 0 400 230" aria-label="Game loops"></svg>
-    <div class="memcol">
-      <div class="mbox" id="mcG"><h5>Doom data · gametic</h5><b>0</b></div>
-      <div class="mbox" id="mcS"><h5>Screen · 0xA0000</h5><canvas id="mcScr" width="64" height="40"></canvas></div>
-    </div>
-  </div>
-  <div class="seq-say" id="mcSay" aria-live="polite"></div>
+<section class="ch col" data-hud="The whole machine"><p class="sec-tag">Map 00</p><h2>The whole machine</h2><p class="lead1">Every mechanism as a closed box first. Each chapter opens one or two.</p><p class="skip">Know stack switching already? <a href="#map03">Skip to Map 03</a>.</p></section>
+
+<div class="wide console" id="ov0" data-parts="cpu stacks sched code data slots heaps host screen keys"><div class="console-head"><h2 class="console-title">The machine, closed</h2><span class="badge b-sim">3D map</span></div><div class="m3-stage"><canvas aria-label="3D map of the whole machine"></canvas><div class="m3-hint">drag to turn</div></div><div class="seq-say" aria-live="polite"></div></div>
+
+<section class="ch col" data-hud="Seven words"><p class="sec-tag">Map 01</p><h2>Seven words</h2><p class="lead1">The vocabulary the rest of the page uses. No mechanism yet.</p></section>
+
+<div class="wide console" id="tm" data-parts="cpu stacks data screen keys">
+  <div class="console-head"><h2 class="console-title">Seven words</h2><span class="badge b-sim">Animation</span></div>
+  <div class="terms" id="tmGrid"></div>
+  <div class="seq-say" id="tmSay" aria-live="polite"></div>
 </div>
 
-<section class="ch col" data-hud="Taking turns"><p class="sec-tag">Map 02</p><h2>Taking turns</h2><p class="lead1">A paused program is just its stack, plus a pointer to that stack.</p><div class="machine"><span class="mlab">The machine, from here on:</span><span>one CPU, one ESP</span><span>a stack per depth</span><span>a scheduler</span><span>Doom's code, with patches</span><span>Doom's data, live</span><span>a snapshot slot per depth</span><span>private memory per depth</span><span>mtx_hs, the host's own state</span><span>one screen</span><span>one keyboard</span></div><p class="hudtxt" style="margin-top:8px">The status bar at the bottom lights up the parts each scene shows.</p></section>
+<section class="ch col" data-hud="Taking turns"><p class="sec-tag">Map 02</p><h2>Taking turns</h2><p class="recall"><b>So far:</b> three copies, one CPU, taking turns.</p><p class="lead1">A paused copy is its stack plus one pointer to it. First the big picture, then the instructions, then when it is allowed.</p></section>
+
 <div class="wide console" id="tw" data-parts="cpu stacks sched">
   <div class="console-head"><h2 class="console-title">Three stacks, one CPU</h2><span class="badge b-sim">Animation</span></div>
   <div class="schedbox" id="twSched"></div>
@@ -533,6 +581,7 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <div class="seq-say" id="twSay" aria-live="polite"></div>
   <figcaption>Amber frames are host code. Function names are from the source.</figcaption>
 </div>
+
 <div class="wide console" id="stk" data-parts="cpu stacks">
   <div class="console-head">
     <h2 class="console-title">Two stacks, one ESP</h2>
@@ -549,7 +598,6 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <figcaption><span class="badge b-code">Code</span> from <code>mtx_switch.S</code>. Depth 1's addresses and saved words are from the run's log. The root's values and the trampoline address are illustrative.</figcaption>
 </div>
 
-<section class="ch col" data-hud="Only between frames"><p class="sec-tag">Map 03</p><h2>Only between frames</h2><p class="lead1">A switch can be requested at any time. It only happens at a frame boundary.</p></section>
 <div class="wide console" id="fb" data-parts="cpu sched">
   <div class="console-head"><h2 class="console-title">A request waits for the boundary</h2><span class="badge b-sim">Simulation</span></div>
   <canvas class="fb-c" id="fbCanvas" width="1000" height="160" aria-label="Frames on a timeline, with switch requests"></canvas>
@@ -564,7 +612,22 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <div class="narr" id="fbLog" aria-live="polite"></div>
 </div>
 
-<section class="ch col" data-hud="What a switch moves"><p class="sec-tag">Map 04</p><h2>What a switch moves</h2><p class="lead1">Each depth's bytes go in and out of its own snapshot slot.</p></section>
+<div class="wide console" id="ov2" data-parts="cpu stacks sched"><div class="console-head"><h2 class="console-title">Back to the machine: 2 of 8 open</h2><span class="badge b-sim">3D map</span></div><div class="m3-stage"><canvas aria-label="3D map of the whole machine"></canvas><div class="m3-hint">drag to turn</div></div><div class="seq-say" aria-live="polite"></div></div>
+
+<section class="ch col" id="map03" data-hud="Keeping them apart"><p class="sec-tag">Map 03</p><h2>Keeping them apart</h2><p class="recall"><b>So far:</b> the CPU switches between stacks, at frame boundaries.</p><p class="lead1">What breaks first if two copies just run? Their globals collide. This chapter is about every way to keep them apart.</p></section>
+
+<div class="wide console" id="mc" data-parts="code data screen">
+  <div class="console-head"><h2 class="console-title">One loop, one set of addresses</h2><span class="badge b-sim">Animation</span></div>
+  <div class="mach">
+    <svg class="loops" id="mcSvg" viewBox="0 0 400 230" aria-label="Game loops"></svg>
+    <div class="memcol">
+      <div class="mbox" id="mcG"><h5>Doom data · gametic</h5><b>0</b></div>
+      <div class="mbox" id="mcS"><h5>Screen · 0xA0000</h5><canvas id="mcScr" width="64" height="40"></canvas></div>
+    </div>
+  </div>
+  <div class="seq-say" id="mcSay" aria-live="polite"></div>
+</div>
+
 <div class="wide console sp" id="sp" data-parts="data code slots heaps">
   <div class="console-head"><h2 class="console-title">What a switch moves</h2><span class="badge b-sim">Animation</span></div>
   <p class="runlbl" id="spRun"></p>
@@ -578,21 +641,14 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <svg class="ov" id="spSvg" aria-hidden="true"><defs><marker id="spArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#f1b23c"/></marker></defs><path id="spPath" fill="none" stroke="#f1b23c" stroke-width="2" marker-end="url(#spArr)"/></svg>
   <div class="seq-say" id="spSay" aria-live="polite"></div>
 </div>
+
 <div class="wide console" id="m3" data-parts="code data slots heaps host">
   <div class="console-head"><h2 class="console-title">One address space, three snapshots</h2><span class="badge b-sim">3D animation</span></div>
   <div class="m3-stage" id="m3Stage"><canvas id="m3Canvas" aria-label="3D map of the process memory"></canvas><div class="m3-hint">drag to turn</div><div class="m3-live" id="m3Live"></div></div>
   <div class="seq-say" id="m3Say" aria-live="polite"></div>
   <figcaption>Not to scale. The heights of the private blocks follow their real sizes per depth: a 4 MiB heap, a 2 MiB raw pool, a 297 KB screen region, a ~413 KB code image and a ~574 KB snapshot slot.</figcaption>
 </div>
-<div class="wide console" id="rr" data-parts="code data host heaps stacks cpu">
-  <div class="console-head"><h2 class="console-title">From a real run</h2><span class="badge b-meas">Measured · 3D</span></div>
-  <div class="m3-stage" id="rrStage"><canvas id="rrCanvas" aria-label="3D map of a real run's memory"></canvas><div class="m3-hint">drag to turn</div><div class="m3-live" id="rrLive"></div></div>
-  <canvas class="lanesc" id="rrLanes" width="1000" height="66" aria-label="The measured schedule"></canvas>
-  <div class="seq-say" id="rrSay" aria-live="polite"></div>
-  <figcaption id="rrCap"></figcaption>
-</div>
 
-<section class="ch col" data-hud="The host inside the snapshot"><p class="sec-tag">Map 05</p><h2>The host inside the snapshot</h2><p class="lead1">The switch code has state too. It must not belong to any depth.</p></section>
 <div class="wide console" id="hs" data-parts="host slots data">
   <div class="console-head">
     <h2 class="console-title">Whose bytes are these?</h2>
@@ -609,6 +665,7 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <div class="okmsg" id="hsOk"></div>
   <figcaption>Hatched cells are inside the snapshot. The crash is measured; the addresses are illustrative.</figcaption>
 </div>
+
 <div class="wide console" id="dg" data-parts="host stacks">
   <div class="console-head"><h2 class="console-title">A pointer that outlives its frame</h2><span class="badge b-sim">Animation</span></div>
   <p class="runlbl" id="dgMode"></p>
@@ -622,7 +679,18 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <div class="okmsg" id="dgOk">save_state runs · the switch goes ahead</div>
 </div>
 
-<section class="ch col" data-hud="Booting a second copy"><p class="sec-tag">Map 06</p><h2>Booting a second copy</h2><p class="lead1">The engine image loads again, without touching its parent.</p></section>
+<div class="wide console" id="rr" data-parts="code data host heaps stacks cpu">
+  <div class="console-head"><h2 class="console-title">From a real run</h2><span class="badge b-meas">Measured · 3D</span></div>
+  <div class="m3-stage" id="rrStage"><canvas id="rrCanvas" aria-label="3D map of a real run's memory"></canvas><div class="m3-hint">drag to turn</div><div class="m3-live" id="rrLive"></div></div>
+  <canvas class="lanesc" id="rrLanes" width="1000" height="66" aria-label="The measured schedule"></canvas>
+  <div class="seq-say" id="rrSay" aria-live="polite"></div>
+  <figcaption id="rrCap"></figcaption>
+</div>
+
+<div class="wide console" id="ov3" data-parts="data code slots heaps host"><div class="console-head"><h2 class="console-title">Back to the machine: 5 of 8 open</h2><span class="badge b-sim">3D map</span></div><div class="m3-stage"><canvas aria-label="3D map of the whole machine"></canvas><div class="m3-hint">drag to turn</div></div><div class="seq-say" aria-live="polite"></div></div>
+
+<section class="ch col" data-hud="Starting a copy"><p class="sec-tag">Map 04</p><h2>Starting a copy</h2><p class="recall"><b>So far:</b> switching, and keeping bytes apart.</p><p class="lead1">The loader runs first in the program, but it makes sense only now: it is the same isolation problem, at boot time.</p></section>
+
 <div class="wide console" id="ln" data-parts="heaps">
   <div class="console-head"><h2 class="console-title">Two second stages, side by side</h2><span class="badge b-sim">Animation</span></div>
   <div class="lanes">
@@ -631,6 +699,7 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   </div>
   <div class="seq-say" id="lnSay" aria-live="polite"></div>
 </div>
+
 <div class="wide console" id="rl" data-parts="cpu heaps host">
   <div class="console-head"><h2 class="console-title">Booting depth 1, hand-off by hand-off</h2><span class="badge b-sim">Animation</span></div>
   <p class="runlbl" id="rlMode"></p>
@@ -646,6 +715,7 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <div class="seq-say" id="rlSay" aria-live="polite"></div>
   <figcaption>The second run shows the design that was avoided, and ends in the failure measured when an instance had no block.</figcaption>
 </div>
+
 <div class="wide console" id="pc" data-parts="heaps">
   <div class="console-head"><h2 class="console-title">A clue spelled in ASCII</h2><span class="badge b-sim">Animation</span></div>
   <div class="pcl" id="pcLog"></div>
@@ -654,7 +724,10 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <div class="seq-say" id="pcSay" aria-live="polite"></div>
 </div>
 
-<section class="ch col" data-hud="One screen"><p class="sec-tag">Map 07</p><h2>One screen</h2><p class="lead1">Every depth draws its own frame. The host picks which one reaches the monitor.</p></section>
+<div class="wide console" id="ov4" data-parts="heaps host cpu"><div class="console-head"><h2 class="console-title">Back to the machine: 6 of 8 open</h2><span class="badge b-sim">3D map</span></div><div class="m3-stage"><canvas aria-label="3D map of the whole machine"></canvas><div class="m3-hint">drag to turn</div></div><div class="seq-say" aria-live="polite"></div></div>
+
+<section class="ch col" data-hud="One screen, one keyboard"><p class="sec-tag">Map 05</p><h2>One screen, one keyboard</h2><p class="recall"><b>So far:</b> three isolated copies, booted safely.</p><p class="lead1">Output is chosen by patching four bytes of code. Input goes through one word of host state. Both reuse patterns from Map 03.</p></section>
+
 <div class="wide console" id="bl" data-parts="screen">
   <div class="console-head"><h2 class="console-title">Choosing what reaches the screen</h2><span class="badge b-meas">Measured addresses · 3D</span></div>
   <div class="imm" id="blImm"></div>
@@ -663,7 +736,6 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <figcaption>Buffer addresses from the run's log. The pictures are stand-ins for the frames.</figcaption>
 </div>
 
-<section class="ch col" data-hud="One keyboard"><p class="sec-tag">Map 08</p><h2>One keyboard</h2><p class="lead1">Doom's key array is per-depth data, so a key press lands in whichever copy is loaded.</p></section>
 <div class="wide console" id="kt" data-parts="keys host">
   <div class="console-head"><h2 class="console-title">One press, many copies</h2><span class="badge b-sim">Model</span></div>
   <div class="controls" style="margin-top:0">
@@ -677,7 +749,10 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <div class="kt-wrap"><svg class="kt" id="ktB" role="img" aria-label="Authority rule timeline"></svg></div>
 </div>
 
-<section class="ch col" data-hud="The price of a turn"><p class="sec-tag">Map 09</p><h2>The price of a turn</h2><p class="lead1">Every switch costs time. Run <span class="knob" data-k="n" data-min="1" data-max="3">3</span> depths with slices of <span class="knob" data-k="slice" data-min="1" data-max="16">4</span> frames, and drag the numbers to change them.</p></section>
+<div class="wide console" id="ov5" data-parts="screen keys host"><div class="console-head"><h2 class="console-title">Back to the machine: all 8 open</h2><span class="badge b-sim">3D map</span></div><div class="m3-stage"><canvas aria-label="3D map of the whole machine"></canvas><div class="m3-hint">drag to turn</div></div><div class="seq-say" aria-live="polite"></div></div>
+
+<section class="ch col" data-hud="The price of a turn"><p class="sec-tag">Map 06</p><h2>The price of a turn</h2><p class="recall"><b>So far:</b> the whole machine works.</p><p class="lead1">Every switch costs time. Run <span class="knob" data-k="n" data-min="1" data-max="3">3</span> depths with slices of <span class="knob" data-k="slice" data-min="1" data-max="16">4</span> frames, and drag the numbers to change them.</p></section>
+
 <div class="wide console" id="cl" data-parts="slots data">
   <div class="console-head"><h2 class="console-title">What a switch costs</h2><span class="badge b-sim">Simulation</span></div>
   <div class="stages" id="clStages" role="group" aria-label="Steps"></div>
@@ -715,7 +790,13 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   </div>
   <figcaption>Scale model: 1,280 blocks of 32 bytes, two depths.</figcaption>
 </div>
+
 <div class="wide console" data-ring="full" data-parts="cpu sched screen"></div>
+
+<section class="ch col" data-hud="The whole picture"><p class="sec-tag">Map 07</p><h2>The whole picture</h2><p class="recall"><b>So far:</b> every box is open.</p><p class="lead1">Take each mechanism away and see what breaks. Then name what each one is in an operating system.</p></section>
+
+<div class="wide console" id="ovF" data-parts="cpu stacks sched code data slots heaps host screen keys"><div class="console-head"><h2 class="console-title">Take one away</h2><span class="badge b-sim">3D map</span></div><div class="m3-stage"><canvas aria-label="3D map of the whole machine"></canvas><div class="m3-hint">drag to turn</div></div><div class="seq-say" aria-live="polite"></div></div>
+
 
 </main>
 
@@ -1105,7 +1186,7 @@ document.addEventListener("keydown",function(e){
   if(!best)return;e.preventDefault();best[e.key==="ArrowRight"?"next":"back"]();
 });
 function Seq(root,o){
-  var steps=[],i=0,timer=null,playing=false,want=false,vis=false,wait=null,self=this;
+  var steps=[],i=0,timer=null,playing=false,want=false,vis=false,wait=null,self=this,scrolly=false,chain=null;
   var bar=document.createElement("div");bar.className="seqc";
   bar.innerHTML='<button data-q="back" aria-label="Back one step">◀ Back</button><button class="primary" data-q="next">Next ▶</button><button data-q="play">Play</button><button data-q="restart">Restart</button><input type="range" class="scrub" data-q="scrub" min="0" max="1" value="0" aria-label="Scrub through the steps"><span class="hudtxt" data-q="pos"></span>';
   (o.controlsIn||root).appendChild(bar);
@@ -1135,6 +1216,7 @@ function Seq(root,o){
     if(wait){reveal(-1);return "wait";}
     if(i>=steps.length){if(o.loop){i=0;if(o.reset)o.reset();if(o.onLoop)o.onLoop();}else{stop();return false;}}
     var s=steps[i++];
+    if(s.predict&&scrolly){label();return s;}
     if(s.predict){ask(s.predict);stop();label();return "wait";}
     pq.hidden=true;exec(s);label();return s;
   }
@@ -1146,7 +1228,38 @@ function Seq(root,o){
     while(i<n){var s=steps[i++];if(!s.predict)exec(s);}
     RM=keep;label();
   }
-  self.load=function(list){stop();steps=list;i=0;wait=null;pq.hidden=true;if(o.reset)o.reset();if(o.say)o.say.innerHTML=o.intro||"";listSteps();(o.listIn||root).appendChild(sl);label();};
+  self.load=function(list){stop();steps=list;i=0;wait=null;pq.hidden=true;if(o.reset)o.reset();if(o.say)o.say.innerHTML=o.intro||"";listSteps();(o.listIn||root).appendChild(sl);label();
+    var anchors=[];steps.forEach(function(s,k){if(s.say||s.predict)anchors.push(k);});
+    if(!scrolly&&o.say&&o.scrolly!==false&&anchors.length>1&&anchors.length<=24)makeScrolly(anchors);};
+  function runTo(n){if(chain){clearTimeout(chain);chain=null;}stop();
+    if(n<=i-1||n<i){replay(n);return;}
+    if(n-i>3){replay(n-1);}
+    (function go(){if(i>=n)return;var s=one();if(s===false)return;chain=setTimeout(go,RM?0:Math.min((s&&s.ms)||600,650));})();}
+  function makeScrolly(anchors){
+    scrolly=true;root.classList.add("scrolly");
+    var st=document.createElement("div");st.className="sc-stage";
+    var col=document.createElement("div");col.className="sc-steps";
+    var keep=[];[].slice.call(root.children).forEach(function(c){
+      if(c===bar||c===pq||c===sl||c===o.say||c.tagName==="FIGCAPTION"||c.classList.contains("console-head"))keep.push(c);else st.appendChild(c);});
+    var head=root.querySelector(".console-head");if(head)col.appendChild(head);
+    anchors.forEach(function(k,j){var s=steps[k],d=document.createElement("div");d.className="stp";
+      var upto=(j+1<anchors.length?anchors[j+1]:steps.length);
+      if(s.predict){d.classList.add("stp-q");var P=s.predict;
+        d.innerHTML='<div class="pq-q">Predict: '+P.q+'</div><div class="pq-o">'+P.options.map(function(t,z){return '<button data-k="'+z+'">'+t+'</button>';}).join("")+'</div><div class="pq-a"></div>';
+        d.querySelectorAll("button").forEach(function(b){b.addEventListener("click",function(){var z=+b.getAttribute("data-k");d.querySelectorAll("button").forEach(function(x,y){x.disabled=true;if(y===P.a)x.className="ok";else if(y===z)x.className="no";});
+          d.querySelector(".pq-a").innerHTML=(z===P.a?"<b class='good'>Right.</b> ":"<b class='bad'>Not this time.</b> ")+P.why+" Keep scrolling to see it.";});});}
+      else d.innerHTML=s.say;
+      d.setAttribute("data-upto",upto);col.appendChild(d);});
+    var fc=root.querySelector("figcaption");if(fc)col.appendChild(fc);
+    var tail=document.createElement("div");tail.className="stp-tail";col.appendChild(tail);
+    root.appendChild(st);root.appendChild(col);
+    bar.classList.add("sc-bar");st.appendChild(bar);if(o.say)o.say.hidden=true;sl.hidden=true;pq.hidden=true;
+    var stps=[].slice.call(col.querySelectorAll(".stp"));
+    if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;
+      stps.forEach(function(x){x.classList.toggle("on",x===e.target);});runTo(+e.target.getAttribute("data-upto"));});},{rootMargin:"-42% 0px -48% 0px"});
+      stps.forEach(function(x){io.observe(x);});}
+    setTimeout(function(){window.dispatchEvent(new Event("resize"));},50);
+  }
   self.goto=function(n){want=false;replay(Math.max(0,Math.min(steps.length,n)));};
   self.pos=function(){return i;};
   scrub.addEventListener("input",function(){want=false;replay(+scrub.value);});
@@ -1196,7 +1309,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     var y=window.scrollY+window.innerHeight*0.35,cur=null,i;
     for(i=0;i<secs.length;i++){if(secs[i].offsetTop<=y)cur=i;}
     if(cur===null){lvl.textContent="TITLE";nm.textContent="DOOMATRYOSHKA";}
-    else{lvl.textContent="MAP "+(cur+1<10?"0":"")+(cur+1);nm.textContent=secs[cur].getAttribute("data-hud");}
+    else{lvl.textContent=secs[cur].querySelector(".sec-tag").textContent.toUpperCase();nm.textContent=secs[cur].getAttribute("data-hud");}
     var h=document.documentElement.scrollHeight-window.innerHeight;
     mt.style.width=(h>0?Math.min(100,100*window.scrollY/h):0)+"%";
   }
@@ -1207,22 +1320,48 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
    3D toolkit shared by the 3D scenes: one look, one camera behaviour
    ===================================================================== */
 var DCHEX=[0xe0553c,0x7fd23e,0x6c9cf0],DCCSS=["#e0553c","#7fd23e","#6c9cf0"],HUDHEX=0xf1b23c;
+/* Doom-like grit for every 3D surface: a shared greyscale plate texture,
+   tinted by each material's colour, with world-sized UVs so it never smears. */
+var GRIT=null,GRATE=null;
+function gritTex(T,kind){
+  var c=document.createElement("canvas");c.width=c.height=64;var g=c.getContext("2d"),x,y,i;
+  var im=g.createImageData(64,64),dd=im.data;
+  function h(a,b,s){var q=(a*374761393+b*668265263+s*982451653)|0;q=Math.imul(q^(q>>>13),1274126177);return ((q^(q>>>16))>>>0)/4294967295;}
+  for(y=0;y<64;y++)for(x=0;x<64;x++){
+    var n=0.62+0.22*h(x>>2,y>>2,3)+0.16*h(x,y,5),v;
+    if(kind==="grate"){v=((x%8<2)||(y%8<2))?0.35:n*0.8;}
+    else{var px=x%32,py=y%32;v=n;
+      if(px===0||py===0)v=0.38;else if(px===1||py===1)v=1.05;
+      if((px===4||px===27)&&(py===4||py===27))v=1.25;
+      if(h(x,y,9)>0.985)v*=0.55;
+      if(Math.abs((x+y*0.35)%23-11)<0.5&&h(x>>3,y>>3,7)>0.6)v*=0.7;}
+    v=Math.max(0,Math.min(1.3,v));i=(y*64+x)*4;dd[i]=dd[i+1]=dd[i+2]=Math.min(255,v*200);dd[i+3]=255;}
+  g.putImageData(im,0,0);
+  var t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.magFilter=T.NearestFilter;t.minFilter=T.LinearMipmapLinearFilter;return t;}
+function gritUV(geo,w,h,d,k){var uv=geo.attributes.uv,dims=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];k=k||0.9;
+  for(var f=0;f<6;f++)for(var j=0;j<4;j++){var ix=f*4+j;uv.setXY(ix,uv.getX(ix)*dims[f][0]*k,uv.getY(ix)*dims[f][1]*k);}uv.needsUpdate=true;}
+function gritScene(T,scene,rd){
+  if(!GRIT){GRIT=gritTex(T,"plate");GRATE=gritTex(T,"grate");}
+  scene.fog=new T.FogExp2(0x0c0806,0.0085);
+  var torch=new T.PointLight(0xff8a3c,0.9,60,1.6);torch.position.set(0,7,4);scene.add(torch);
+  return torch;}
 function K3(stage,cv,o){
   var T=window.THREE;if(!T)return null;var rd;
   try{rd=new T.WebGLRenderer({canvas:cv,antialias:true,alpha:true});}catch(e){return null;}
   rd.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
   var scene=new T.Scene(),cam=new T.PerspectiveCamera(o.fov||38,2,0.1,400),k={T:T,scene:scene,cam:cam,frames:[],t:0};
-  scene.add(new T.AmbientLight(0xffffff,0.55));var dl=new T.DirectionalLight(0xffffff,0.75);dl.position.set(-6,14,10);scene.add(dl);
-  k.mat=function(c,e,op){return new T.MeshStandardMaterial({color:c,roughness:.75,metalness:.05,emissive:c,emissiveIntensity:e===undefined?0.1:e,transparent:true,opacity:op===undefined?1:op});};
-  k.box=function(w,h,d,c,x,y,z,e,op){var m=new T.Mesh(new T.BoxGeometry(w,h,d),k.mat(c,e,op));m.position.set(x,y+h/2,z);
+  scene.add(new T.AmbientLight(0xffe6cc,0.55));var dl=new T.DirectionalLight(0xfff1dd,0.7);dl.position.set(-6,14,10);scene.add(dl);
+  var torch=gritScene(T,scene,rd);k.frames.push(function(dt,now){torch.intensity=0.75+0.18*Math.sin(now/90)+0.1*Math.sin(now/37);});
+  k.mat=function(c,e,op,map){return new T.MeshStandardMaterial({color:c,map:map||GRIT,roughness:.85,metalness:.15,emissive:c,emissiveIntensity:e===undefined?0.1:e,transparent:true,opacity:op===undefined?1:op});};
+  k.box=function(w,h,d,c,x,y,z,e,op){var geo=new T.BoxGeometry(w,h,d);gritUV(geo,w,h,d);var m=new T.Mesh(geo,k.mat(c,e,op,(h<0.1&&w>5)?GRATE:GRIT));m.position.set(x,y+h/2,z);
     m.add(new T.LineSegments(new T.EdgesGeometry(m.geometry),new T.LineBasicMaterial({color:0x000000,transparent:true,opacity:.45})));scene.add(m);m.userData={h:h,y0:y,rise:1,cur:1};return m;};
   k.label=function(txt,x,y,z,col,size){
     var c=document.createElement("canvas");c.width=640;c.height=96;var g=c.getContext("2d");
     g.font="56px VT323, 'IBM Plex Mono', monospace";g.textAlign="center";g.textBaseline="middle";
-    var w=Math.min(630,g.measureText(txt).width+30);g.fillStyle="rgba(11,8,7,.78)";g.fillRect(320-w/2,10,w,76);
+    var w=Math.min(630,g.measureText(txt).width+34);g.fillStyle="rgba(14,9,7,.88)";g.fillRect(320-w/2,10,w,76);g.strokeStyle="rgba(241,178,60,.55)";g.lineWidth=3;g.strokeRect(320-w/2+1.5,11.5,w-3,73);g.fillStyle="rgba(255,255,255,.06)";g.fillRect(320-w/2+3,13,w-6,4);
     g.fillStyle=col||"#eadccb";g.fillText(txt,320,50);
     var s=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(c),transparent:true,depthTest:false}));
-    var q=(size||1)*1.45;s.position.set(x,y,z);s.scale.set(q*640/96*0.5,q*0.5,1);s.renderOrder=10;scene.add(s);return s;};
+    var q=(size||1)*1.75;s.position.set(x,y,z);s.scale.set(q*640/96*0.5,q*0.5,1);s.renderOrder=10;scene.add(s);return s;};
   k.arc=function(a,b,c,h){var cu=new T.CubicBezierCurve3(a,new T.Vector3(a.x,a.y+h,a.z),new T.Vector3(b.x,b.y+h,b.z),b);
     var m=new T.Mesh(new T.TubeGeometry(cu,60,0.04,6,false),new T.MeshBasicMaterial({color:c,transparent:true,opacity:0}));m.userData={curve:cu,want:0};scene.add(m);return m;};
   k.show=function(m,on){m.userData.rise=on?1:0;};
@@ -1264,6 +1403,146 @@ function after3d(fn){var done=false;function go(){if(!done){done=true;fn();}}
   if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go);setTimeout(go,2500);}else go();}
 var RUN=null;try{RUN=JSON.parse(document.getElementById("mtxrun").textContent);}catch(e){}
 function hx(v){return "0x"+(v>>>0).toString(16).toUpperCase();}
+
+/* =====================================================================
+   THE MACHINE MAP: one 3D overview, opened box by box across the article
+   ===================================================================== */
+var OVKEYS={
+  sw:{name:"switch",ch:"Map 02",col:0xf1b23c,os:"thread switch"},
+  fb:{name:"frame boundary",ch:"Map 02",col:0xf1b23c,os:"preemption point"},
+  snap:{name:"snapshots",ch:"Map 03",col:0xb08a3a,os:"address spaces"},
+  pin:{name:"pins & patches",ch:"Map 03",col:0xb08a3a,os:"per-process mappings"},
+  host:{name:"mtx_hs · host state",ch:"Map 03",col:0xf1b23c,os:"kernel memory"},
+  load:{name:"loader",ch:"Map 04",col:0x9aa4ae,os:"exec()"},
+  scr:{name:"screen",ch:"Map 05",col:0x9aa4ae,os:"compositor"},
+  keys:{name:"keyboard",ch:"Map 05",col:0x9aa4ae,os:"input queue"}
+};
+function MachineMap(rootId,open0,build){after3d(function(){
+  var root=$(rootId),stage=root.querySelector(".m3-stage"),cv=stage.querySelector("canvas"),say=root.querySelector(".seq-say");
+  var k=K3(stage,cv,{r:23,tilt:0.42,look:[0,1.6,-1],sway:0.22});
+  if(!k){say.textContent="This scene needs WebGL and three.js, which did not load.";return;}
+  var T=k.T,M={k:k,parts:{},open:{}};
+  k.box(21,0.05,4,0x1a1310,0,-0.06,0,0);
+  var memLbl=k.label("memory: one copy of Doom",-6.5,-0.25,2.4,"#6f5f50",0.75);
+  var code=k.box(3.4,0.35,1.8,0x5a5048,-7,0,0,0.08),data=k.box(3.4,0.35,1.8,0x6b5a40,-3.2,0,0,0.08);
+  k.label("Doom code",-7,0.9,0,"#d8c39a",0.8);k.label("Doom data",-3.2,0.9,0,"#d8c39a",0.8);
+  var towers=[],tl=[];
+  for(var d=0;d<3;d++){var t=k.box(1.6,3.2,1.6,DCHEX[d],-4+d*4,0,-4.5,0.15);towers.push(t);tl.push(k.label("depth "+d,-4+d*4,4.1,-4.5,DCCSS[d],0.95));}
+  k.box(13,0.05,3.4,0x1a1310,0,-0.06,-4.5,0);
+  function mech(key,mesh,lx,ly,lz){var u=OVKEYS[key];mesh.userData.key=key;var l=k.label(u.name,lx,ly,lz,"#6f5f50",0.8);M.parts[key]={mesh:mesh,lab:l,base:u.col};closeP(key);}
+  function closeP(key){var p=M.parts[key];p.mesh.material.color.setHex(0x2a2420);p.mesh.material.emissive.setHex(0x2a2420);p.mesh.material.emissiveIntensity=0.05;p.lab.material.opacity=0.65;}
+  var swBox=k.box(1.2,0.6,1.2,0x2a2420,0,4.6,-4.5,0.05);mech("sw",swBox,0,5.7,-4.5);
+  var fbRing=new T.Mesh(new T.TorusGeometry(1.25,0.09,8,32),k.mat(0x2a2420,0.05));fbRing.rotation.x=Math.PI/2;fbRing.position.set(-4,3.3,-4.5);k.scene.add(fbRing);mech("fb",fbRing,-6.6,3.4,-4.5);
+  var slots=[];for(d=0;d<3;d++)slots.push(k.box(1.3,0.55,1.4,0x2a2420,1.6+d*1.7,0,0,0.05));
+  var snapG=slots[0];mech("snap",snapG,3.3,1.2,0);
+  var pinBox=k.box(0.9,0.5,0.9,0x2a2420,-5.1,0.36,0.3,0.05);mech("pin",pinBox,-5.1,1.5,1.2);
+  var hostP=k.box(4.2,0.4,1.6,0x2a2420,0,0,4.2,0.05);mech("host",hostP,0,1.1,4.2);
+  var hostLbl=k.label("outside every snapshot",0,-0.3,5.3,"#6f5f50",0.7);
+  var ldr=k.box(1.4,1.2,1.4,0x2a2420,-8.6,0,-4.5,0.05);mech("load",ldr,-8.6,1.9,-4.5);
+  var scr=k.box(2.2,1.5,0.25,0x2a2420,8.6,1.5,-4.5,0.05);mech("scr",scr,8.6,3.6,-4.5);
+  var keys=k.box(2.2,0.25,0.9,0x2a2420,8.6,0,-2.2,0.05);mech("keys",keys,8.6,0.8,-2.2);
+  /* the CPU orb hops between the towers, through the switch */
+  var orb=new T.Mesh(new T.SphereGeometry(0.32,16,12),new T.MeshBasicMaterial({color:0xffffff}));k.scene.add(orb);
+  var halo=new T.Mesh(new T.SphereGeometry(0.6,16,12),new T.MeshBasicMaterial({color:0xffd27a,transparent:true,opacity:0.3}));orb.add(halo);
+  var order=[0,1,0,2],oi=0,ot=0,cur=0,nxt=1,paused=false;
+  function tpos(i){return new T.Vector3(-4+i*4,3.8,-4.5);}
+  k.frames.push(function(dt){if(!M.cpuOn){orb.visible=false;return;}orb.visible=true;
+    if(!paused)ot+=dt/1.4;if(ot>=1){ot=0;oi=(oi+1)%order.length;cur=order[oi];nxt=order[(oi+1)%order.length];}
+    var a=tpos(cur),b=tpos(nxt),p=ot<0.6?0:(ot-0.6)/0.4,mid=new T.Vector3(0,5.0,-4.5);
+    if(p===0){orb.position.copy(a);orb.position.y+=Math.sin(k.t*6)*0.08;}
+    else{var c=new T.QuadraticBezierCurve3(a,mid,b);orb.position.copy(c.getPoint(p));}
+    towers.forEach(function(t,i){t.material.emissiveIntensity=i===cur&&p===0?0.45:0.1;});});
+  M.cpuOn=false;
+  M.openP=function(key,flash){var p=M.parts[key];if(!p)return;M.open[key]=1;var c=p.base;
+    if(key==="snap")slots.forEach(function(s,i){s.material.color.setHex(DCHEX[i]);s.material.emissive.setHex(DCHEX[i]);s.material.emissiveIntensity=0.2;});
+    p.mesh.material.color.setHex(key==="snap"?DCHEX[0]:c);p.mesh.material.emissive.setHex(key==="snap"?DCHEX[0]:c);p.mesh.material.emissiveIntensity=flash?0.6:0.25;p.lab.material.opacity=1;M.relabel(key,OVKEYS[key].name,"#f4dca8");
+    if(flash)setTimeout(function(){p.mesh.material.emissiveIntensity=0.25;},RM?0:900);};
+  M.close=function(key){delete M.open[key];closeP(key);if(key==="snap")slots.forEach(function(s){s.material.color.setHex(0x2a2420);s.material.emissive.setHex(0x2a2420);});};
+  M.breakP=function(key,txt){var p=M.parts[key];p.mesh.material.color.setHex(0xff4a32);p.mesh.material.emissive.setHex(0xff4a32);p.mesh.material.emissiveIntensity=0.6;
+    if(M.bl)k.scene.remove(M.bl);var pp=p.mesh.position;M.bl=k.label(txt,pp.x,pp.y+2.2,pp.z+0.6,"#ff8a76",0.75);};
+  M.clearBreak=function(){if(M.bl){k.scene.remove(M.bl);M.bl=null;}Object.keys(M.parts).forEach(function(key){if(M.open[key])M.openP(key);else closeP(key);});};
+  M.relabel=function(key,txt,col){var p=M.parts[key],pos=p.lab.position.clone();k.scene.remove(p.lab);p.lab=k.label(txt,pos.x,pos.y,pos.z,col||"#eadccb",0.85);};
+  M.focusP=function(key,r){var p=M.parts[key].mesh.position;k.focus(p.x,p.y+0.6,p.z,r||9);};
+  M.home=function(){k.focus(0,1.6,-1,23);};
+  M.reset=function(){M.clearBreak();Object.keys(OVKEYS).forEach(function(key){M.relabel(key,OVKEYS[key].name,"#6f5f50");closeP(key);});M.open={};
+    (open0||[]).forEach(function(key){M.openP(key);});M.home();M.cpuOn=true;};
+  M.reset();
+  build(M,root,say);
+});}
+/* --- Map 00: the whole machine, every mechanism still closed --- */
+MachineMap("ov0",[],function(M,root,say){
+  var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset();M.cpuOn=false;}});
+  root.insertBefore(root.querySelector(".seqc"),say);
+  p.load([
+    {ms:3200,say:"Three copies of one game engine, inside one DOOM2.EXE.",run:function(){M.home();}},
+    {ms:3600,say:"One CPU. The copies take turns on it.",run:function(){M.cpuOn=true;}},
+    {ms:3400,say:"They all run the same Doom code, on the same data addresses.",run:function(){M.k.focus(-5,0.6,0,11);}},
+    {ms:3400,say:"Something has to <b>switch</b> the CPU between them, and only at a <b>frame boundary</b>.",run:function(){M.focusP("sw",11);}},
+    {ms:3400,say:"Something has to keep each copy's bytes apart: <b>snapshots</b>, <b>pins &amp; patches</b>.",run:function(){M.k.focus(-1,0.6,0,12);}},
+    {ms:3400,say:"The switching code keeps its own state, <b>outside every snapshot</b>.",run:function(){M.focusP("host",10);}},
+    {ms:3400,say:"A <b>loader</b> starts the copies. There is one <b>screen</b> and one <b>keyboard</b>.",run:function(){M.home();}},
+    {ms:4000,say:"Each box opens in its own chapter, and this map comes back at the end of each one. Hold on to one question: if two copies simply ran, what would break first? Map 03 answers it.",run:function(){}}
+  ]);
+});
+/* --- chapter-end returns: the same map, with what the chapter opened --- */
+function recap(id,before,opened,lines){
+  MachineMap(id,before,function(M,root,say){
+    var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset();}});
+    root.insertBefore(root.querySelector(".seqc"),say);
+    var L=[{ms:2600,say:"Back to the whole machine.",run:function(){M.home();}}];
+    opened.forEach(function(key,i){L.push({ms:3200,say:lines[i],run:function(){M.openP(key,true);M.focusP(key,10);}});});
+    L.push({ms:3600,say:"Open so far: "+Object.keys(OVKEYS).filter(function(x){return before.concat(opened).indexOf(x)>=0;}).map(function(x){return OVKEYS[x].name;}).join(" · ")+".",run:function(){M.home();}});
+    p.load(L);
+  });
+}
+recap("ov2",[],["sw","fb"],["<b>Switch</b>: save the callee-saved registers, publish ESP, load another ESP.","<b>Frame boundary</b>: requests wait, and are consumed at the next one."]);
+recap("ov3",["sw","fb"],["snap","pin","host"],["<b>Snapshots</b>: every switch compares each depth's bytes and copies what differs.","<b>Pins &amp; patches</b>: per-depth pointers are forced, and patched code bytes are restored.","<b>mtx_hs</b>: the switch's own state, outside every snapshot."]);
+recap("ov4",["sw","fb","snap","pin","host"],["load"],["<b>Loader</b>: it can read and allocate, and nothing else, and it passes the parameter block in EBP."]);
+recap("ov5",["sw","fb","snap","pin","host","load"],["scr","keys"],["<b>Screen</b>: chosen by patching four bytes of the blit, the same pattern as the patches.","<b>Keyboard</b>: one word of host state, the same lesson as mtx_hs."]);
+/* --- Map 07: take each mechanism away --- */
+MachineMap("ovF",Object.keys(OVKEYS),function(M,root,say){
+  var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset();}});
+  root.insertBefore(root.querySelector(".seqc"),say);
+  var cut=[["snap","copies overwrite each other's globals","Without <b>snapshots</b>, the copies overwrite each other's globals (Map 03)."],
+    ["host","ESP = 0 on the first switch","With <b>mtx_hs</b> inside a snapshot, the first switch loads ESP = 0. Measured: 2,000 illegal reads."],
+    ["pin","the child uses its parent's heap","Without <b>pins</b>, a cloned depth allocates from its parent's heap and draws into its screen."],
+    ["fb","a half-drawn frame","Switching anywhere but a <b>frame boundary</b> suspends a renderer in mid-update."],
+    ["keys","one press, two toggles","Without the authority word, one held <b>key</b> toggles twice. Measured at frames 285 and 289."],
+    ["load","the parent's heap is freed","The stock <b>loader</b> frees the parent's heap and closes its files before the child runs."]];
+  var L=[{ms:2600,say:"Everything open. Now take one mechanism away at a time.",run:function(){M.home();}}];
+  cut.forEach(function(c,i){
+    if(i===1)L.push({predict:{q:"put <code>mtx_hs</code> inside the snapshot. What happens on the first switch?",options:["nothing visible","the switch loads a stale ESP and jumps into nowhere","the screen flickers"],a:1,why:"load_state restores the scheduler's own variables, including the ESP it just published."}});
+    if(i===4)L.push({predict:{q:"remove the authority word. One held key press does what?",options:["nothing","toggles once","toggles more than once"],a:2,why:"Each depth's copy of the key array sees the press on its own."}});
+    L.push({ms:3600,say:c[2],run:function(){M.clearBreak();M.breakP(c[0],c[1]);M.focusP(c[0],11);}});
+  });
+  L.push({ms:2600,say:"Put them all back.",run:function(){M.clearBreak();M.home();}});
+  L.push({ms:5200,say:"Each mechanism is a small version of something an operating system does.",run:function(){Object.keys(OVKEYS).forEach(function(key){M.relabel(key,OVKEYS[key].name+" = "+OVKEYS[key].os,"#f4dca8");});}});
+  p.load(L);
+});
+
+/* =====================================================================
+   MAP 01: SEVEN WORDS, before any mechanism
+   ===================================================================== */
+(function(){
+  var root=$("tm"),grid=$("tmGrid");
+  var A="#f1b23c",F="#6f5f50",B="#2a201b";
+  var TERMS=[
+    ["stack frame","A function's slice of the stack: return address, saved registers, locals.",'<rect x="20" y="8" width="80" height="14" fill="'+B+'" stroke="'+F+'"/><rect x="20" y="24" width="80" height="14" fill="'+B+'" stroke="'+F+'"/><rect x="20" y="40" width="80" height="14" fill="#3a2a12" stroke="'+A+'"/><text x="60" y="51" text-anchor="middle" fill="'+A+'" font-size="10">frame</text>'],
+    ["ESP","The register that points at the top of the stack in use.",'<rect x="30" y="8" width="70" height="46" fill="'+B+'" stroke="'+F+'"/><path d="M4 31 H28" stroke="'+A+'" stroke-width="3"/><path d="M28 31 l-6 -5 v10z" fill="'+A+'"/><text x="4" y="22" fill="'+A+'" font-size="11">ESP</text>'],
+    ["callee-saved registers","ebx, esi, edi, ebp: a C function must hand them back unchanged.",'<g font-size="11" fill="'+A+'"><rect x="6" y="20" width="24" height="18" fill="#3a2a12" stroke="'+A+'"/><text x="18" y="33" text-anchor="middle">ebx</text><rect x="34" y="20" width="24" height="18" fill="#3a2a12" stroke="'+A+'"/><text x="46" y="33" text-anchor="middle">esi</text><rect x="62" y="20" width="24" height="18" fill="#3a2a12" stroke="'+A+'"/><text x="74" y="33" text-anchor="middle">edi</text><rect x="90" y="20" width="24" height="18" fill="#3a2a12" stroke="'+A+'"/><text x="102" y="33" text-anchor="middle">ebp</text></g>'],
+    ["frame (tic)","One pass of Doom's loop: think, render, present. Vanilla Doom does 35 a second.",'<circle cx="60" cy="31" r="20" fill="none" stroke="'+A+'" stroke-width="2"/><circle cx="60" cy="11" r="4" fill="#fff"/><text x="60" y="35" text-anchor="middle" fill="'+F+'" font-size="10">loop</text>'],
+    ["globals at fixed addresses","Doom's variables sit at addresses fixed when it was built. Every copy uses the same ones.",'<g font-size="9" fill="'+F+'"><rect x="10" y="10" width="100" height="14" fill="'+B+'" stroke="'+F+'"/><text x="14" y="21">0x1FF000 gametic</text><rect x="10" y="28" width="100" height="14" fill="'+B+'" stroke="'+F+'"/><text x="14" y="39">0x1FF004 player</text></g>'],
+    ["framebuffer and blit","A 320×200 array of pixels. The blit copies it to VGA memory at 0xA0000.",'<rect x="6" y="14" width="44" height="30" fill="#3a2a12" stroke="'+A+'"/><rect x="70" y="14" width="44" height="30" fill="'+B+'" stroke="'+F+'"/><path d="M52 29 H66" stroke="'+A+'" stroke-width="3"/><path d="M68 29 l-6 -5 v10z" fill="'+A+'"/><text x="92" y="56" text-anchor="middle" fill="'+F+'" font-size="9">0xA0000</text>'],
+    ["key array","Doom's table of which keys are down, written by its keyboard interrupt.",'<g fill="'+B+'" stroke="'+F+'"><rect x="8" y="18" width="16" height="16"/><rect x="28" y="18" width="16" height="16" fill="#3a2a12" stroke="'+A+'"/><rect x="48" y="18" width="16" height="16"/><rect x="68" y="18" width="16" height="16"/><rect x="88" y="18" width="16" height="16"/></g><text x="36" y="48" text-anchor="middle" fill="'+A+'" font-size="9">down</text>']
+  ];
+  function card(t){var c=document.createElement("div");c.className="term";c.innerHTML='<svg viewBox="0 0 120 62" aria-hidden="true">'+t[2]+'</svg><b>'+t[0]+'</b><span>'+t[1]+'</span>';return c;}
+  function reset(){grid.innerHTML="";}
+  var L=TERMS.map(function(t){return {ms:2600,say:"<b>"+t[0]+"</b>",run:function(){grid.appendChild(card(t));}};});
+  L.push({ms:2600,say:"That is all the vocabulary the rest of the page needs.",run:function(){}});
+  var p=new Seq(root,{loop:true,say:$("tmSay"),reset:reset});
+  root.insertBefore(root.querySelector(".seqc"),$("tmSay"));
+  reset();p.load(L);
+})();
 
 /* =====================================================================
    RING: one simulation of three tiny raycasters, three consoles
@@ -1588,7 +1867,7 @@ function hx(v){return "0x"+(v>>>0).toString(16).toUpperCase();}
     {ms:4800,say:"Start a second copy of the engine in the same process.",run:function(){st.show2=true;st.on[1]=true;draw();}},
 {predict:{"q": "both copies write <code>gametic</code> every lap. What does that cell hold?", "options": ["each copy's own value", "whichever copy wrote last"], "a": 1, "why": "There is one cell at one address, and both copies use it."}},
     {ms:4200,say:"<span class='bad'>Same code, same addresses.</span> Both copies write the same <code>gametic</code> and the same screen.",run:function(){}},
-    {ms:6500,say:"<b>The plan:</b> run one copy at a time, and give each copy its own bytes.",run:function(){st.turn=true;st.turnOf=0;st.frozen=[false,true];st.lapsInTurn=0;g.classList.remove("hit");draw();}}
+    {ms:6500,say:"Taking turns is not enough on its own. Each copy's value has to be swapped in when it runs, and that swap is the snapshot.",run:function(){st.turn=true;st.turnOf=0;st.frozen=[false,true];st.lapsInTurn=0;g.classList.remove("hit");draw();}}
   ]);
 })();
 
@@ -1675,13 +1954,14 @@ function hx(v){return "0x"+(v>>>0).toString(16).toUpperCase();}
   scene.add(new T.AmbientLight(0xffffff,0.55));
   var dl=new T.DirectionalLight(0xffffff,0.75);dl.position.set(-6,14,10);scene.add(dl);
   var DC=[0xe0553c,0x7fd23e,0x6c9cf0],HUD=0xf1b23c;
-  function mat(c,o){return new T.MeshStandardMaterial({color:c,roughness:.75,metalness:.05,emissive:c,emissiveIntensity:(o&&o.e)||0.08,transparent:true,opacity:(o&&o.op)||1});}
-  function box(w,h,d,c,x,y,z,o){var m=new T.Mesh(new T.BoxGeometry(w,h,d),mat(c,o));m.position.set(x,y+h/2,z);
+  var torch=gritScene(T,scene,renderer);
+  function mat(c,o){return new T.MeshStandardMaterial({color:c,map:GRIT,roughness:.85,metalness:.15,emissive:c,emissiveIntensity:(o&&o.e)||0.08,transparent:true,opacity:(o&&o.op)||1});}
+  function box(w,h,d,c,x,y,z,o){var geo=new T.BoxGeometry(w,h,d);gritUV(geo,w,h,d);var m=new T.Mesh(geo,mat(c,o));m.position.set(x,y+h/2,z);
     var e=new T.LineSegments(new T.EdgesGeometry(m.geometry),new T.LineBasicMaterial({color:0x000000,transparent:true,opacity:.45}));m.add(e);scene.add(m);m.userData.h=h;m.userData.y0=y;return m;}
   function label(txt,x,y,z,col,size){
     var c=document.createElement("canvas");c.width=512;c.height=96;var g=c.getContext("2d");
     g.font="56px VT323, 'IBM Plex Mono', monospace";g.textAlign="center";g.textBaseline="middle";
-    g.fillStyle="rgba(11,8,7,.75)";var w=Math.min(500,g.measureText(txt).width+30);g.fillRect(256-w/2,10,w,76);
+    var w=Math.min(500,g.measureText(txt).width+34);g.fillStyle="rgba(14,9,7,.88)";g.fillRect(256-w/2,10,w,76);g.strokeStyle="rgba(241,178,60,.55)";g.lineWidth=3;g.strokeRect(256-w/2+1.5,11.5,w-3,73);
     g.fillStyle=col||"#eadccb";g.fillText(txt,256,50);
     var tex=new T.CanvasTexture(c),s=new T.Sprite(new T.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
     s.position.set(x,y,z);var k=(size||1.4)*1.45;s.scale.set(k*512/96*0.5,k*0.5,1);s.renderOrder=10;scene.add(s);return s;}
@@ -1745,6 +2025,7 @@ function hx(v){return "0x"+(v>>>0).toString(16).toUpperCase();}
       arcs[f.d].forEach(function(tb){for(var k=0;k<4;k++){var q=p-k*0.08;if(q<0||q>1)continue;var u=f.dir>0?q:1-q;
         if(!dots[di]){dots[di]=new T.Mesh(new T.SphereGeometry(0.11,10,8),new T.MeshBasicMaterial({color:0xffffff}));scene.add(dots[di]);}
         var m=dots[di++];m.visible=true;m.material.color.setHex(DC[f.d]);m.position.copy(tb.userData.curve.getPoint(u));}});return true;});
+    torch.intensity=0.75+0.18*Math.sin(now/90)+0.1*Math.sin(now/37);
     renderer.render(scene,cam);requestAnimationFrame(frame);
   }
   if("IntersectionObserver" in window)new IntersectionObserver(function(es){es.forEach(function(e){var was=vis;vis=e.isIntersecting;if(vis&&!was)requestAnimationFrame(frame);});}).observe(stage);
@@ -2042,7 +2323,7 @@ function hx(v){return "0x"+(v>>>0).toString(16).toUpperCase();}
     });
     return seq;
   }
-  player=new Seq(root,{loop:true,say:say,reset:initState,controlsIn:root,
+  player=new Seq(root,{scrolly:false,loop:true,say:say,reset:initState,controlsIn:root,
     intro:"Depths 1 and 2 are frozen inside their own <code>mtx_switch_ctx</code>."});
   root.insertBefore(root.querySelector(".seqc"),say);
   initState();player.load(program());
@@ -2441,7 +2722,7 @@ function hx(v){return "0x"+(v>>>0).toString(16).toUpperCase();}
   function seqFor(b){var L=[{ms:2600,run:function(){mode(b);}}];for(var k=1;k<10;k++)(function(k){if(b&&k===8)L.push({predict:{"q": "<code>load_state(root)</code> copies the root's slot over live memory. What is <code>ctx[0].esp</code> afterwards?", "options": ["0x003FFF40, as published", "0, the value in the snapshot", "depth 1's ESP"], "a": 1, "why": "The slot was taken before the real ESP was published, and the scheduler's variables are in the slot."}});L.push({cap:null,ms:k===9?4200:(k===8?2600:1900),run:function(){idx=k;show();}});})(k);return L;}
   var player=new Seq(root,{loop:true,reset:function(){mode(true);}});
   root.insertBefore(root.querySelector(".seqc"),$("hsNarr"));
-  player.load(seqFor(true).concat(seqFor(false)));
+  player.load([{predict:{q:"the switch code has variables too: <code>mtx_cur</code> and <code>ctx[].esp</code>. They sit in the engine's .bss, which the snapshot covers. Is that a problem?",options:["no, they are saved like everything else","yes, a restore will rewind them in the middle of a switch"],a:1,why:"The switch writes them while it runs, and load_state copies an older version back."}}].concat(seqFor(true),seqFor(false)));
 })();
 
 
