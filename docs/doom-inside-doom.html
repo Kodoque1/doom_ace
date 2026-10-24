@@ -388,17 +388,60 @@ footer h2{font-size:34px}
 .imm .byte.flip{animation:flip .5s}
 @keyframes flip{0%{transform:rotateX(90deg);background:var(--blood);color:#fff}100%{transform:none}}
 @media (prefers-reduced-motion:reduce){.fr,.calls div,.imm .byte.flip,.mseg.wipe::after{animation:none!important}.cpu{transition:none}}
+/* scenes */
+.lead1{font-size:21px;color:var(--dim);margin:0 0 6px;max-width:640px}
+section.ch{padding-block:64px 0}
+section.ch h2{margin-bottom:10px}
+.scene-h{font-family:var(--f-hud);font-size:19px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;margin:0 0 8px}
+.mach{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:center}
+@media (max-width:700px){.mach{grid-template-columns:minmax(0,1fr)}}
+.loops{width:100%;height:auto;display:block}
+.memcol{display:grid;gap:8px}
+.mbox{background:#0b0807;border:1px solid var(--line);border-radius:3px;padding:8px 10px;font-family:var(--f-mono);font-size:13px;color:var(--dim);transition:border-color .2s,background .2s}
+.mbox h5{margin:0 0 4px;font-family:var(--f-hud);font-weight:400;font-size:17px;color:var(--hud)}
+.mbox b{font-family:var(--f-hud);font-size:30px;font-weight:400;color:#fff;display:inline-block;min-width:3ch;transition:color .2s}
+.mbox.hit{border-color:#ff4a32;background:#2a0c07}
+.mbox canvas{width:100%;max-width:240px;display:block;aspect-ratio:16/10;image-rendering:pixelated;background:#000}
+.sp{position:relative}
+.sp-grid{display:grid;grid-template-columns:7.5em repeat(3,minmax(0,1fr));gap:6px;align-items:stretch}
+@media (max-width:620px){.sp-grid{grid-template-columns:5.2em repeat(3,minmax(0,1fr))}}
+.sp-h{font-family:var(--f-hud);font-size:18px;color:var(--hud);padding:2px 4px}
+.sp-k{font-family:var(--f-hud);font-size:18px;color:var(--dim);display:flex;align-items:center;padding:2px 4px}
+.sp-c{background:#0b0807;border:1px solid var(--line);border-radius:3px;padding:7px 8px;font-family:var(--f-mono);font-size:13px;color:#e7cfa9;min-height:34px;display:flex;align-items:center;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;transition:border-color .2s,background .3s}
+.sp-c.d0{color:#ffb1a2}.sp-c.d1{color:#c9f0a6}
+.sp-c.flash{background:#3a2a12;border-color:var(--hud)}
+.sp-c.bad{background:#3a0b05;border-color:#ff4a32}
+.sp-row{display:contents}
+.sp-row[hidden]{display:none!important}
+.heaps{display:grid;grid-template-columns:7.5em repeat(2,minmax(0,1fr)) minmax(0,1fr);gap:6px;margin-top:14px}
+@media (max-width:620px){.heaps{grid-template-columns:5.2em repeat(2,minmax(0,1fr)) minmax(0,.4fr)}}
+.heap{background:#101a0b;border:1px solid #3d5a25;border-radius:3px;padding:10px 8px;font-family:var(--f-mono);font-size:13px;color:#cfeeb4;text-align:center;transition:box-shadow .3s}
+.heap.h0{background:#1f0f0b;border-color:#6b2a1d;color:#ffb1a2}
+.heap.pulse{box-shadow:0 0 0 2px var(--hud),0 0 16px rgba(241,178,60,.4)}
+.sp svg.ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.runlbl{font-family:var(--f-hud);font-size:19px;color:var(--dim);margin:0 0 8px}
+.runlbl b{font-weight:400}
+.pc-big{font-family:var(--f-hud);font-size:clamp(30px,6vw,54px);color:#fff;letter-spacing:.06em;min-height:1.3em;line-height:1.2}
+.pc-big .x{color:var(--hud)}
+.pc-big .m{color:#ff6a52}
+.pool{display:flex;gap:0;margin-top:14px;font-family:var(--f-mono);font-size:13px;position:relative;overflow-x:auto}
+.pool div{border:1px solid var(--line);padding:8px 8px;background:#0b0807;color:var(--dim);white-space:nowrap;transition:all .3s}
+.pool .hdr{background:#2e2414;color:#f4dca8}
+.pool .hdr.hi{background:#5b160c;color:#fff;border-color:#ff4a32;box-shadow:0 0 14px rgba(255,74,50,.45)}
+.pool .pay{flex:1;min-width:90px}
+.pcl{font-family:var(--f-hud);font-size:20px;color:#b9e88f;background:#0a0706;border:1px solid var(--line);border-radius:3px;padding:8px 12px;white-space:nowrap;overflow-x:auto;min-height:1.6em}
+footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
 </style>
 </head>
 <body>
 
-<div class="hudbar" aria-hidden="true"><div class="in"><span class="lvl" id="hudLvl">E0M0</span><span class="nm" id="hudNm">DOOMATRYOSHKA</span><span class="meter"><i id="hudMeter"></i></span></div></div>
+<div class="hudbar" aria-hidden="true"><div class="in"><span class="lvl" id="hudLvl">TITLE</span><span class="nm" id="hudNm">DOOMATRYOSHKA</span><span class="meter"><i id="hudMeter"></i></span></div></div>
 
 <header class="hero wrap">
   <div class="wide">
-    <p class="eyebrow">Doomatryoshka · a field report from inside one DOOM2.EXE process</p>
+    <p class="eyebrow">Doomatryoshka · three engines inside one DOOM2.EXE</p>
     <h1 aria-label="Doomatryoshka: Doom inside Doom inside Doom inside the first Doom">Doom<span class="nest">inside Doom</span><span class="nest2">inside Doom</span><span class="nest3">inside the <b>first</b> Doom ↺</span></h1>
-    <p class="dek">Three copies of a game engine run inside one DOS process, and none of them was written to share it. This article explains how the <strong>matryoshka</strong> host makes them take turns, what each copy has to own, and the seven times something turned out to belong to the wrong owner.</p>
+    <p class="dek">How the matryoshka host runs several copies of a game engine that was written to be alone.</p>
   </div>
 </header>
 
@@ -408,55 +451,24 @@ footer h2{font-size:34px}
 
 <main class="wrap">
 
-<!-- ============================================================ 1 -->
-<section id="alone" data-hud="A program that believes it is alone" class="col">
-  <p class="sec-tag">Map 01</p>
-  <h2>A program that believes it is alone</h2>
-  <p class="lead">The goal: N live instances of the ACE engine coexisting inside one running <code>DOOM2.EXE</code>, switched at runtime, without ever re-launching the executable.</p>
-  <p>ACE is a replacement engine for Doom 2 version 1.9. It ships inside a WAD file and takes over a stock, unmodified <code>DOOM2.EXE</code> through two quirks of the original engine (a negative-size lump allocation and a read past the stack). That bootstrap is a finished, frozen piece of work, and this article treats it as a black box. Once ACE is resident, nesting becomes a different problem entirely, and that problem is the subject here.</p>
-  <p>Start with what a single copy of the engine assumes about the world. None of these assumptions is a bug. Each one is reasonable for a program that expects to be the only one running.</p>
-  <ol>
-    <li><strong>Its globals live at fixed addresses.</strong> Doom's mutable data is 416 variables spread over 475,676 bytes. A second copy running the same code uses the same addresses.</li>
-    <li><strong>Its main loop never returns.</strong> <code>D_DoomLoop</code> has no exit. You cannot call it and wait for it to finish.</li>
-    <li><strong>There is no C runtime.</strong> ACE has no libc: no threads, no <code>setjmp</code>, no <code>memcpy</code> unless you write the loop yourself.</li>
-    <li><strong>It rewrites code.</strong> ACE installs 405 patches into Doom's memory, and 399 of them land in Doom's code segment.</li>
-    <li><strong>It owns the machine.</strong> It owns the screen at <code>0xA0000</code>, the keyboard interrupt, and a heap that takes all the remaining RAM.</li>
-  </ol>
-  <p>Now imagine the naive plan: jump into the engine's entry point a second time. The stock first-stage loader works out its own base address from the startup stack (<code>sub $0x34615,%esi</code>), and that arithmetic is only true once. The stock second stage frees the lump cache, the lump table and the heap, closes every WAD file, and then jumps into the engine, which destroys the parent's world before the child starts. The child's <code>Z_Init</code> asks for all the free RAM, and none is left. Its renderer draws into the parent's screen. Its <code>ace_main</code> re-patches Doom code that the parent is executing.</p>
-  <p>Every one of those failures gets a section below. They all have the same shape, though, and it is worth stating that shape before the details.</p>
-  <div class="thesis">
-    <p><strong>An instance is its state.</strong> If you can name every byte that a program can change, you can run several copies of it on one machine. You swap those bytes at a moment when nothing is in flight. The engineering lies in the naming. Every serious bug in this project turned out to be a byte whose owner had been named wrong.</p>
+<section class="ch col" data-hud="One Doom, one machine"><p class="sec-tag">Map 01</p><h2>One Doom, one machine</h2><p class="lead1">Doom assumes it is the only program running.</p></section>
+<div class="wide console" id="mc">
+  <div class="console-head"><h2 class="console-title">One loop, one set of addresses</h2><span class="badge b-sim">Animation</span></div>
+  <div class="mach">
+    <svg class="loops" id="mcSvg" viewBox="0 0 400 230" aria-label="Game loops"></svg>
+    <div class="memcol">
+      <div class="mbox" id="mcG"><h5>Doom data · gametic</h5><b>0</b></div>
+      <div class="mbox" id="mcS"><h5>Screen · 0xA0000</h5><canvas id="mcScr" width="64" height="40"></canvas></div>
+    </div>
   </div>
-</section>
+  <div class="seq-say" id="mcSay" aria-live="polite"></div>
+</div>
 
-<!-- ============================================================ 2 -->
-<section id="turns" data-hud="Taking turns without threads" class="col">
-  <p class="sec-tag">Map 02</p>
-  <h2>Taking turns without threads</h2>
-  <p>The first problem is control flow. Depth 0 is somewhere deep inside Doom's frame loop. We want to stop it, run depth 1 for a while, and later continue depth 0 at the exact instruction where it stopped. DOS has no threads to do this for us.</p>
-  <p>Look at what a suspended C function actually needs in order to continue. It needs its stack, which holds return addresses, locals and arguments. It also needs the registers that C promises to preserve across a call: <code>ebx</code>, <code>esi</code>, <code>edi</code> and <code>ebp</code>. It does not need <code>eax</code>, <code>ecx</code> or <code>edx</code>, because the function that calls the switch already expects those to be destroyed. So a "thread" is really just a stack pointer. Give each depth its own stack, and switching depths means swapping <code>ESP</code>.</p>
-  <p>Here is the whole primitive, the only part of the scheduler that had to be written in assembly:</p>
-<pre class="code" data-hl>mtx_switch_ctx:                 /* (uint32_t **save_esp, uint32_t *load_esp) */
-	mov	4(%esp), %eax		/* eax = save_esp */
-	mov	8(%esp), %edx		/* edx = load_esp (new ESP value) */
-	push	%ebp
-	push	%ebx
-	push	%esi
-	push	%edi
-	mov	%esp, (%eax)		/* *save_esp = esp */
-	mov	%edx, %esp		/* switch stacks */
-	pop	%edi
-	pop	%esi
-	pop	%ebx
-	pop	%ebp
-	ret				/* resumes the loaded depth */</pre>
-  <p>The switch is symmetric. The depth that switches away later resumes right after its own call to <code>mtx_switch_ctx</code>, as if it had made an ordinary function call that took a long time. That leaves one puzzle: a depth that has never run has nothing to resume. Step through it below.</p>
-</section>
-
+<section class="ch col" data-hud="Taking turns"><p class="sec-tag">Map 02</p><h2>Taking turns</h2><p class="lead1">A paused program is just its stack, plus a pointer to that stack.</p></section>
 <div class="wide console" id="stk">
   <div class="console-head">
     <h2 class="console-title">Two stacks, one ESP</h2>
-    <span class="badge b-sim">Step-through</span>
+    <span class="badge b-sim">Animation</span>
   </div>
   <div class="stepper">
     <div class="listing" id="stkList"></div>
@@ -464,59 +476,18 @@ footer h2{font-size:34px}
     <div class="stack" id="stkB"></div>
   </div>
   <div class="regs" id="stkRegs"></div>
-  <div class="controls">
-    <button id="stkBack">◀ Back</button>
-    <button class="primary" id="stkStep">Step ▶</button>
-    <button id="stkPlay">Play ▶▶</button>
-    <button id="stkReset">Reset</button>
-    <label class="rng">Step <input type="range" id="stkScrub" min="0" max="1" value="0"> <output id="stkScrubOut">0</output></label>
-  </div>
   <div class="narr" id="stkNarr"></div>
   <div class="espmark" id="stkMark" aria-hidden="true">◀ ESP</div>
-  <figcaption><span class="badge b-code">Code</span> The instructions are verbatim from <code>mtx_switch.S</code>, and the seeded layout is the one <code>mtx_seed()</code> writes. <span class="badge b-inf">Illustrative</span> The addresses and register values are made up for the walk-through. Part one enters a brand-new depth. Part two is that depth handing control back.</figcaption>
+  <figcaption><span class="badge b-code">Code</span> from <code>mtx_switch.S</code>. Addresses are illustrative.</figcaption>
 </div>
-
-<section class="col" style="padding-top:8px">
-  <p>The trick for a fresh depth is a forged suspension. <code>mtx_seed()</code> writes the stack a switched-out depth <em>would</em> have: four zeroed register slots, then the address of <code>mtx_trampoline</code> where a return address would sit, then the entry argument. The first switch into it "restores" the zeros and its <code>ret</code> lands in the trampoline, which calls the depth's entry function. Nothing is special-cased. A new depth looks to the switch exactly like an old one.</p>
-  <p>This is also why the code doesn't use <code>setjmp</code>/<code>longjmp</code>. Those need a C runtime, and they assume the jump target's frame is still alive. Here the frames that have to stay alive belong to a game loop that never returns.</p>
-</section>
-
 <div class="wide console" id="tw">
   <div class="console-head"><h2 class="console-title">Three stacks, one CPU</h2><span class="badge b-sim">Animation</span></div>
   <div class="towers" id="twBox"></div>
   <div class="seq-say" id="twSay" aria-live="polite"></div>
-  <figcaption>Each column is one depth's call stack, newest call on top. The glowing dot is the CPU: only one stack has it at a time. A frozen column is a depth suspended inside its own <code>mtx_switch_ctx</code>, and its whole state is the one number in <code>ctx[d].esp</code>. Amber frames are host code. A nested depth reaches the host's switch through <code>host_yield</code> in its parameter block, so host code runs on the depth's own stack. Function names are from the source. The order is the viewer-first schedule with the viewer in depth 0. Each instance's boot (<code>mtx_trampoline</code> … <code>ace_main</code>) is folded into one frame and shown in Map 06.</figcaption>
+  <figcaption>Amber frames are host code. Function names are from the source.</figcaption>
 </div>
 
-<section class="col" style="padding-top:8px">
-  <p>Read the animation once with one question in mind: what does a depth "remember" while it is frozen? Nothing beyond its stack, and the stack pointer that leads back into it. When control comes back, every function on that stack simply returns, one after another, as if nothing had happened.</p>
-</section>
-
-<!-- ============================================================ 3 -->
-<section id="stop" data-hud="A safe place to stop" class="col">
-  <p class="sec-tag">Map 03</p>
-  <h2>A safe place to stop</h2>
-  <p>A cooperative switch only happens when the running code calls it, and the running code is Doom's frame loop. So where should the call go? Switch in the middle of rendering and you leave a half-drawn frame and a renderer whose state is mid-update. Switch in the middle of game logic and you suspend a world partway through a tic.</p>
-  <p>The answer is the <strong>frame boundary</strong>: after a frame is rendered and before it is presented. At that moment the engine has no work in flight. Anyone can <em>request</em> a switch at any time (an input handler, a timer, the scheduler), and the request only becomes an actual switch the next time the engine reaches that point:</p>
-<pre class="code" data-hl>void MTX_FRAME_TICK_ABI mtx_frame_tick(void)
-{
-	uint8_t k = sched_kind;
-
-	if(k == MTX_REQ_NONE)
-		return;
-
-	/* Consume BEFORE switching: neither the incoming depth nor this one when it
-	   is resumed later may re-service the same request. */
-	sched_kind = MTX_REQ_NONE;
-
-	if(k == MTX_REQ_YIELD)
-		mtx_yield();
-	else if(k == MTX_REQ_SWITCH)
-		mtx_switch_to(sched_depth);
-}</pre>
-  <p>Notice the line that clears the request <em>before</em> switching. The switch doesn't return until someone switches back, possibly many frames later, and by then the request must already be gone. Otherwise the resumed depth would service it a second time. Try both orders below.</p>
-</section>
-
+<section class="ch col" data-hud="Only between frames"><p class="sec-tag">Map 03</p><h2>Only between frames</h2><p class="lead1">A switch can be requested at any time. It only happens at a frame boundary.</p></section>
 <div class="wide console" id="fb">
   <div class="console-head"><h2 class="console-title">A request waits for the boundary</h2><span class="badge b-sim">Simulation</span></div>
   <canvas class="fb-c" id="fbCanvas" width="1000" height="160" aria-label="Frames on a timeline, with switch requests"></canvas>
@@ -529,166 +500,54 @@ footer h2{font-size:34px}
     <button id="fbPause">Pause</button>
   </div>
   <div class="narr" id="fbLog" aria-live="polite"></div>
-  <figcaption>Two depths, one frame at a time. Each frame is game logic, then rendering, then the boundary where <code>mtx_frame_tick</code> runs. Press the button at any moment: the request waits, pulsing, until the running depth reaches its next boundary. If you leave it alone, it makes a request now and then by itself. Switch to <em>Switch, then consume</em> to see why the real code clears the request first: the switch only returns when this depth is resumed, so the depth that was switched to finds the same request still set and services it again.</figcaption>
 </div>
 
-<section class="col" style="padding-top:8px">
-  <details>
-    <summary>Deep dive: finding a hook that actually runs</summary>
-    <p>The obvious frame boundary is <code>swap_buffers()</code> in <code>engine/vesa.c</code>, ACE's replacement for Doom's <code>I_FinishUpdate</code>. In the first live boot it never ran, because it is only hooked when VESA activates, and VESA did not activate on DOSBox's emulated S3 card for a 320×200 mode. <code>hook_draw_stbar</code> only runs during levels, while the title screen is a different game state. ACE's assembly <code>I_FinishUpdate</code> runs in every state, but calling C from there crashed the game (<code>Illegal read … CS:IP 170:b02c7d5c</code>, black screen), because it is entered from a Doom path where the C calling convention does not hold.</p>
-    <p>The request/consume pair is what made a game-state-dependent hook acceptable: a pending request simply waits for the next frame that reaches the yield point. Today the frame path runs from <code>swap_buffers()</code> through <code>mtx_engine_frame()</code>.</p>
-  </details>
-  <details>
-    <summary>Deep dive: the calling-convention promise</summary>
-    <p><code>swap_buffers</code> is declared <code>__attribute((regparm(2),no_caller_saved_registers))</code>, which means it promises its Doom callers that <code>eax</code>, <code>ecx</code> and <code>edx</code> survive the call. A plain C function called from inside it is allowed to clobber all three, and that would silently break the promise. So <code>mtx_frame_tick</code> carries the same attribute, and gcc saves those registers around the switch. The attribute also forces <code>-mgeneral-regs-only</code>, because such a function may not touch x87 state.</p>
-  </details>
-</section>
-
-<!-- ============================================================ 4 -->
-<section id="state" data-hud="What an instance is made of" class="col">
-  <p class="sec-tag">Map 04</p>
-  <h2>What an instance is made of</h2>
-  <p>Control flow is solved. Two depths now run on two stacks, but they still share every global variable, and a global that one depth writes is a global the other depth reads. The real work of nesting is the inventory: which bytes belong to a depth, and what has to happen to them on a switch.</p>
-  <p>The answer comes in four kinds, plus a fifth that belongs to no depth at all. Try sorting them yourself before reading on. Pick a card, then pick the bin you think it belongs in.</p>
-</section>
-
-<div class="wide console" id="sorter">
-  <div class="console-head"><h2 class="console-title">Sort the bytes</h2><span class="badge b-sim">Exercise</span></div>
-  <div class="sort-tray" id="sortTray" aria-label="Cards to sort"></div>
-  <div class="bins" id="sortBins"></div>
-  <div class="sort-msg" id="sortMsg" aria-live="polite">Pick a card above.</div>
-  <div class="controls">
-    <span class="hudtxt" id="sortProg"></span>
-    <button id="sortShow">Show the answers</button>
-    <button id="sortReset">Start over</button>
+<section class="ch col" data-hud="What a switch moves"><p class="sec-tag">Map 04</p><h2>What a switch moves</h2><p class="lead1">Each depth's bytes go in and out of its own snapshot slot.</p></section>
+<div class="wide console sp" id="sp">
+  <div class="console-head"><h2 class="console-title">What a switch moves</h2><span class="badge b-sim">Animation</span></div>
+  <p class="runlbl" id="spRun"></p>
+  <div class="sp-grid" id="spGrid">
+    <div class="sp-h"></div><div class="sp-h">Live memory</div><div class="sp-h">Depth 0's slot</div><div class="sp-h">Depth 1's slot</div>
+    <div class="sp-row" data-row="g"><div class="sp-k">gametic</div><div class="sp-c" data-c="live.g"></div><div class="sp-c" data-c="s0.g"></div><div class="sp-c" data-c="s1.g"></div></div>
+    <div class="sp-row" data-row="p" hidden><div class="sp-k">Doom code</div><div class="sp-c" data-c="live.p"></div><div class="sp-c" data-c="s0.p"></div><div class="sp-c" data-c="s1.p"></div></div>
+    <div class="sp-row" data-row="z" hidden><div class="sp-k">mainzone</div><div class="sp-c" data-c="live.z"></div><div class="sp-c" data-c="s0.z"></div><div class="sp-c" data-c="s1.z"></div></div>
   </div>
-  <figcaption>The bins are the real categories in <code>dos_state.c</code> and <code>mtx_host.h</code>, and the cards are real variables and patches. A wrong pick tells you what would break, and most of those failures really happened.</figcaption>
+  <div class="heaps" id="spHeaps" hidden><div class="sp-k">heaps</div><div class="heap h0" id="spH0">depth 0's heap</div><div class="heap" id="spH1">depth 1's heap</div><div></div></div>
+  <svg class="ov" id="spSvg" aria-hidden="true"><defs><marker id="spArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#f1b23c"/></marker></defs><path id="spPath" fill="none" stroke="#f1b23c" stroke-width="2" marker-end="url(#spArr)"/></svg>
+  <div class="seq-say" id="spSay" aria-live="polite"></div>
 </div>
 
-<section class="col" style="padding-top:8px">
-  <p>The first four kinds are registered by a wiring layer (<code>dos_wire.c</code>), so the save/load code itself knows nothing about Doom. The fifth gets its own section, <a href="#host">Map 05</a>. A depth's snapshot is seeded by cloning the parent's <em>live</em> state the first time the depth is entered. A child starts as a copy of its parent and then diverges, which is what a nested instance should do.</p>
-
-  <h3>The patches nobody snapshots</h3>
-  <p>Regions cover data, and Doom's code segment is not data. ACE does not patch its own code. It patches <em>Doom's</em>: calls redirected into ACE, constants changed, instructions overwritten with NOPs. A second instance's <code>ace_main</code> re-patches that shared code while the root is executing it. Without a fix, a patch made by any depth is visible to every depth.</p>
-  <p>The host builds its list by reading the engine's own hook table (<code>_hooks_start</code>…<code>_hooks_end</code>) at boot. It never transcribes addresses by hand, because a hand-written list would rot the first time the engine gained a hook, and the resulting failure would look like random memory corruption instead of a missing entry. Measured from the built engine:</p>
-  <div class="tbl"><table>
-    <thead><tr><th>Hook type</th><th class="num">Entries</th><th>Bytes it rewrites</th></tr></thead>
-    <tbody>
-      <tr><td><code>CALL_ACE</code> / <code>JMP_ACE</code> / <code>JMP_DOOM</code> / <code>CALL_DOOM</code></td><td class="num">111 / 24 / 24 / 1</td><td>5 (opcode + rel32)</td></tr>
-      <tr><td><code>UINT32</code> / <code>UINT16</code> / <code>UINT8</code></td><td class="num">87 / 84 / 40</td><td>4 / 2 / 1</td></tr>
-      <tr><td><code>SET_NOPS</code></td><td class="num">26</td><td>the entry's count</td></tr>
-      <tr><td><code>ABSADDR_DATA</code></td><td class="num">8</td><td>4</td></tr>
-      <tr><td><code>IMPORT</code> / <code>READ32</code></td><td class="num">10 / 4</td><td>0 (they copy <em>from</em> Doom into ACE)</td></tr>
-    </tbody>
-  </table></div>
-  <p>That gives 419 entries and 405 that write into Doom, for 1,517 bytes. Isolation is checked live, and the check has two halves, because either half alone would prove nothing:</p>
-<pre class="log">[MTX] isolation: 3 regions, 405 patches, snapshot 540041 B
-[MTX] probe site 2022787, byte there now 232
-[MTX] hook isolation: <span class="hl">depth1 wrote 204</span> at 2022787 (<span class="hl">read back 204</span>);
-      root now 232, was 232 => <span class="hl">ISOLATED</span></pre>
-  <p class="log-cap"><span class="badge b-meas">Measured</span> MTX.LOG, real DOOM2.EXE in DOSBox</p>
-  <p>Depth 1 writes <code>0xCC</code> (204) over an <code>0xE8</code> (232), which is a call opcode ACE had installed, and reads it back, so the write really happened. After the switch, the root reads the same address and finds <code>0xE8</code>. A write that never happened would look exactly like perfect isolation, which is why both halves are in the log. The snapshot total also checks the arithmetic: 529,468 + 9,056 + 1,517 = 540,041.</p>
-
-  <h3>Why pins exist</h3>
-  <p>Some globals are pointers to memory that must <em>not</em> be shared. <code>mainzone</code> points at the heap. If it came back from the snapshot unchanged, a child cloned from its parent would allocate from the parent's heap. So after the snapshot is restored, the host forces these pointers to the incoming depth's own values.</p>
-  <p>There are three pins, not two, and the third one was found by testing where pixels landed. ACE copies Doom's <code>screens[0]</code> into its own <code>screen_buffer</code> exactly once, at init. After that the two are separate variables, and Doom's renderer keeps drawing through <em>its</em> copy. With only ACE's pointer pinned, a nested depth still painted over the root's frame. The test writes a marker through Doom's pointer at depth 1 and then searches both buffers for it:</p>
-<pre class="log">[MTX] doom screens[0] -> 4251936: marker in depth1 buffer <span class="hl">YES</span>, in root buffer <span class="hl">NO</span></pre>
-  <p class="log-cap"><span class="badge b-meas">Measured</span> MTX.LOG</p>
-
-  <h3>What one level costs</h3>
-  <p>The engine reserves one arena for the whole ring before Doom's <code>Z_Init</code> runs. It has to come first, because <code>Z_Init</code> walks the free memory downward and takes all of it except a 32 KiB reserve, so an arena requested at frame time could never be satisfied. Each level then gets a fixed share of that arena. Drawn to scale:</p>
-</section>
-
-<div class="wide console">
-  <div class="console-head"><h2 class="console-title">One level's share of the arena</h2><span class="badge b-meas">From the source</span></div>
-  <div class="budget" id="budgetBar"></div>
-  <div class="budget-key" id="budgetKey"></div>
-  <figcaption>About 7.3 MiB per level. The engine asks DPMI for a 28 MiB arena, and the planner rounds the division down, so the arena holds three levels: the root plus two instances. The heap and raw pool are policy figures (<code>MTX_ZONE_PER_DEPTH</code>, <code>MTX_RAW_PER_DEPTH</code>). The heap used to be 256 KiB, until a real instance died in <code>Z_Malloc</code> loading a 28 KB patch. The snapshot and image sizes vary by a few hundred bytes between builds. These figures come from a recent boot log (<code>snap 573933 img 413380</code>). The 12-depth ceiling in <code>context.h</code> is a limit on memory reservation, not a wall in the code.</figcaption>
-</div>
-
-<!-- ============================================================ 5 -->
-<section id="host" data-hud="The host was standing inside the guest" class="col">
-  <p class="sec-tag">Map 05</p>
-  <h2>The host was standing inside the guest</h2>
-  <p>With all that in place the host booted inside DOOM2.EXE, depth 1 came up, and everything looked healthy until the <em>first real switch</em>. That switch produced 2,000 illegal reads and writes, plus <code>DYNX86: Can't run code in this page</code>. The baseline build has zero.</p>
-  <p>Here is the question that had been skipped: <strong>where does the scheduler keep its own variables?</strong> <code>mtx_ctx[]</code>, <code>mtx_cur</code> and the <code>inited[]</code> flags were ordinary globals, so they lived in the engine's <code>.bss</code>. That is the same <code>.bss</code> the snapshot saves and restores on every switch. The switch was restoring its own bookkeeping while it was still using it.</p>
-  <p>Reproduce it below. The order of operations inside <code>mtx_switch()</code> is fixed: save the outgoing depth, write <code>cur</code>, load the incoming depth, then swap stacks.</p>
-</section>
-
+<section class="ch col" data-hud="The host inside the snapshot"><p class="sec-tag">Map 05</p><h2>The host inside the snapshot</h2><p class="lead1">The switch code has state too. It must not belong to any depth.</p></section>
 <div class="wide console" id="hs">
   <div class="console-head">
     <h2 class="console-title">Whose bytes are these?</h2>
-    <span class="badge b-sim">Step-through</span>
+    <span class="badge b-sim">Animation</span>
   </div>
-  <div class="controls" style="margin-top:0">
-    <span class="seg" role="group" aria-label="Layout">
-      <button id="hsBug" aria-pressed="true">Original layout: host state inside .bss snapshot</button>
-      <button id="hsFix" aria-pressed="false">Fix: host state in mtx_hs, outside every snapshot</button>
-    </span>
-  </div>
+  <p class="runlbl" id="hsMode"></p>
   <div class="mem3">
     <div class="box" id="hsLive"></div>
     <div class="box" id="hsS0"></div>
     <div class="box" id="hsS1"></div>
   </div>
-  <div class="controls">
-    <button id="hsBack">◀ Back</button>
-    <button class="primary" id="hsStep">Step ▶</button>
-    <button id="hsReset">Reset</button>
-    <span class="hudtxt" id="hsPos"></span>
-  </div>
   <div class="narr" id="hsNarr"></div>
   <div class="crash" id="hsCrash"></div>
   <div class="okmsg" id="hsOk"></div>
-  <figcaption>Hatched cells are covered by the snapshot, so <code>save_state</code> copies them out and <code>load_state</code> copies them back. The simulation runs the real sequence of copies over five variables; the addresses are illustrative. The failure it reproduces was measured: the stale <code>ESP</code> is loaded, and the final <code>ret</code> of the switch jumps into unmapped memory.</figcaption>
+  <figcaption>Hatched cells are inside the snapshot. The crash is measured; the addresses are illustrative.</figcaption>
 </div>
-
-<section class="col" style="padding-top:8px">
-  <p>The fix is a rule about ownership: all host control state lives in <strong>one object</strong>, <code>mtx_hs</code>, and the wiring layer registers the engine's <code>.bss</code> as two regions, one below that object and one above it. The split is exact because <code>mtx_hs</code> is a single object, so the linker can place other data before or after it but never inside it. If that ever stops holding, the host refuses to nest at all. The boot log confirms the split: the snapshot dropped from 536,262 to 529,468 bytes per depth, which is exactly <code>sizeof(mtx_hs)</code>.</p>
-  <h3>The same bug, a second time</h3>
-  <p>The next crash was <code>exception 06h (invalid opcode)</code> at a garbage EIP. The useful clue was that <code>ESP</code> still pointed into the <em>root's</em> stack, which meant the bad jump happened before the stack swap, so the resumed depth could not be at fault. That left the calls the switch makes before swapping, which go through the save/load function table. <code>mtx_init()</code> had kept a <em>pointer</em> to that table, and the engine had passed it the address of a local variable in a boot function whose stack frame was long dead by the first switch.</p>
-  <p>Now <code>mtx_init()</code> copies the table into <code>mtx_hs</code>. The first regression test for this also hid the bug: it compared the kept pointer against the dead frame's address, but returning a dead local's address is undefined behavior, so gcc folded it to NULL and the test passed <em>against the buggy code</em>. The test that works today inspects the table the scheduler will actually call. It calls <code>mtx_init</code> from a helper whose frame is then overwritten with <code>0x4D4D4D4D</code>, and asserts that the callbacks still work.</p>
-</section>
-
 <div class="wide console" id="dg">
   <div class="console-head"><h2 class="console-title">A pointer that outlives its frame</h2><span class="badge b-sim">Animation</span></div>
-  <div class="controls" style="margin-top:0">
-    <span class="seg" role="group" aria-label="mtx_init behaviour">
-      <button id="dgBug" aria-pressed="true">Keep the pointer</button>
-      <button id="dgFix" aria-pressed="false">Copy the table</button>
-    </span>
-  </div>
+  <p class="runlbl" id="dgMode"></p>
   <div class="ptr" id="dgBox">
     <div class="box"><h4>Root stack</h4><div id="dgStack"></div></div>
     <div class="box"><h4>mtx_hs (host state)</h4><div id="dgHs"></div></div>
     <svg class="ov" id="dgSvg" aria-hidden="true"><defs><marker id="dgArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#f1b23c"/></marker><marker id="dgArrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#ff4a32"/></marker></defs><path id="dgPath" fill="none" stroke-width="2"/></svg>
   </div>
   <div class="seq-say" id="dgSay" aria-live="polite"></div>
-  <div class="crash" id="dgCrash">exception 06h (invalid opcode) · EIP = 0x4D4D4D4D<br><span style="font-family:var(--f-body);font-size:15px;color:#f0b4a8">Measured in DOSBox: the bad call happens before the stack swap, so ESP is still on the root's stack.</span></div>
+  <div class="crash" id="dgCrash">exception 06h (invalid opcode) · EIP = 0x4D4D4D4D · <span style="color:#f0b4a8">measured, with ESP still on the root's stack</span></div>
   <div class="okmsg" id="dgOk">save_state runs · the switch goes ahead</div>
-  <figcaption>The addresses are illustrative. The sequence is the one in <code>mtx_init</code> before and after the fix. In the buggy version the arrow keeps pointing at a frame that no longer exists, and the first switch calls whatever has since been written there.</figcaption>
 </div>
 
-<section class="col" style="padding-top:8px">
-</section>
-
-<!-- ============================================================ 6 -->
-<section id="boot" data-hud="Booting a second engine" class="col">
-  <p class="sec-tag">Map 06</p>
-  <h2>Booting a second engine</h2>
-  <p>So far, depth 1 has been a purpose-built test guest, a few dozen bytes of position-independent code loaded from a WAD lump. A real nested instance is the whole ACE engine image: about 400 KB, which relocates itself, clears its own <code>.bss</code>, builds a heap, initializes video and patches Doom. Each of those steps had been written for a program that runs once.</p>
-
-  <h3>A loader that cannot do harm</h3>
-  <p>The stock second-stage loader is one-shot by construction: it frees the parent's memory and closes the parent's files before jumping into the engine. The reentrant version, <code>ldr1n.c</code>, fixes that structurally. Its entire authority is a table of three services:</p>
-<pre class="code" data-hl>typedef struct {
-    int32_t  (*read)(void *ctx, int32_t fd, void *dst, uint32_t n);
-    void    *(*alloc)(void *ctx, uint32_t n);
-    void     (*enter)(void *ctx, void *code, uint32_t code_base,
-                      uint32_t data_base, uint32_t ace_base);
-} mtx_ldr1n_ops_t;</pre>
-  <p>There is no <code>free()</code> and no <code>close()</code>. The loader cannot destroy the parent's state because it has no way to. That is a stronger guarantee than a comment saying "don't free anything here", because it is enforced by what the loader can call. The first stage, <code>ldr0N.S</code>, takes its base addresses as data instead of deriving them from the startup stack, and assembles to 39 bytes, well inside the 256-byte patch budget of the original.</p>
-</section>
-
+<section class="ch col" data-hud="Booting a second copy"><p class="sec-tag">Map 06</p><h2>Booting a second copy</h2><p class="lead1">The engine image loads again, without touching its parent.</p></section>
 <div class="wide console" id="ln">
   <div class="console-head"><h2 class="console-title">Two second stages, side by side</h2><span class="badge b-sim">Animation</span></div>
   <div class="lanes">
@@ -696,29 +555,10 @@ footer h2{font-size:34px}
     <div class="lane"><h4>LDR1N, the reentrant one</h4><div class="calls" id="lnB"></div><div class="hudtxt">Its whole authority</div><div class="world" id="lnT"></div><div class="hudtxt" style="margin-top:6px">Parent's world</div><div class="world" id="lnWB"></div></div>
   </div>
   <div class="seq-say" id="lnSay" aria-live="polite"></div>
-  <figcaption>The stock loader's calls are the ones the README lists. LDR1N's are the two reads and one allocation that host test [8] checks.</figcaption>
 </div>
-
-<section class="col" style="padding-top:8px">
-  <details>
-    <summary>Deep dive: two loader bugs DOS could never show</summary>
-    <p>The original first stage never returned, so it was free to use <code>EBP</code> as scratch. The reentrant copy kept that habit, which meant it destroyed its caller's frame pointer, and nothing that intends to continue can call such a function. It now saves and restores <code>EBP</code>, which costs two instructions and still fits in 39 bytes.</p>
-    <p>It also loaded the hand-off registers <em>before</em> calling Doom's <code>printf</code> to print its banner. <code>printf</code> is a C function, so it clobbers <code>ecx</code>, and the next stage received a garbage argument. In the live run the guest ignored that register, so the bug corrupted a value nobody was reading. A DOS run can't catch that kind of bug. Host test [11] does: it points <code>code_base</code> at a stand-in <code>printf</code> (ldr0N reaches it at <code>code_base + 0x3FE40</code>) and records exactly which registers arrive.</p>
-  </details>
-
-  <h3>Telling an instance what it is</h3>
-  <p>A nested instance is a relocated <em>copy</em> of the engine with its own <code>.bss</code>. Its <code>mtx_hs</code> is therefore a different, empty object. In the first attempt, the instance's allocator consulted that empty object, decided it was the root, and asked DPMI for 209,184 bytes when only 61,440 were free. Meanwhile its own memory pool sat unused.</p>
-  <p>The host now fills a parameter block for each depth inside its <em>own</em> <code>mtx_hs</code> and hands the block's address over in <code>%ebp</code> at the entry. A register is used because the entry clears <code>.bss</code>, which would erase anything the host wrote into the instance beforehand, and <code>EBP</code> is the one register the entry doesn't consume. The engine validates the block by its contents: the magic word <code>'MTXP'</code> plus the block's own address stored inside it. When a root boots, <code>EBP</code> holds whatever the loader left there, the check fails, and a null block is exactly the signal that this copy is the host.</p>
-</section>
-
 <div class="wide console" id="rl">
   <div class="console-head"><h2 class="console-title">Booting depth 1, hand-off by hand-off</h2><span class="badge b-sim">Animation</span></div>
-  <div class="controls" style="margin-top:0">
-    <span class="seg" role="group" aria-label="How the parameter block travels">
-      <button id="rlEbp" aria-pressed="true">Hand it over in %ebp</button>
-      <button id="rlBss" aria-pressed="false">Write it into the instance's .bss</button>
-    </span>
-  </div>
+  <p class="runlbl" id="rlMode"></p>
   <div class="stations" id="rlSt"></div>
   <div class="rgrid">
     <div><div class="hudtxt" style="margin-bottom:4px">Registers at the hand-off</div><div class="regchips" id="rlRegs"></div></div>
@@ -729,68 +569,17 @@ footer h2{font-size:34px}
     </div></div>
   </div>
   <div class="seq-say" id="rlSay" aria-live="polite"></div>
-  <figcaption>The order and the registers are from <code>ldr0N.S</code>, <code>mtx_params.h</code> and the README, and the addresses are illustrative. The second option shows why the design avoids it. The instance's entry clears its own <code>.bss</code>, so anything written there beforehand is gone. Its ending (no block, so the instance thinks it is the root and asks DPMI for 209,184 B) is the failure that was measured when an instance had no block at all.</figcaption>
+  <figcaption>The second run shows the design that was avoided, and ends in the failure measured when an instance had no block.</figcaption>
+</div>
+<div class="wide console" id="pc">
+  <div class="console-head"><h2 class="console-title">A clue spelled in ASCII</h2><span class="badge b-sim">Animation</span></div>
+  <div class="pcl" id="pcLog"></div>
+  <div class="pc-big" id="pcBig"></div>
+  <div class="pool" id="pcPool"></div>
+  <div class="seq-say" id="pcSay" aria-live="polite"></div>
 </div>
 
-<section class="col" style="padding-top:8px">
-  <details>
-    <summary>Deep dive: the store that landed somewhere else</summary>
-    <p>The obvious place to store the pointer was the assembly entry, using the same <code>mov %eax,mtx_params(%ecx)</code> idiom the rest of the entry uses. The assembler records that displacement as a relocation, so the entry's own relocator added the image base to it a <em>second</em> time and the store landed elsewhere. The pointer stayed null through an entire nested boot. The store now happens in C, where it is an ordinary relocated absolute reference.</p>
-  </details>
-
-  <h3>A heap of its own, checked with Doom's own rules</h3>
-  <p>Doom's allocator walks a ring of block headers, so handing a depth raw memory is not enough. The first <code>Z_Malloc</code> would read an uninitialized header. Each depth's heap is built inside its arena slot and checked against the same invariants Doom's <code>Z_CheckHeap</code> enforces.</p>
-<pre class="log">[MTX] depth1 zone 262144 B at 3987460 <span class="hl">build 0</span> <span class="hl">alloc 3987516</span> <span class="hl">probe 0</span></pre>
-  <p class="log-cap"><span class="badge b-meas">Measured</span> MTX.LOG, from the 256 KiB heap era</p>
-  <p><code>build 0</code> means the checks passed. <code>alloc 3987516</code> is Doom's <em>real</em> <code>Z_Malloc</code> returning a pointer inside the depth's heap: 3987516 − 3987460 = 56, which is 32 bytes of zone header plus 24 bytes of block header. <code>probe 0</code> means the invariants still hold after an allocate-and-free round trip.</p>
-
-  <h3>A clue spelled in ASCII</h3>
-  <p>The instance booted, drew frames, and then died on some runs with errors that made no sense as Doom errors: <code>Lump PLAYFAL read failed!</code>, <code>W_CacheLumpNum: 19796 &gt;= numlumps</code>, and a 1.5 GB allocation request. The pattern becomes clear once you decode the numbers. The host stamps memory with magic words, and magic words are readable text. Try it:</p>
-</section>
-
-<div class="wide console">
-  <div class="console-head"><h2 class="console-title">Decode the log</h2><span class="badge b-sim">Tool</span></div>
-  <div class="dec">
-    <div>
-      <label class="hudtxt" for="decIn">A number from MTX.LOG</label>
-      <input type="text" id="decIn" value="19796" inputmode="numeric" autocomplete="off">
-      <div class="chips" id="decChips"></div>
-    </div>
-    <div class="dec-out" id="decOut" aria-live="polite"></div>
-  </div>
-</div>
-
-<section class="col" style="padding-top:8px">
-  <p>A lump index of <code>0x4D54</code> is "MT", the top half of <code>'MTXR'</code>, which is the header magic of the depth's raw memory pool. So Doom was reading pool metadata as data. The pool's own arithmetic turned out to be the problem, in three ways that are each easy to get wrong:</p>
-  <ul>
-    <li><strong>The tip test compared the requested size instead of the space a block occupies.</strong> A 1-byte request occupies 8 bytes, so such a block was never recognized as the newest one. The engine's lump table starts as a 1-byte allocation and is grown to tens of kilobytes. Each grow moved the block and leaked the original, and the lump table quietly stopped growing.</li>
-    <li><strong>The pool trusted its base address to be aligned.</strong> The arena comes from Doom's allocator, which is happy to return 4-byte alignment. The pool landed 4 bytes off, its ownership check rejected all of its own memory, and frees fell through to the DPMI heap, which handed back pointers untouched.</li>
-    <li><strong>A zero-byte request needs real space.</strong> Refusing it turned a working call into <code>Texture memory allocation failed! (0B)</code>. Serving it with no payload put the caller's first byte in the next block's header.</li>
-  </ul>
-  <p>The pool also counts every leak and every refused request. That makes "the pool is big enough" a number you can check rather than an assumption.</p>
-</section>
-
-<!-- ============================================================ 7 -->
-<section id="screen" data-hud="One screen, many worlds" class="col">
-  <p class="sec-tag">Map 07</p>
-  <h2>One screen, many worlds</h2>
-  <p>Three instances now render three frames, but the monitor can show only one. Every frame reaches VGA memory through a single assembly routine, ACE's <code>I_FinishUpdate</code>, which copies 64,000 bytes to <code>0xA0000</code>. The copy's source address isn't a variable. It is baked into the routine's own code at init:</p>
-<pre class="code">1141:  57                   push %edi
-1142:  56                   push %esi
-1143:  51                   push %ecx
-1144:  be <span class="nu">78 56 34 12</span>       mov $0x12345678,%esi   <span class="cm">&lt;- the source, patched at +4</span>
-1149:  bf 00 00 0a 00       mov $0xa0000,%edi
-114e:  b9 80 3e 00 00       mov $0x3e80,%ecx
-1153:  f3 a5                rep movsl %ds:(%esi),%es:(%edi)</pre>
-  <p>Every depth originally presented the root's buffer, so a nested instance's frames could never reach the screen. Now the host owns that immediate, and each depth has its own copy of the routine, so the host tells each depth's blit what to copy from (<code>present_src</code>).</p>
-  <p>Setting a pointer is not evidence that the screen changed, so the host reads the screen back. It compares the first dword of VGA memory with the chosen buffer, one frame later, because the blit for the current frame hasn't run yet when the policy decides:</p>
-<pre class="log">[MTX] present -> depth 1, buffer 4250976 (blit runs this frame; checked next frame)
-[MTX] screen check: depth 1 <span class="hl">CONFIRMED</span> (vga 16843009 vs buffer 16843009)
-[MTX] present -> depth 0, buffer 36528 (blit runs this frame; checked next frame)
-[MTX] screen check: depth 0 <span class="hl">CONFIRMED</span> (vga 16843014 vs buffer 16843014)</pre>
-  <p class="log-cap"><span class="badge b-meas">Measured</span> MTX.LOG. 16843009 is 0x01010101, the first pixels of the depth's color bars</p>
-</section>
-
+<section class="ch col" data-hud="One screen"><p class="sec-tag">Map 07</p><h2>One screen</h2><p class="lead1">Every depth draws its own frame. The host picks which one reaches the monitor.</p></section>
 <div class="wide console" id="bl">
   <div class="console-head"><h2 class="console-title">Choosing what reaches the screen</h2><span class="badge b-sim">Animation</span></div>
   <div class="imm" id="blImm"></div>
@@ -799,42 +588,10 @@ footer h2{font-size:34px}
     <div class="vga"><canvas id="blVga" width="160" height="100"></canvas><div class="hudtxt" id="blVgaT">VGA memory at 0xA0000</div></div>
   </div>
   <div class="seq-say" id="blSay" aria-live="polite"></div>
-  <figcaption>The bytes are the routine's real encoding: <code>be</code> is <code>mov $imm32,%esi</code>, and the four bytes after it are the source address, stored little-endian. Depth 0's and depth 1's addresses are the ones in the log above, and depth 2's is illustrative. The pictures are stand-ins for the frames.</figcaption>
+  <figcaption>Depth 2's address is illustrative.</figcaption>
 </div>
 
-<section class="col" style="padding-top:8px">
-
-  <h3>Screens inside the world</h3>
-  <p>Showing one instance at a time proves the plumbing but makes for a dull picture. The finished version is <em>diegetic</em>: one wall surface in each level is a TV, and it shows another instance's frame. Which instance is decided by the ring rule:</p>
-<pre class="code" data-hl>static uint8_t mtx_ring_next(uint8_t d)
-{
-	uint8_t k;
-
-	for(k = 1; k < MTX_MAX_DEPTH; k++)
-	{
-		uint8_t c = (uint8_t)((d + k) % MTX_MAX_DEPTH);
-
-		if(mtx_alive(c))
-			return c;
-	}
-	return d;                       /* nothing else live: nothing to show */
-}</pre>
-  <p>The modulo is the wrap. Without it, the deepest level's TV would have nothing to show and the chain would be a ladder. With it, the levels close into a cycle and every picture contains the whole nest. Each step inward is one lap older, because the frame on a TV is whatever that instance drew the last time it ran. The console below runs the same rule, and lets you take the wrap away.</p>
-  <p>Painting happens in two phases. During Doom's wall loop the engine only <em>records</em>, for each screen column, where that column falls on the TV. After the frame is finished, it fills those columns from the other instance's framebuffer. The first version drew directly inside the wall loop, where Doom's clipping state is mid-calculation, and produced 112 writes outside video memory and a black screen. The picture is placed in wall space, so perspective and occlusion are Doom's own. It is drawn without Doom's distance darkening, because a screen gives off light, and a darkened screen looks like a texture rather than a picture.</p>
-  <p>The switch key no longer toggles an overlay. It moves the viewer: the screen shows one instance full-size, and each press transports you to the next instance in the ring, with a short sweep and Doom's own teleport sound, looked up by name in the engine's sound table.</p>
-</section>
-
-<div class="wide console" data-ring="wrap"></div>
-
-<!-- ============================================================ 8 -->
-<section id="keys" data-hud="One keyboard for three worlds" class="col">
-  <p class="sec-tag">Map 08</p>
-  <h2>One keyboard for three worlds</h2>
-  <p>The switch key misbehaved: a single held press sometimes transported the viewer twice. The cause was another ownership question, and it took a measurement to see it.</p>
-  <p>Doom 1.9 installs its own keyboard interrupt handler and never passes keys on to the BIOS. Sampled on every frame of a press, the BIOS keyboard buffer never moved. That leaves exactly one channel for input: Doom's own key array, <code>gamekeydown[]</code>. That array is part of Doom's data segment, so it is <strong>snapshot state</strong>. Each depth has its own copy, and a key event lands in whichever copy happens to be loaded when the interrupt fires.</p>
-  <p>So the question "is the key down?" has three answers, and each copy only knows about the events that arrived while it was loaded. Below, one press is held across several slices. The top timeline uses the earlier rule, where each depth decides from its own copy and resets its edge tracker at the start of every slice. The bottom timeline uses the current rule.</p>
-</section>
-
+<section class="ch col" data-hud="One keyboard"><p class="sec-tag">Map 08</p><h2>One keyboard</h2><p class="lead1">Doom's key array is per-depth data, so a key press lands in whichever copy is loaded.</p></section>
 <div class="wide console" id="kt">
   <div class="console-head"><h2 class="console-title">One press, many copies</h2><span class="badge b-sim">Model</span></div>
   <div class="controls" style="margin-top:0">
@@ -846,45 +603,11 @@ footer h2{font-size:34px}
   <div class="kt-wrap"><svg class="kt" id="ktA" role="img" aria-label="Old rule timeline"></svg></div>
   <p class="verdict good" id="ktVb"></p>
   <div class="kt-wrap"><svg class="kt" id="ktB" role="img" aria-label="Authority rule timeline"></svg></div>
-  <figcaption>Three depths in turn, four-frame slices. A filled dot means that depth's copy of the key array says "down". A press, a release and any auto-repeats land in the copy that is loaded at that frame. The top rule is modeled from the description in <code>mtx_boot.c</code>. The real run recorded two toggles from one held press, at frames 285 and 289. The model shows the mechanism behind that and how far it can go. The bottom rule follows the shipped code.</figcaption>
 </div>
 
-<section class="col" style="padding-top:8px">
-  <p>The fix moves the answer outside the snapshots. <code>mtx_hs.key_state</code> is a single word in host memory. The root reaches it directly, and a depth reaches it through an address in its parameter block. The rule is the same on both sides:</p>
-  <ol>
-    <li>At the first frame of a slice, <em>force</em> the loaded copy to agree with the authority word. The restored value is what this depth saw last time, and any events since then went to other copies, so the restored value is known to be wrong. Forcing it, instead of clearing a tracker, means a stale "down" is overwritten with the truth instead of turning into a new key press.</li>
-    <li>On every frame, a key press or release is simply <code>copy != authority</code>. Whoever sees it updates the authority. A different depth can't report the same press, because its copy is either already equal to the authority or gets forced equal at the start of its own slice.</li>
-  </ol>
-  <p>The movement keys hit the same problem in a different form. After being transported into depth 1, the viewer stood still, because the held "forward" key had only ever reached depth 0's copy. The fix has the same shape: <code>mtx_hs.keys</code> is a single 256-byte keyboard state that every depth merges its key events into and adopts at its frame boundary.</p>
-</section>
-
-<!-- ============================================================ 9 -->
-<section id="price" data-hud="The price of a turn" class="col">
-  <p class="sec-tag">Map 09</p>
-  <h2>The price of a turn</h2>
-  <p>The ring works, and its picture updates too slowly to look smooth. These are the numbers as measured in DOSBox Staging, and they come with real noise: about 40% spread from one session to the next.</p>
-  <div class="tbl"><table>
-    <thead><tr><th>Configuration</th><th class="num">Frames/s</th><th>Source</th></tr></thead>
-    <tbody>
-      <tr><td>Vanilla Doom, same emulator</td><td class="num">35.6</td><td>HANDOFF.md</td></tr>
-      <tr><td>Ring of three, round robin, each instance</td><td class="num">~16</td><td>HANDOFF.md (aggregate 48)</td></tr>
-      <tr><td>Viewer first, slice 4: viewed / each other</td><td class="num">30.0 / 15.2</td><td>scheduler notes, <code>mtx_boot.c</code></td></tr>
-      <tr><td>Viewer first, slice 2: viewed</td><td class="num">18.3</td><td>same</td></tr>
-      <tr><td>Viewer first, slice 1: viewed</td><td class="num">8.3</td><td>same</td></tr>
-    </tbody>
-  </table></div>
-  <p>The last two rows are a trade you can try in the console below. Shorter slices give the viewed instance more frequent turns but pay for more switches, and a switch is not free. Its cost is mostly the state copy from <a href="#state">Map 04</a>, which is roughly 573 KB registered per depth.</p>
-</section>
-
-<div class="wide console" data-ring="full"></div>
-
-<section class="col" style="padding-top:8px">
-  <h3>Copy less by comparing everything</h3>
-  <p>A naive switch copies the whole registered set twice: about 1.1 MB of memory traffic. A measurement on every switch shows that only <strong>about 4,000 of 572,945 bytes (0.6%) actually differ</strong>. Most of Doom's data segment is tables that are written once and then only read. That suggests caching which blocks are hot and copying only those. The project tried exactly that, and the widget below lets you watch why it was taken out.</p>
-</section>
-
+<section class="ch col" data-hud="The price of a turn"><p class="sec-tag">Map 09</p><h2>The price of a turn</h2><p class="lead1">Every switch costs time, and three worlds share one machine.</p></section>
 <div class="wide console" id="cl">
-  <div class="console-head"><h2 class="console-title">Four ways to learn what a switch costs</h2><span class="badge b-sim">Simulation</span></div>
+  <div class="console-head"><h2 class="console-title">What a switch costs</h2><span class="badge b-sim">Simulation</span></div>
   <div class="stages" id="clStages" role="group" aria-label="Steps"></div>
   <div class="narr stage-narr" id="clPrompt"></div>
   <div class="controls" style="margin-top:0">
@@ -897,11 +620,11 @@ footer h2{font-size:34px}
   <canvas class="cl-grid" id="clGrid" width="1024" height="320" aria-label="Snapshot blocks"></canvas>
   <div class="legend" style="margin-top:8px" id="clLegend"></div>
   <div class="controls">
-    <button class="primary" id="clRun">Pause</button>
-    <button id="clStep">One switch</button>
+    <button hidden class="primary" id="clRun">Pause</button>
+    <button hidden id="clStep">One switch</button>
     <button id="clLate">Late write: touch a cold block now</button>
-    <button id="clReset">Reset</button>
-    <button id="clNext" class="primary">Next ▸</button>
+    <button hidden id="clReset">Reset</button>
+    <button hidden id="clNext" class="primary">Next ▸</button>
   </div>
   <div class="stats five">
     <div class="stat"><span>Switches</span><b id="clSw">0</b></div>
@@ -916,60 +639,17 @@ footer h2{font-size:34px}
     <div class="cost-row"><span>Compare-and-branch loop in C</span><span class="track"><i class="bar" style="width:100%"></i></span><span class="n">~6,500</span></div>
     <div class="cost-row"><span><code>repe cmpsl</code>, at the change</span><span class="track"><i class="bar rng" style="left:7.5%;width:7.9%"></i><i class="bar solid" style="width:7.5%"></i></span><span class="n">490–1,000</span></div>
     <div class="cost-row"><span><code>repe cmpsl</code>, a later run</span><span class="track"><i class="bar rng" style="left:12.3%;width:16.9%"></i><i class="bar solid" style="width:12.3%"></i></span><span class="n">800–1,900</span></div>
-    <p class="hudtxt" style="margin:8px 0 0;font-size:17px">The C loop cost more than two of a depth's own Doom frames per switch. The later range is from the scheduler notes in <code>mtx_boot.c</code>, where a switch still costs more than half a frame. That is why one-frame slices lose.</p>
+    <p class="hudtxt" style="margin:8px 0 0;font-size:17px">The C loop cost more than two Doom frames per switch.</p>
   </div>
-  <figcaption>A scale model: 1,280 blocks of 32 bytes and two depths taking turns, each writing a small hot set every slice. The real set is about 18,000 blocks. In the caching mode, the first six switches are a warm-up that compares and records which blocks differ. After that only known-hot blocks are copied, and a canary pass checks the cold blocks every eighth switch.</figcaption>
+  <figcaption>Scale model: 1,280 blocks of 32 bytes, two depths.</figcaption>
 </div>
-
-<section class="col" style="padding-top:8px">
-  <p>The live run of the caching version produced 1,000 illegal reads from one wild pointer, and a depth whose frame stopped reaching the screen. By the time the damage was visible, only seven blocks had been promoted to hot. A block can stay cold through the entire warm-up and still be written later, and a canary that checks periodically arrives too late.</p>
-  <p>The shipped version keeps the hot set for reporting only. Every switch compares every block and copies only the blocks that differ. Correctness then depends on no prediction about what a depth will write, because the comparison itself detects the difference. The commit message describes the result plainly: the same throughput within noise, with about 500 times less emulated memory traffic per switch.</p>
-  <p>The comparison is the remaining cost, and the instruction used for it matters a great deal inside an emulator. A C loop of compare-and-branch made one switch cost about 6,500 thousand emulated cycles, more than two of the depth's own Doom frames. Replacing it with <code>repe cmpsl</code>, the x86 string instruction that compares until a mismatch, brought it to about 490–1,000 thousand cycles with identical results, verified by a fuzz test of 20,000 random regions. DOSBox runs a string instruction as one tight loop on the host instead of decoding each compare separately.</p>
-  <h3>What the numbers rule out</h3>
-  <p>The handoff notes list the levers that were tested and found not to matter. Raising the emulated CPU speed hit the ceiling. Halving the CPU cap left the frame rate unchanged at 16.00. Patching the PIT timer divisor, skipping the VGA retrace wait, and turning the recorder off all left it unchanged too. Per instance, the frames cost about 2.2 times a vanilla frame, and the ring's bookkeeping explains only a few percent of that. The leading hypothesis, which has <em>not</em> been measured yet, is the per-frame composite: each instance paints another instance's picture into its screen walls every frame.</p>
-  <p>One measurement detail generalizes to other projects. The figure that matters is how often the <em>picture changes</em>, counted from DOSBox's lossless AVI. The same clip scores 8.47 distinct pictures per second on the AVI and 28.45 on its H.264 re-encode, because compression noise makes "identical" frames differ in their lowest bits.</p>
-</section>
-
-<!-- ============================================================ 10 -->
-<section id="ledger" data-hud="One bug, seven times" class="col">
-  <p class="sec-tag">Map 10</p>
-  <h2>One bug, seven times</h2>
-  <p>Look back over the failures. They seem unrelated: a wild jump, an invalid opcode, a lump name with one letter changed, a key that toggled twice, a level that booted in the wrong slot. Each one has the same cause, which is a piece of state whose owner had been named wrong.</p>
-  <div class="tbl"><table class="ledger">
-    <thead><tr><th>#</th><th>State</th><th>Assumed owner</th><th>Actual owner</th><th>Fix</th></tr></thead>
-    <tbody>
-      <tr><td>1</td><td>Scheduler control (<code>mtx_ctx</code>, <code>cur</code>)</td><td>each depth (inside <code>.bss</code>)</td><td>the host</td><td>one object, <code>mtx_hs</code>, outside every snapshot</td></tr>
-      <tr><td>2</td><td>Save/load function table</td><td>a boot function's stack frame</td><td>the host</td><td>copied into <code>mtx_hs</code></td></tr>
-      <tr><td>3</td><td>The parent's heap and open files</td><td>whatever loader runs next</td><td>the parent</td><td>a loader with no <code>free</code> or <code>close</code></td></tr>
-      <tr><td>4</td><td>"Which depth am I?"</td><td>the instance's own <code>mtx_hs</code></td><td>the host</td><td>a parameter block passed in <code>%ebp</code></td></tr>
-      <tr><td>5</td><td>Doom's <code>screens[0]</code></td><td>shared, since only ACE's copy was pinned</td><td>each depth</td><td>the third pin</td></tr>
-      <tr><td>6</td><td>Whether the key is down</td><td>each depth's copy of <code>gamekeydown[]</code></td><td>the machine (one keyboard)</td><td>one authority word in host memory</td></tr>
-      <tr><td>7</td><td>The slot a new sibling boots into</td><td><code>cur + 1</code></td><td>the first slot not in use</td><td><code>mtx_push</code> searches for a free slot</td></tr>
-    </tbody>
-  </table></div>
-  <p>The seventh case is the most recent. A ring boots every level from the root, so the second push happened while the current depth was the root again. <code>cur + 1</code> named the slot the first child already occupied, and the second level re-booted inside it. The log showed two "depth1 entered" lines with identical addresses and no depth 2 anywhere.</p>
-  <p>This is the practical lesson of the project. When you multiply a program that was written to be alone, you have to decide, for each piece of state, whether it belongs to the program, to one copy, or to the machine. Then you put it where that owner can reach it and nobody else's restore can overwrite it.</p>
-</section>
-
-<!-- ============================================================ 11 -->
-<section id="open" data-hud="What is not solved" class="col">
-  <p class="sec-tag">Map 11</p>
-  <h2>What is not solved</h2>
-  <ul>
-    <li><strong>Sound.</strong> Runs with sound enabled die with <code>NetUpdate: netbuffer-&gt;numtics &gt; BACKUPTICS</code>. <span class="badge b-inf">Inference</span> The likely mechanism is the Sound Blaster's interrupt handler, which runs in whichever depth's context is loaded. Nothing isolates interrupt handlers per depth yet.</li>
-    <li><strong>Containment.</strong> A fatal error inside a depth ends the whole program, because the error screen calls <code>dos_exit</code>. One instance should not be able to kill the others, and there is no policy for that yet.</li>
-    <li><strong>Video modes.</strong> VESA presents frames through a different path (page flipping), and a nested instance re-running <code>I_InitGraphics</code> is a real mode set that nothing virtualizes.</li>
-    <li><strong>Frame rate.</strong> The per-frame composite is the leading suspect and has not been measured. The next step is to time save, load and screen paint per frame in emulated time and compare a frame with the composite turned off.</li>
-  </ul>
-</section>
+<div class="wide console" data-ring="full"></div>
 
 </main>
 
-<footer class="wrap">
+<footer class="wrap mini">
   <div class="col">
-    <h2>How to read this page</h2>
-    <p><span class="badge b-meas">Measured</span> marks lines and figures quoted from the project's own logs (<code>MTX.LOG</code>), commit messages, <code>README.md</code> and <code>HANDOFF.md</code>. <span class="badge b-code">Code</span> marks code quoted from the repository. <span class="badge b-sim">Simulation</span> and <span class="badge b-sim">Model</span> mark re-enactments written in JavaScript for this page. Each one states its simplifications in its caption. <span class="badge b-inf">Inference</span> marks a claim the project has not measured.</p>
-    <p>Sources: <code>nested/</code> (<code>mtx_switch.S</code>, <code>mtx_core.c</code>, <code>mtx_sched.c</code>, <code>mtx_host.h</code>, <code>dos_state.c</code>, <code>dos_wire.c</code>, <code>mtx_hooks.c</code>, <code>mtx_params.h</code>, <code>mtx_raw.c</code>, <code>mtx_zone.c</code>, <code>ldr0N.S</code>, <code>ldr1n.c</code>, <code>README.md</code>) and <code>doom_ace/</code> (<code>engine/mtx_boot.c</code>, <code>HANDOFF.md</code>). The page uses no game data. Its textures are generated procedurally, and its type comes from Google Fonts. Doom is a trademark of its owners, and this is an independent technical write-up.</p>
+    <p><span class="badge b-sim">Animation</span> re-enactments written for this page, from the code in <code>nested/</code> and <code>doom_ace/engine/</code>. Lines marked measured come from the project's logs, README, HANDOFF and commits. No game data is used.</p>
   </div>
 </footer>
 
@@ -1084,7 +764,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     I.y=7.0+0.75*Math.sin(t*0.23+ph);
   }
   function render(I,src,n){
-    var fb=I.fb,map=MAPS[I.d],tex=TEX[I.d],half=RH/2,y,x,bx0=RW,by0=RH,bx1=-1,by1=-1;
+    var fb=I.fb,map=MAPS[I.d],tex=TEX[I.d],half=RH/2,y,x;
     var c=CEIL[I.d],f=FLOOR[I.d];
     for(y=0;y<RH;y++){var t=y<half?(half-y)/half:(y-half)/half,cc=y<half?c:f,k=0.22+0.78*t;
       fb.fill(rgb(cc[0]*k|0,cc[1]*k|0,cc[2]*k|0),y*RW,y*RW+RW);}
@@ -1103,7 +783,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       if(cell===2){
         var inU=wx>=TU0&&wx<=TU1,su=((wx-TU0)/(TU1-TU0)*RW)|0;if(su>RW-1)su=RW-1;
         for(y=y0;y<=y1;y++){var v=(y-top)/lh,col=BEZ;
-          if(inU&&src&&v>=TV0&&v<=TV1){var sv=((v-TV0)/(TV1-TV0)*RH)|0;if(sv>RH-1)sv=RH-1;col=src[sv*RW+su];if(x<bx0)bx0=x;if(x>bx1)bx1=x;if(y<by0)by0=y;if(y>by1)by1=y;}
+          if(inU&&src&&v>=TV0&&v<=TV1){var sv=((v-TV0)/(TV1-TV0)*RH)|0;if(sv>RH-1)sv=RH-1;col=src[sv*RW+su];}
           fb[y*RW+x]=col;}
       }else{
         var tx=(wx*32)|0;
@@ -1111,7 +791,6 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
           fb[y*RW+x]=rgb((p&255)*sh|0,((p>>>8)&255)*sh|0,((p>>>16)&255)*sh|0);}
       }
     }
-    I.tvBox=(bx1-bx0>8&&by1-by0>5)?{x0:bx0,y0:by0,x1:bx1,y1:by1}:null;
     badge(I,n);
   }
   function badge(I,n){
@@ -1125,18 +804,14 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   }
 
   var STAGES=[
-    {label:"One Doom",n:1,wrap:false,txt:"<b>One Doom.</b> A single instance renders its world into its own 160×100 framebuffer. The TV on the far wall has nothing to show yet, so it shows only its dark bezel."},
-    {label:"A second",n:2,wrap:false,txt:"<b>A second Doom.</b> Depth 0's TV now shows the newest frame of depth 1, a separate instance with its own world. Press <b>Teleport</b> to step into depth 1: its own TV is blank, because nothing comes after it."},
-    {label:"A third",n:3,wrap:false,txt:"<b>A third Doom.</b> Depth 1's TV now shows depth 2, and depth 2's TV is blank. This is a ladder, and its last rung has nothing to show. Teleport down to check."},
-    {label:"Close the ring",n:3,wrap:true,txt:"<b>Close the ring.</b> The deepest TV now wraps back to depth 0, so every picture contains the whole ring, one lap older at each step inward. That wrap is one modulo in the real code, shown in <a href=\"#screen\">Map 07</a>. How three instances share one machine comes in <a href=\"#price\">Map 09</a>."}
+    {label:"One Doom",n:1,wrap:false,txt:"One instance. Its TV has nothing to show."},
+    {label:"A second",n:2,wrap:false,txt:"A second instance. Depth 0's TV shows depth 1's newest frame."},
+    {label:"A third",n:3,wrap:false,txt:"A third. Now it's a ladder: the last TV is blank."},
+    {label:"Close the ring",n:3,wrap:true,txt:"Close the ring: the last TV wraps back to depth 0."}
   ];
   var CFG={
-    hero:{title:"The ring, built up",stages:true,monitors:false,strip:false,sched:false,wrapCtl:false,stage:1,
-      caption:"Each step adds one instance. In the real project each one is a full copy of the ACE engine inside the same DOOM2.EXE. This page re-enacts them with three small raycasters, and the TV in each world shows another instance's newest frame, as the real screen-walls do. <b>Teleport</b> moves you into the next instance, with a sweep like the real engine's. <b>All controls</b> skips ahead and shows everything at once."},
-    wrap:{title:"Open the ring, close the ring",monitors:true,strip:false,sched:false,wrapCtl:true,n:3,wrap:true,
-      caption:"The three monitors are the three framebuffers. Untick the wrap and depth 2's TV goes to its bezel, as it did before the modulo existed: the chain becomes a ladder. Tick it and the last TV shows the first instance again."},
-    full:{title:"One machine, three worlds",monitors:true,strip:true,sched:true,wrapCtl:true,n:3,wrap:true,
-      caption:"<span class=\"badge b-inf\">Model</span> The simulated machine renders 48 instance-frames per second, which is the measured aggregate across three real instances before the scheduler change. Each switch costs 0.6 of a frame, and each world advances one game tic per frame it renders, as Doom's does. Try this: choose <em>Round robin</em> and the viewed picture freezes for two slices out of every three. Choose <em>Viewer first</em> and it runs every other slice. Drag the slice to 1 and the switch cost eats the gain. The monitor with the amber border is the instance that holds the machine."}
+    hero:{title:"The ring",stages:true,monitors:false,strip:false,sched:false,wrapCtl:false,stage:1,caption:""},
+    full:{title:"One machine, three worlds",monitors:true,strip:true,sched:true,wrapCtl:false,n:3,wrap:true,caption:""}
   };
   var rings=[];
   function Ring(host,key){
@@ -1150,7 +825,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     if(cfg.stages){
       h+='<div class="stages" role="group" aria-label="Build the ring">';
       STAGES.forEach(function(s,i){h+='<button data-stage="'+(i+1)+'">'+(i+1)+' · '+s.label+'</button>';});
-      h+='<button class="ghost" data-r="all">All controls</button></div><div class="narr stage-narr" data-r="snarr" aria-live="polite"></div>';
+      h+='</div><div class="narr stage-narr" data-r="snarr" aria-live="polite"></div>';
     }
     h+='<div class="ring" data-r="ring"><div><div class="screen"><canvas data-r="main" width="160" height="100" aria-label="The depth you are viewing"></canvas><span class="tag" data-r="tag"></span></div>'+
       '<div data-r="stripbox"><canvas class="strip" data-r="strip" width="480" height="22" aria-label="Who held the machine, frame by frame"></canvas>'+
@@ -1161,7 +836,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       '<span data-r="schedbox" style="display:contents"><span class="seg" role="group" aria-label="Scheduler"><button data-r="rr" aria-pressed="false">Round robin</button><button data-r="vw" aria-pressed="true">Viewer first</button></span>'+
       '<label class="rng">Slice <input type="range" id="'+id+'Slice" data-r="slice" min="1" max="16" value="4"> <output data-r="sliceOut">4</output> frames</label></span>'+
       '<button data-r="pause">Pause</button></div>'+
-      '<p class="hudtxt" data-r="stat"></p><figcaption>'+cfg.caption+'</figcaption>';
+      '<p class="hudtxt" data-r="stat"></p>';
     host.innerHTML=h;
     function q(r){return host.querySelector('[data-r="'+r+'"]');}
     var mainC=q("main").getContext("2d"),stripC=q("strip").getContext("2d"),mons=q("mons"),monC=[],monT=[],monBox=[];
@@ -1173,8 +848,6 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       monC.push(cv.getContext("2d"));monT.push(tx);monBox.push(box);
     }
     var fxBuf=new Uint32Array(RW*RH),fxImg=new ImageData(new Uint8ClampedArray(fxBuf.buffer),RW,RH);
-    var snapC=document.createElement("canvas"),toC=document.createElement("canvas");snapC.width=toC.width=RW;snapC.height=toC.height=RH;
-    var snapX=snapC.getContext("2d"),toX=toC.getContext("2d");
     function srcFor(d){
       if(n<2)return null;var nx=d+1;
       if(nx>=n){if(!wrap)return null;nx=0;}
@@ -1219,19 +892,13 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       }
     }
     self.draw=function(now){
-      if(fx&&fx.zoom){var pz=(now-fx.t0)/1000;if(pz>=1){fx=null;}else{
-        var z=fx.zoom,e=pz<0.72?pz/0.72:1;e=e*e*(3-2*e);
-        mainC.imageSmoothingEnabled=false;
-        mainC.drawImage(snapC,z.x0*e,z.y0*e,RW+(z.x1-z.x0+1-RW)*e,RH+(z.y1-z.y0+1-RH)*e,0,0,RW,RH);
-        if(pz>0.72){toX.putImageData(inst[fx.to].img,0,0);mainC.globalAlpha=(pz-0.72)/0.28;mainC.drawImage(toC,0,0);mainC.globalAlpha=1;}
-      }}
-      if(fx&&!fx.zoom){var p=(now-fx.t0)/550;if(p>=1){fx=null;}else{
+      if(fx){var p=(now-fx.t0)/550;if(p>=1){fx=null;}else{
         var a=inst[fx.from].fb,b=inst[fx.to].fb,bx=Math.floor(p*RW),x,y;
         for(y=0;y<RH;y++)for(x=0;x<RW;x++){var i=y*RW+x;fxBuf[i]=x<bx?b[i]:a[i];}
         for(y=0;y<RH;y++){fxBuf[y*RW+Math.min(RW-1,bx)]=rgb(190,255,140);if(bx>0)fxBuf[y*RW+bx-1]=rgb(127,210,62);}
         mainC.putImageData(fxImg,0,0);}}
       if(!fx)mainC.putImageData(inst[V].img,0,0);
-      q("tag").textContent=(fx&&fx.zoom?"ENTERING DEPTH ":"VIEWING DEPTH ")+V;
+      q("tag").textContent="VIEWING DEPTH "+V;
       if(show.monitors)for(var d=0;d<n;d++){
         monC[d].putImageData(inst[d].img,0,0);
         monBox[d].classList.toggle("run",d===cur&&show.strip);
@@ -1255,13 +922,14 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       if(!paused)advance(dt);
       self.draw(now);
     };
-    self.teleport=function(){if(n<2)return;var from=V;V=(V+1)%n;if(RM)return;
-      var F=inst[from],z=null;
-      if(z)snapX.putImageData(F.img,0,0);
-      fx={from:from,to:V,t0:performance.now(),zoom:z?{x0:z.x0,y0:z.y0,x1:z.x1,y1:z.y1}:null};
-      if(!paused)return;var t0=fx.t0;(function an(){self.draw(performance.now());if(fx&&fx.t0===t0)requestAnimationFrame(an);})();};
+    self.key=key;self.host=host;
+    self.setStage=function(st){stage=st;var S=STAGES[st-1];setN(S.n,S.wrap);};
+    self.setV=function(v){V=v;};
+    self.setPolicy=setPolicyAPI;self.setSlice=function(v){slice=v;q("slice").value=v;q("sliceOut").textContent=v;if(sliceLeft>slice)sliceLeft=slice;};
+    self.teleport=function(){if(n<2)return;var from=V;V=(V+1)%n;if(!RM)fx={from:from,to:V,t0:performance.now()};};
     q("tele").addEventListener("click",self.teleport);
     q("wrap").addEventListener("change",function(){wrap=this.checked;if(cfg.stages&&stage>=3)stage=wrap?4:3;sync();});
+    function setPolicyAPI(p){setPol(p);}
     function setPol(p){policy=p;q("rr").setAttribute("aria-pressed",p==="rr");q("vw").setAttribute("aria-pressed",p==="viewer");}
     q("rr").addEventListener("click",function(){setPol("rr");});
     q("vw").addEventListener("click",function(){setPol("viewer");});
@@ -1270,7 +938,6 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     if(cfg.stages){
       host.querySelectorAll("[data-stage]").forEach(function(b){b.addEventListener("click",function(){
         stage=+b.getAttribute("data-stage");var S=STAGES[stage-1];setN(S.n,S.wrap);});});
-      q("all").addEventListener("click",function(){show={monitors:true,strip:true,sched:true,wrapCtl:true};stage=4;setN(3,true);this.hidden=true;});
       var S0=STAGES[stage-1];n=S0.n;wrap=S0.wrap;
     }
     q("wrap").checked=wrap;
@@ -1281,6 +948,34 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     }
   }
   document.querySelectorAll("[data-ring]").forEach(function(el){rings.push(new Ring(el,el.getAttribute("data-ring")));});
+  rings.forEach(function(r){
+    var say=document.createElement("div");say.className="seq-say";
+    if(r.key==="hero"){
+      var p=new Seq(r.host,{loop:true,reset:function(){r.setV(0);r.setStage(1);}});
+      p.load([
+        {ms:3200,run:function(){r.setStage(1);}},
+        {ms:3000,run:function(){r.setStage(2);}},
+        {ms:3400,run:function(){r.teleport();}},
+        {ms:3000,run:function(){r.setStage(3);r.teleport();}},
+        {ms:3200,run:function(){r.teleport();}},
+        {ms:3400,run:function(){r.teleport();}},
+        {ms:4200,run:function(){r.setStage(4);}},
+        {ms:3000,run:function(){r.teleport();}},
+        {ms:3000,run:function(){r.teleport();}},
+        {ms:3000,run:function(){r.teleport();}}
+      ]);
+    }else if(r.key==="full"){
+      r.host.appendChild(say);
+      var p2=new Seq(r.host,{loop:true,say:say,reset:function(){r.setPolicy("rr");r.setSlice(4);r.setV(0);}});
+      r.host.insertBefore(r.host.querySelector(".seqc"),say);
+      p2.load([
+        {ms:7000,say:"Round robin: each depth gets one slice in three. The viewed picture freezes two slices out of three.",run:function(){r.setPolicy("rr");r.setSlice(4);}},
+        {ms:7000,say:"Viewer first: the viewed depth gets every other slice. Measured: 30.0 frames/s viewed, 15.2 for each of the others.",run:function(){r.setPolicy("viewer");}},
+        {ms:7000,say:"Slice of 1 frame: more turns, but more switches, and every switch costs time. Measured: 8.3 frames/s viewed.",run:function(){r.setSlice(1);}},
+        {ms:5000,say:"Back to slices of 4 frames, which is what ships.",run:function(){r.setSlice(4);}}
+      ]);
+    }
+  });
   function loop(now){rings.forEach(function(r){r.tick(now);});requestAnimationFrame(loop);}
   requestAnimationFrame(loop);
   document.addEventListener("keydown",function(e){
@@ -1289,6 +984,123 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       var best=null;rings.forEach(function(r){if(r.visible&&(!best||(r.ratio||1)>(best.ratio||1)))best=r;});
       if(best)best.teleport();}
   });
+})();
+
+/* =====================================================================
+   MAP 01: ONE LOOP, ONE SET OF ADDRESSES
+   ===================================================================== */
+(function(){
+  var root=$("mc"),svg=$("mcSvg"),g=$("mcG"),gb=g.querySelector("b"),scr=$("mcScr").getContext("2d");
+  var C=[{x:100,y:112,col:"#e0553c",rgb:[224,85,60]},{x:300,y:112,col:"#7fd23e",rgb:[127,210,62]}],Rr=64;
+  var st,raf=null,last=null,vis=false;
+  function init(){st={on:[true,false],frozen:[false,false],ang:[0,0],cnt:[120,40],turn:false,turnOf:0,lapsInTurn:0,show2:false,tag:false};gb.textContent=st.cnt[0];gb.style.color="#ffb1a2";g.classList.remove("hit");scr.fillStyle="#000";scr.fillRect(0,0,64,40);draw();}
+  function node(c,a,label){var x=c.x+Rr*Math.cos(a),y=c.y+Rr*Math.sin(a);return '<circle cx="'+x+'" cy="'+y+'" r="5" fill="#2a201b" stroke="#6f5f50"/><text x="'+x+'" y="'+(y+(Math.sin(a)<0?-11:22))+'" text-anchor="middle" fill="#a9957f" font-family="VT323,monospace" font-size="17">'+label+'</text>';}
+  function draw(){
+    var h="";
+    for(var i=0;i<2;i++){if(i===1&&!st.show2)continue;var c=C[i],fz=st.frozen[i];
+      h+='<circle cx="'+c.x+'" cy="'+c.y+'" r="'+Rr+'" fill="none" stroke="'+(fz?"#3d2c23":c.col)+'" stroke-width="2" stroke-dasharray="'+(fz?"4 5":"none")+'" opacity="'+(fz?0.7:0.55)+'"/>';
+      h+=node(c,-Math.PI/2,"think")+node(c,Math.PI/6,"render")+node(c,5*Math.PI/6,"present");
+      h+='<text x="'+c.x+'" y="'+(c.y+5)+'" text-anchor="middle" fill="'+(fz?"#6f5f50":c.col)+'" font-family="VT323,monospace" font-size="19">'+(fz?"❄ waiting":(i?"copy 2":"copy 1"))+'</text>';
+      if(st.tag&&i===0)h+='<text x="'+c.x+'" y="'+(c.y+24)+'" text-anchor="middle" fill="#6f5f50" font-family="VT323,monospace" font-size="15">D_DoomLoop: no exit</text>';
+      if(!fz){var a=st.ang[i]-Math.PI/2,x=c.x+Rr*Math.cos(a),y=c.y+Rr*Math.sin(a);
+        h+='<circle cx="'+x+'" cy="'+y+'" r="9" fill="#ffd27a" opacity=".35"/><circle cx="'+x+'" cy="'+y+'" r="5" fill="#fff"/>';}
+    }
+    svg.innerHTML=h;
+  }
+  function lap(i){
+    st.cnt[i]++;
+    var shared=st.show2&&!st.turn;
+    gb.textContent=st.cnt[i];gb.style.color=i?"#c9f0a6":"#ffb1a2";
+    g.classList.toggle("hit",shared);
+    var c=C[i].rgb;scr.fillStyle="rgb("+c[0]+","+c[1]+","+c[2]+")";
+    if(shared){scr.fillRect(0,i?20:0,64,20);}else scr.fillRect(0,0,64,40);
+    if(st.turn){st.lapsInTurn++;if(st.lapsInTurn>=2){st.lapsInTurn=0;st.frozen[st.turnOf]=true;st.turnOf=1-st.turnOf;st.frozen[st.turnOf]=false;}}
+  }
+  function frame(now){
+    raf=null;if(last===null)last=now;var dt=Math.min(0.05,(now-last)/1000);last=now;
+    for(var i=0;i<2;i++){if(!st.on[i]||st.frozen[i])continue;var sp=i?3.3:2.6;st.ang[i]+=dt*sp;if(st.ang[i]>=2*Math.PI){st.ang[i]-=2*Math.PI;lap(i);}}
+    draw();if(vis&&!RM)raf=requestAnimationFrame(frame);
+  }
+  function go(){if(!raf&&vis&&!RM){last=null;raf=requestAnimationFrame(frame);}}
+  if("IntersectionObserver" in window)new IntersectionObserver(function(es){es.forEach(function(e){vis=e.isIntersecting;go();});}).observe(root);else{vis=true;go();}
+  var p=new Seq(root,{loop:true,say:$("mcSay"),reset:init,onLoop:init});
+  root.insertBefore(root.querySelector(".seqc"),$("mcSay"));
+  init();
+  p.load([
+    {ms:4200,say:"DOOM2.EXE runs one loop: think, render, present. Each lap writes Doom's globals and the screen.",run:function(){}},
+    {ms:3200,say:"The loop never returns, so there is nothing to call and wait for.",run:function(){st.tag=true;draw();}},
+    {ms:4800,say:"Start a second copy of the engine in the same process.",run:function(){st.show2=true;st.on[1]=true;draw();}},
+    {ms:4200,say:"<span class='bad'>Same code, same addresses.</span> Both copies write the same <code>gametic</code> and the same screen.",run:function(){}},
+    {ms:6500,say:"<b>The plan:</b> run one copy at a time, and give each copy its own bytes.",run:function(){st.turn=true;st.turnOf=0;st.frozen=[false,true];st.lapsInTurn=0;g.classList.remove("hit");draw();}}
+  ]);
+})();
+
+/* =====================================================================
+   MAP 04: WHAT A SWITCH MOVES
+   ===================================================================== */
+(function(){
+  var root=$("sp"),run=0,ptr="h0";
+  function c(k){return root.querySelector('[data-c="'+k+'"]');}
+  function set(k,v,d,fl){var e=c(k);e.textContent=v;e.className="sp-c"+(d===0?" d0":d===1?" d1":"")+(fl?" flash":"");if(fl)setTimeout(function(){e.classList.remove("flash");},700);}
+  function row(r,on){root.querySelector('[data-row="'+r+'"]').hidden=!on;}
+  function runl(){$("spRun").innerHTML="Running: <b style='color:"+(run?"var(--d1)":"var(--d0)")+"'>depth "+run+"</b>";}
+  function arrow(){
+    var pth=$("spPath");if($("spHeaps").hidden){pth.setAttribute("d","");return;}
+    var R=root.getBoundingClientRect(),a=c("live.z").getBoundingClientRect(),b=$(ptr==="h0"?"spH0":"spH1").getBoundingClientRect();
+    var x1=a.left-R.left+a.width/2,y1=a.bottom-R.top,x2=b.left-R.left+b.width/2,y2=b.top-R.top-2;
+    pth.setAttribute("d","M"+x1+","+y1+" C"+x1+","+(y1+30)+" "+x2+","+(y2-30)+" "+x2+","+y2);
+  }
+  function mv(from,to,val,d,delay,cls){var a=c(from),b=c(to);var t=fly(root,a,b,esc(val),cls||"",delay||0,800);setTimeout(function(){set(to,val,d,true);},RM?0:t);return t;}
+  function init(){
+    run=0;ptr="h0";row("p",false);row("z",false);$("spHeaps").hidden=true;
+    set("live.g","120",0);set("s0.g","",null);set("s1.g","40",1);
+    set("live.p","E8 · call",0);set("s0.p","",null);set("s1.p","E8 · call",1);
+    set("live.z","→ heap 0",0);set("s0.z","",null);set("s1.z","→ heap 0",1);
+    runl();arrow();
+  }
+  var L=[
+    {ms:2600,say:"Depth 0 runs. Its world lives at Doom's fixed addresses.",run:function(){}},
+    {ms:2400,say:"Switch to depth 1. <b>save_state</b> copies the live bytes into depth 0's slot.",run:function(){mv("live.g","s0.g","120",0);}},
+    {ms:2600,say:"<b>load_state</b> copies depth 1's slot over the live bytes.",run:function(){mv("s1.g","live.g","40",1);setTimeout(function(){run=1;runl();},RM?0:800);}},
+    {ms:2800,say:"Code is not data, and no region covers it. But ACE rewrote 399 places in Doom's code.",run:function(){row("p",true);set("s0.p","E8 · call",0);}},
+    {ms:2400,say:"Depth 1 overwrites one patched byte.",run:function(){set("live.p","CC · int3",1,true);}},
+    {ms:3200,say:"Switch back. Patches are saved and restored as raw bytes, like the data.",run:function(){
+      mv("live.g","s1.g","41",1,0);mv("live.p","s1.p","CC · int3",1,120);
+      setTimeout(function(){mv("s0.g","live.g","120",0,0);mv("s0.p","live.p","E8 · call",0,120);setTimeout(function(){run=0;runl();},RM?0:900);},RM?0:1000);}},
+    {ms:3000,say:"<span class='good'>Measured: depth 1 wrote 204 over 232. The root read 232 back.</span>",run:function(){}},
+    {ms:3000,say:"Some globals are pointers. <code>mainzone</code> points at the heap.",run:function(){row("z",true);$("spHeaps").hidden=false;set("s0.z","→ heap 0",0);arrow();}},
+    {ms:3000,say:"Switch to depth 1. Its snapshot was cloned from depth 0, so it brings back <em>depth 0's</em> heap pointer.",run:function(){
+      mv("live.g","s0.g","120",0,0);mv("live.z","s0.z","→ heap 0",0,100);
+      setTimeout(function(){mv("s1.g","live.g","41",1,0);mv("s1.p","live.p","CC · int3",1,100);mv("s1.z","live.z","→ heap 0",1,200,"red");setTimeout(function(){run=1;runl();c("live.z").classList.add("bad");},RM?0:1000);},RM?0:950);}},
+    {ms:3200,say:"So the <b>pin</b> overwrites it with depth 1's own heap.",run:function(){set("live.z","→ heap 1",1,true);ptr="h1";arrow();}},
+    {ms:3400,say:"The heaps themselves never move. They are <b>private</b>: a different address for each depth.",run:function(){$("spH0").classList.add("pulse");$("spH1").classList.add("pulse");setTimeout(function(){$("spH0").classList.remove("pulse");$("spH1").classList.remove("pulse");},2200);}}
+  ];
+  var p=new Seq(root,{loop:true,say:$("spSay"),reset:init,onLoop:init});
+  root.insertBefore(root.querySelector(".seqc"),$("spSay"));
+  init();p.load(L);
+  window.addEventListener("resize",arrow);
+})();
+
+/* =====================================================================
+   MAP 06: A CLUE SPELLED IN ASCII
+   ===================================================================== */
+(function(){
+  var root=$("pc");
+  function pool(hi,ptr){
+    $("pcPool").innerHTML='<div class="hdr">size 00000040</div><div class="hdr'+(hi?" hi":"")+'">\'M\' \'T\' \'X\' \'R\'</div><div class="pay">payload</div><div class="hdr">size 00000008</div><div class="hdr">\'M\' \'T\' \'X\' \'R\'</div><div class="pay">payload</div>';
+  }
+  function init(){$("pcLog").textContent="";$("pcBig").innerHTML="";$("pcPool").innerHTML="";}
+  var L=[
+    {ms:2600,say:"A nested instance dies on some runs with an error that makes no sense.",run:function(){$("pcLog").textContent="W_CacheLumpNum: 19796 >= numlumps";}},
+    {ms:2200,say:"Write the number in hex.",run:function(){$("pcBig").innerHTML='19796 = <span class="x">0x4D54</span>';}},
+    {ms:2600,say:"Read the two bytes as letters.",run:function(){$("pcBig").innerHTML='<span class="x">0x4D 0x54</span> = <span class="m">\'M\' \'T\'</span>';}},
+    {ms:2800,say:"Every block in a depth's raw memory pool starts with a header: a size, then the magic word <code>'MTXR'</code>.",run:function(){pool(false);}},
+    {ms:3200,say:"<span class='bad'>Doom was reading the pool's own header as if it were data.</span>",run:function(){pool(true);}},
+    {ms:4200,say:"The bug was in the pool's bookkeeping: it compared the size requested instead of the space occupied, it assumed an aligned base, and it handled zero-byte blocks wrong. All three are fixed.",run:function(){}}
+  ];
+  var p=new Seq(root,{loop:true,say:$("pcSay"),reset:init,onLoop:init});
+  root.insertBefore(root.querySelector(".seqc"),$("pcSay"));
+  init();p.load(L);
 })();
 
 /* =====================================================================
@@ -1427,26 +1239,26 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   var who=function(d){return d===0?"the root":"depth "+d;};
   function runFrames(d,n){
     var out=[];
-    out.push({ms:350,say:"<b>"+who(d).replace(/^t/,"T")+"</b> owns the CPU and runs its own game loop: think, render, present, "+n+" times.",run:function(){}});
+    out.push({ms:350,say:"<b>"+who(d).replace(/^t/,"T")+"</b> has the CPU and runs "+n+" frames.",run:function(){}});
     for(var k=0;k<n;k++)out.push({ms:330,run:function(){frames[d]++;blinkTop(d);status();}});
     return out;
   }
   function dive(d,to){
     var out=[],fr=diveFrames(d,to);
-    out.push({ms:520,say:"Frame boundary. "+(d===0?"The root's policy has asked for depth "+to+" (every 4 frames, <code>mtx_request_switch</code>).":"Depth "+d+"'s slice is over, so it calls the <b>host's</b> frame service through <code>host_yield</code>. That is host code, running on depth "+d+"'s stack."),run:function(){push(d,fr[0]);}});
+    out.push({ms:520,say:"Frame boundary. "+(d===0?"The root asks for depth "+to+".":"Depth "+d+" calls the <b>host's</b> code through <code>host_yield</code>."),run:function(){push(d,fr[0]);}});
     for(var k=1;k<fr.length;k++)(function(f){out.push({ms:360,run:function(){push(d,f);}});})(fr[k]);
-    out.push({ms:520,say:"<code>mtx_frame_tick</code> clears the request, then <code>mtx_switch</code> saves depth "+d+"'s state and loads depth "+to+"'s.",run:function(){push(d,{n:"save_state("+d+")",h:1});}});
+    out.push({ms:520,say:"Save depth "+d+"'s state, load depth "+to+"'s.",run:function(){push(d,{n:"save_state("+d+")",h:1});}});
     out.push({ms:300,run:function(){pop(d);}});
     out.push({ms:420,run:function(){push(d,{n:"load_state("+to+")",h:1});}});
     out.push({ms:300,run:function(){pop(d);}});
-    out.push({ms:620,say:"<code>mtx_switch_ctx</code> pushes depth "+d+"'s callee-saved registers and publishes its stack pointer into <b>ctx["+d+"].esp</b>…",run:function(){push(d,{n:"mtx_switch_ctx",h:1});}});
+    out.push({ms:620,say:"Publish <b>ctx["+d+"].esp</b>…",run:function(){push(d,{n:"mtx_switch_ctx",h:1});}});
     out.push({ms:500,run:function(){esp[d]=(d===0?0x003FFE80:(d===1?0x00A5FED0:0x00B5FED0));status();var f=cols[d].querySelectorAll(".tfoot b")[1];f.classList.add("flash");setTimeout(function(){f.classList.remove("flash");},700);}});
-    out.push({ms:1100,say:"…then loads <b>ctx["+to+"].esp</b>. One <code>mov</code> to ESP, and the CPU is on depth "+to+"'s stack. Depth "+d+" is now frozen mid-call.",run:function(){run=to;status();placeCpu(true);}});
+    out.push({ms:1100,say:"…load <b>ctx["+to+"].esp</b>. Depth "+d+" freezes mid-call.",run:function(){run=to;status();placeCpu(true);}});
     return out;
   }
   function resume(d){
     var out=[];
-    out.push({ms:620,say:"Depth "+d+"'s own <code>mtx_switch_ctx</code> returns, many frames after it was called. Every frame above <code>D_Display</code> now unwinds as an ordinary return.",run:function(){pop(d);}});
+    out.push({ms:620,say:"Depth "+d+"'s old call returns. Its stack unwinds like nothing happened.",run:function(){pop(d);}});
     var n=stacks[d].length;
     return {first:out,rest:function(){var o=[],k;var cnt=d===0?6:6;for(k=0;k<cnt;k++)o.push({ms:240,run:function(){pop(d);}});return o;}};
   }
@@ -1459,7 +1271,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     return seq;
   }
   var player=new Seq(root,{loop:true,say:say,reset:initState,controlsIn:root,
-    intro:"The root is running. Depths 1 and 2 are already booted and frozen, each one deep inside its own call to <code>mtx_switch_ctx</code>."});
+    intro:"Depths 1 and 2 are frozen inside their own <code>mtx_switch_ctx</code>."});
   root.insertBefore(root.querySelector(".seqc"),say);
   initState();player.load(program());
   window.addEventListener("resize",function(){placeCpu(false);});
@@ -1491,35 +1303,35 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   }
   function steps(){
     var L=[];
-    L.push({ms:1400,say:"<b>mtx_engine_boot()</b> runs. Its stack frame holds a local table, <code>ops = {save_state, load_state}</code>.",run:function(){
+    L.push({ms:1400,say:"<b>mtx_engine_boot()</b> builds a local table: <code>ops = {save, load}</code>.",run:function(){
       S.rows[1]={a:ADDR[1],v:"ret → boot",l:"mtx_engine_boot frame",cls:"new"};S.rows[2]={a:ADDR[2],v:"&mtx_dos_load_state",l:"ops.load",cls:"new"};S.rows[3]={a:ADDR[3],v:"&mtx_dos_save_state",l:"ops.save",cls:"new"};draw();}});
     if(bug){
-      L.push({ms:1600,say:"<b>mtx_init(&amp;ops)</b> keeps the pointer it was handed: <code>mtx_hs.ops = 0x003FFE20</code>. That address is inside the caller's frame.",run:function(){
+      L.push({ms:1600,say:"<b>mtx_init(&amp;ops)</b> keeps the pointer: an address inside the caller's frame.",run:function(){
         S.rows.forEach(function(r){r.cls="";});S.hs[0]={k:"ops",v:"0x003FFE20",cls:"new"};S.tgt="s3";S.rows[3].cls="tgt";draw();}});
     }else{
-      L.push({ms:1600,say:"<b>mtx_init(&amp;ops)</b> <em>copies</em> the table into <code>mtx_hs.host_ops</code> and points at the copy, which lives in host state for the whole run.",run:function(){
+      L.push({ms:1600,say:"<b>mtx_init(&amp;ops)</b> <em>copies</em> the table into host state.",run:function(){
         S.rows.forEach(function(r){r.cls="";});
         var a=root.querySelector('[data-i="s3"] .v'),b=root.querySelector('[data-i="h1"] .v'),a2=root.querySelector('[data-i="s2"] .v'),b2=root.querySelector('[data-i="h2"] .v');
         fly(root,a,b,"&amp;mtx_dos_save_state","",0,800);fly(root,a2,b2,"&amp;mtx_dos_load_state","",120,800);
         setTimeout(function(){S.hs[1]={k:"host_ops.save",v:"&mtx_dos_save_state",cls:"new"};S.hs[2]={k:"host_ops.load",v:"&mtx_dos_load_state",cls:"new"};S.hs[0]={k:"ops",v:"&mtx_hs.host_ops",cls:"new"};S.tgt="h1";draw();},RM?0:780);}});
     }
-    L.push({ms:1500,say:"<b>mtx_engine_boot returns.</b> Its frame is dead: the stack pointer has moved back up and those bytes belong to whoever calls next."+(bug?" The pointer still aims at them.":""),run:function(){
+    L.push({ms:1500,say:"<b>mtx_engine_boot returns.</b> Its frame is dead."+(bug?" The pointer still aims at it.":""),run:function(){
       S.hs.forEach(function(r){r.cls="";});for(var i=1;i<4;i++)S.rows[i].cls="dead";S.rows[1].l="(dead)";draw();}});
-    L.push({ms:1600,say:"Frames later, other calls reuse the same stack bytes for their own locals.",run:function(){
+    L.push({ms:1600,say:"Other calls reuse those stack bytes.",run:function(){
       S.rows[1]={a:ADDR[1],v:"0x0001D4FC",l:"someone else's frame",cls:"new"};S.rows[2]={a:ADDR[2],v:"0x00000140",l:"",cls:"new"};S.rows[3]={a:ADDR[3],v:"0x4D4D4D4D",l:"",cls:"new"+(bug?" tgt":"")};draw();}});
-    L.push({ms:1600,say:"<b>The first real switch.</b> <code>mtx_switch</code> calls <code>mtx_ops-&gt;save_state(...)</code>, through the pointer, before it swaps stacks.",run:function(){
+    L.push({ms:1600,say:"<b>First switch:</b> call <code>mtx_ops-&gt;save_state</code>.",run:function(){
       S.rows.forEach(function(r){r.cls=r.cls==="dead"?"dead":"";});
       if(bug){S.rows[3].cls="badhit";S.redArrow=true;}else{S.hs[1].cls="hit";}draw();}});
-    L.push({ms:2600,say:bug?"<span class='bad'>The call jumps to 0x4D4D4D4D.</span> The fix is to own the copy, which makes this mistake impossible instead of merely documented.":"<span class='good'>The call lands in mtx_dos_save_state.</span> Nothing the caller's frame does later can reach the copy.",run:function(){
+    L.push({ms:2600,say:bug?"<span class='bad'>It jumps to 0x4D4D4D4D.</span>":"<span class='good'>It lands in mtx_dos_save_state.</span>",run:function(){
       if(bug)S.crash=true;else S.ok=true;draw();}});
     return L;
   }
-  var player=new Seq(root,{loop:true,say:$("dgSay"),reset:function(){S&&(S.redArrow=false);reset();},controlsIn:root,onLoop:function(){reset();}});
+  var player=new Seq(root,{loop:true,say:$("dgSay"),reset:function(){bug=true;lbl();reset();},controlsIn:root});
   root.insertBefore(root.querySelector(".seqc"),$("dgSay"));
-  function setBug(b){bug=b;$("dgBug").setAttribute("aria-pressed",b);$("dgFix").setAttribute("aria-pressed",!b);player.load(steps());}
-  $("dgBug").addEventListener("click",function(){setBug(true);});
-  $("dgFix").addEventListener("click",function(){setBug(false);});
-  reset();player.load(steps());
+  function lbl(){$("dgMode").innerHTML=bug?"mtx_init <b style='color:#ff8a76'>keeps the pointer</b>":"mtx_init <b style='color:var(--nukage)'>copies the table</b>";}
+  bug=true;var A=steps();bug=false;var B=steps();bug=true;
+  function sw(b){return {ms:600,run:function(){bug=b;lbl();reset();}};}
+  reset();lbl();player.load([sw(true)].concat(A,[{ms:1200,run:function(){}},sw(false)],B,[{ms:1200,run:function(){}}]));
   window.addEventListener("resize",arrow);
 })();
 
@@ -1537,7 +1349,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   var B=["read(fd, &bss_size, 4)","alloc(bss_size + code) from this depth's slot","read(fd, code, rest)","descriptor list → per-depth scratch","enter(code, bases)",""];
   var L=[];
   for(var k=0;k<A.length;k++)(function(k){
-    L.push({ms:1000,say:k===0?"Both loaders start the same job: get an engine image into memory and jump into it.":k===3?"The stock loader frees the heap that the parent is still using. The reentrant one has no <code>free</code> in its table to call.":k===5?"<b>Stock:</b> the parent's world is gone before the child runs. <b>LDR1N:</b> every one of the parent's resources is intact, and nothing in the loader could have touched it.":undefined,
+    L.push({ms:1000,say:k===0?"Same job: load an engine image and jump into it.":k===3?"The stock loader frees the parent's heap. LDR1N has no <code>free</code> to call.":k===5?"<span class='bad'>Stock: the parent is gone.</span> <span class='good'>LDR1N: the parent is intact.</span>":undefined,
       run:function(){line("lnA",A[k][0],A[k][1]>=0?"bad":"");if(A[k][1]>=0)kill(A[k][1]);if(B[k])line("lnB",B[k],"ok");}});
   })(k);
   L.push({ms:2600,run:function(){}});
@@ -1563,37 +1375,37 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   function reg(r,v,cls){var e=root.querySelector('[data-r="'+r+'"]');e.innerHTML="<span>"+r+"</span>"+v;e.className="rchip "+(cls||"set");}
   function steps(){
     var L=[],ebp=mode==="ebp";
-    L.push({ms:1500,say:"<b>The host</b> calls <code>mtx_push(1)</code>. It seeds a fresh stack and switches into it.",run:function(){at(0);}});
-    L.push({ms:1400,say:"<code>mtx_trampoline</code> calls <code>mtx_run_entry</code>, so depth 1 is now running, on its own stack.",run:function(){at(1);}});
-    L.push({ms:1700,say:"<code>mtx_ldr_load</code> reads <code>ACE_CODE</code> out of the WAD, about 400 KB, into this depth's own image slot.",run:function(){at(2);$("rlImg").querySelector(".fill").style.width="100%";setT("rlImg","ACE_CODE<br>relocatable copy");}});
-    L.push({ms:1800,say:"The host fills depth 1's parameter block in <b>its own</b> <code>mtx_hs</code>: magic <code>'MTXP'</code>, its own address, depth, heap, screen, raw pool, log."+(ebp?"":" In this version the host also writes the block's address into the instance's <code>.bss</code>."),run:function(){
+    L.push({ms:1500,say:"<b>The host</b> calls <code>mtx_push(1)</code>.",run:function(){at(0);}});
+    L.push({ms:1400,say:"Depth 1 runs, on its own stack.",run:function(){at(1);}});
+    L.push({ms:1700,say:"<code>mtx_ldr_load</code> reads <code>ACE_CODE</code> from the WAD into depth 1's image slot.",run:function(){at(2);$("rlImg").querySelector(".fill").style.width="100%";setT("rlImg","ACE_CODE<br>relocatable copy");}});
+    L.push({ms:1800,say:"The host fills depth 1's parameter block, in host memory."+(ebp?"":" It also writes the block's address into the instance's <code>.bss</code>."),run:function(){
       setT("rlPar",'<span class="item">MTXP · self · depth 1<br>zone · screen · raw</span>');
       if(!ebp)setT("rlBssBox",'<span class="item" data-x>params → 0x002E6034</span>');}});
-    L.push({ms:1500,say:"<code>ldr0N</code> prints its banner through Doom's <code>printf</code>, and only then loads the hand-off registers, because <code>printf</code> clobbers ECX.",run:function(){at(3);}});
+    L.push({ms:1500,say:"<code>ldr0N</code> loads the hand-off registers.",run:function(){at(3);}});
     REG.forEach(function(r,k){var v=["code base","data base","next stage","entry","&amp;params[1]"][k];
       L.push({ms:420,run:function(){if(r==="EBP"&&!ebp)reg(r,"(left over)","");else reg(r,v);}});});
-    L.push({ms:1600,say:"<code>jmp *%ebx</code> lands in ACE's <code>_start</code>. It does <code>sub $0x1008,%ecx</code> to recover its own base, and relocates itself.",run:function(){at(4);reg("ECX","base, recovered","set");}});
-    L.push({ms:2000,say:"The entry <b>clears its .bss</b>. "+(ebp?"Registers are not memory, so <b>EBP survives</b>.":"<span class='bad'>The address the host wrote there is wiped.</span>"),run:function(){
+    L.push({ms:1600,say:"ACE's <code>_start</code> recovers its base from ECX and relocates itself.",run:function(){at(4);reg("ECX","base, recovered","set");}});
+    L.push({ms:2000,say:"The entry <b>clears its .bss</b>. "+(ebp?"<span class='good'>EBP is a register: it survives.</span>":"<span class='bad'>The address is wiped.</span>"),run:function(){
       at(5);var b=$("rlBssBox");b.classList.remove("wipe");void b.offsetWidth;b.classList.add("wipe");
       var x=b.querySelector("[data-x]");if(x)x.classList.add("gone");else setT("rlBssBox","zeroed");
       if(ebp)reg("EBP","&amp;params[1]","glow");}});
     if(ebp){
-      L.push({ms:1900,say:"From C, the engine stores EBP into <code>mtx_params</code> and checks the block: magic <code>'MTXP'</code> ✓, the block's own address ✓. <span class='good'>This copy knows it is depth 1.</span>",run:function(){
+      L.push({ms:1900,say:"The engine stores EBP and checks the block: magic ✓, self-address ✓.",run:function(){
         setT("rlBssBox",'<span class="item">mtx_params → params[1] ✓</span>');var p=$("rlPar").querySelector(".item"),b=$("rlBssBox").querySelector(".item");if(p&&b)fly(root,b,p,"reads through the pointer","",0,900);}});
-      L.push({ms:1900,say:"<code>ace_main</code> → <code>Z_Init</code> takes the nested branch and builds depth 1's heap in its arena slot. <code>ldr_malloc</code> goes to depth 1's raw pool.",run:function(){at(6);}});
-      L.push({ms:2400,say:"<code>D_DoomLoop</code>: depth 1 draws its first frame, and at its next frame boundary it hands the CPU back.",run:function(){at(7);}});
+      L.push({ms:1900,say:"<code>ace_main</code> builds depth 1's heap in its own arena slot.",run:function(){at(6);}});
+      L.push({ms:2400,say:"<span class='good'>D_DoomLoop: depth 1 draws its first frame.</span>",run:function(){at(7);}});
     }else{
-      L.push({ms:1900,say:"The engine looks for its block: <code>.bss</code> is zero and EBP is whatever the loader left. No valid block means <b>this copy is the root</b>.",run:function(){at(6,true);setT("rlBssBox","zeroed: no block");}});
-      L.push({ms:2800,say:"<span class='bad'>Acting as the root, <code>ldr_malloc</code> asks DPMI for 209,184 B. Free DPMI: 61,440 B. The instance dies in <code>init_render()</code>, with its own pool unused.</span>",run:function(){}});
+      L.push({ms:1900,say:"No block found, so this copy concludes it is <b>the root</b>.",run:function(){at(6,true);setT("rlBssBox","zeroed: no block");}});
+      L.push({ms:2800,say:"<span class='bad'>It asks DPMI for 209,184 B with 61,440 B free, and dies.</span>",run:function(){}});
     }
     return L;
   }
-  var p=new Seq(root,{loop:true,say:$("rlSay"),reset:reset,onLoop:reset,controlsIn:root});
+  var p=new Seq(root,{loop:true,say:$("rlSay"),reset:function(){reset();lbl("ebp");},controlsIn:root});
   root.insertBefore(root.querySelector(".seqc"),$("rlSay"));
-  function setMode(m){mode=m;$("rlEbp").setAttribute("aria-pressed",m==="ebp");$("rlBss").setAttribute("aria-pressed",m!=="ebp");p.load(steps());}
-  $("rlEbp").addEventListener("click",function(){setMode("ebp");});
-  $("rlBss").addEventListener("click",function(){setMode("bss");});
-  reset();p.load(steps());
+  function lbl(m){$("rlMode").innerHTML=m==="ebp"?"Parameter block passed in <b style='color:var(--nukage)'>%ebp</b>":"Parameter block written into <b style='color:#ff8a76'>the instance's .bss</b>";}
+  mode="ebp";var A=steps();mode="bss";var B=steps();
+  function sw(m){return {ms:700,run:function(){reset();lbl(m);}};}
+  reset();lbl("ebp");p.load([sw("ebp")].concat(A,[sw("bss")],B));
 })();
 
 /* =====================================================================
@@ -1629,9 +1441,9 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   function reset(){vga.fillStyle="#000";vga.fillRect(0,0,160,100);vga.drawImage(bufs[0].cv,0,0);imm(ADDR[0],false);src(0);$("blVgaT").textContent="VGA memory at 0xA0000 · showing depth 0";}
   var L=[];
   [1,2,0].forEach(function(d){
-    L.push({ms:1600,say:"<b>The host decides the screen should show depth "+d+".</b> <code>mtx_present</code> writes depth "+d+"'s buffer address into the routine's own code, at <code>I_FinishUpdate+4</code>.",run:function(){imm(ADDR[d],true);src(d);}});
-    L.push({ms:1700,say:"This frame's blit runs. <code>rep movsl</code> copies 16,000 dwords from the new source to <code>0xA0000</code>. The code did not change shape, only the number inside it.",run:function(){blitAnim(d);}});
-    L.push({ms:1900,say:"<b>Next frame</b>, the host reads the first dword of VGA memory back and compares it with the buffer. Pointing the pointer is not evidence, but the readback is: <span class='good'>screen check: depth "+d+" CONFIRMED</span>.",run:function(){$("blVgaT").textContent="screen check: vga[0] == buffer[0] → depth "+d+" CONFIRMED";}});
+    L.push({ms:1600,say:"Show depth "+d+": the host writes its buffer address into the blit's own code.",run:function(){imm(ADDR[d],true);src(d);}});
+    L.push({ms:1700,say:"The blit copies 16,000 dwords from there to the screen.",run:function(){blitAnim(d);}});
+    L.push({ms:1900,say:"Next frame, the host reads the screen back: <span class='good'>depth "+d+" CONFIRMED</span>.",run:function(){$("blVgaT").textContent="screen check: vga[0] == buffer[0] → depth "+d+" CONFIRMED";}});
   });
   var p=new Seq(root,{loop:true,say:$("blSay"),reset:reset,controlsIn:root});
   root.insertBefore(root.querySelector(".seqc"),$("blSay"));
@@ -1677,27 +1489,27 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   function body(phase){
     var who=phase===0?"root":"depth 1",ctxOut=phase===0?"ctx[0].esp":"ctx[1].esp";
     return [
-      function(s){s.pc=1;s.reg.EAX=s.mem[s.reg.ESP+4];s.rchg.push("EAX");s.narr="<b>"+who+"</b> loads the address of <b>"+ctxOut+"</b> into EAX. It will publish its stack pointer there.";},
-      function(s){s.pc=2;s.reg.EDX=s.mem[s.reg.ESP+8];s.rchg.push("EDX");s.narr="EDX gets the stack pointer of the depth to resume: "+hex(s.reg.EDX)+".";},
-      function(s){s.pc=3;push(s,"EBP",who+"'s ebp");s.narr="Push the callee-saved registers onto <b>"+who+"'s</b> own stack. This is all a suspended C function needs besides its stack.";},
+      function(s){s.pc=1;s.reg.EAX=s.mem[s.reg.ESP+4];s.rchg.push("EAX");s.narr="EAX = &amp;"+ctxOut+": where "+who+" will leave its stack pointer.";},
+      function(s){s.pc=2;s.reg.EDX=s.mem[s.reg.ESP+8];s.rchg.push("EDX");s.narr="EDX = the stack pointer to resume.";},
+      function(s){s.pc=3;push(s,"EBP",who+"'s ebp");s.narr="Push the registers C must preserve onto "+who+"'s stack.";},
       function(s){s.pc=4;push(s,"EBX",who+"'s ebx");s.narr="Push EBX.";},
       function(s){s.pc=5;push(s,"ESI",who+"'s esi");s.narr="Push ESI.";},
-      function(s){s.pc=6;push(s,"EDI",who+"'s edi");s.narr="Push EDI. "+who+"'s stack now holds a complete suspended state.";},
-      function(s){s.pc=7;if(phase===0)s.ctx0=s.reg.ESP;else s.ctx1=s.reg.ESP;s.narr="<b>Publish</b>: "+ctxOut+" = "+hex(s.reg.ESP)+". This single number is "+who+"'s whole identity as a suspended depth.";},
-      function(s){s.pc=8;s.reg.ESP=s.reg.EDX;s.rchg.push("ESP");s.narr="<b>The switch.</b> ESP now points into the other stack. Nothing else changed, but from here on every push and pop belongs to the other depth.";},
-      function(s){s.pc=9;pop(s,"EDI");s.narr=phase===0?"Pop EDI from the seeded stack: 0. This is a forged register value that no earlier switch actually saved.":"Pop EDI: "+hex(s.reg.EDI)+", exactly the value the root pushed in part one.";},
+      function(s){s.pc=6;push(s,"EDI",who+"'s edi");s.narr="Push EDI. "+who+" is now fully described by its stack.";},
+      function(s){s.pc=7;if(phase===0)s.ctx0=s.reg.ESP;else s.ctx1=s.reg.ESP;s.narr="<b>Publish</b> "+ctxOut+" = "+hex(s.reg.ESP)+".";},
+      function(s){s.pc=8;s.reg.ESP=s.reg.EDX;s.rchg.push("ESP");s.narr="<b>The switch:</b> one mov, and ESP is in the other stack.";},
+      function(s){s.pc=9;pop(s,"EDI");s.narr=phase===0?"Pop EDI: 0, a value that was forged, never saved.":"Pop EDI: the value the root pushed earlier.";},
       function(s){s.pc=10;pop(s,"ESI");s.narr="Pop ESI.";},
       function(s){s.pc=11;pop(s,"EBX");s.narr="Pop EBX.";},
-      function(s){s.pc=12;pop(s,"EBP");s.narr=phase===0?"Pop EBP. ESP now points at the slot where a return address would be.":"Pop EBP. The root's registers are exactly as it left them.";},
+      function(s){s.pc=12;pop(s,"EBP");s.narr=phase===0?"Pop EBP.":"Pop EBP. The root's registers are back.";},
       function(s){s.pc=13;s.reg.EIP=phase===0?"mtx_trampoline":"mtx_switch (root), after its call";s.reg.ESP+=4;s.rchg.push("EIP","ESP");
-        s.narr=phase===0?"<b>ret</b> pops the forged return address and lands in <b>mtx_trampoline</b>, with (%esp) = the entry argument.":"<b>ret</b> returns into the root's <b>mtx_switch</b>, right after its own call to mtx_switch_ctx. To the root, that call simply took a long time.";}
+        s.narr=phase===0?"<b>ret</b> lands in <b>mtx_trampoline</b>: the forged return address.":"<b>ret</b> returns into the root's own switch call, as if it had just taken a while.";}
     ];
   }
   var tramp=[
-    function(s){s.pc=16;s.reg.EAX=s.mem[s.reg.ESP];s.reg.EIP="mtx_trampoline";s.rchg.push("EAX");s.narr="The trampoline reads its argument from (%esp).";},
-    function(s){s.pc=17;push(s,"EAX","arg (pushed again)");s.narr="It pushes the argument for a normal C call.";},
+    function(s){s.pc=16;s.reg.EAX=s.mem[s.reg.ESP];s.reg.EIP="mtx_trampoline";s.rchg.push("EAX");s.narr="The trampoline picks up its argument.";},
+    function(s){s.pc=17;push(s,"EAX","arg (pushed again)");s.narr="Push it for a C call.";},
     function(s){s.pc=18;s.reg.ESP-=4;w(s,s.reg.ESP,0x0004B1CB,"return → trampoline");s.chg.push(s.reg.ESP);s.reg.EIP="mtx_run_entry → entry(arg)";s.rchg.push("ESP","EIP");
-      s.narr="<b>call mtx_run_entry</b>: depth 1 is now running its entry function on its own stack. It never returns from here. It boots an engine, which reaches its frame loop.";}
+      s.narr="<b>call mtx_run_entry</b>: depth 1 runs, on its own stack.";}
   ];
   var bridge=function(s){
     s.phase=1;s.pc=0;
@@ -1707,12 +1519,12 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     w(s,0x00A5FFC8,RET1,"return addr → mtx_switch (depth 1)");
     s.reg.ESP=0x00A5FFC8;s.reg.EBP=0x00A5FFE0;s.reg.EBX=0x00000007;s.reg.ESI=0x00C0FFEE;s.reg.EDI=0x00000002;s.reg.EIP="mtx_switch_ctx";
     s.rchg.push("ESP","EBP","EBX","ESI","EDI","EIP");s.chg.push(0x00A5FFD0,0x00A5FFCC,0x00A5FFC8);
-    s.narr="<b>Part two.</b> Some frames later depth 1 reaches its frame boundary, and the scheduler decides the root goes next. Depth 1 calls mtx_switch_ctx(&ctx[1].esp, ctx[0].esp). Its registers hold depth 1's own values.";
+    s.narr="<b>Later:</b> depth 1 switches back to the root.";
   };
   var steps=[].concat(body(0),tramp,[bridge],body(1));
-  var states=[clone(S)];states[0].narr="<b>Part one.</b> The root has just called mtx_switch_ctx(&ctx[0].esp, ctx[1].esp) to enter depth 1 for the first time. Depth 1's stack was seeded by mtx_seed(): four zero registers, &mtx_trampoline, then arg.";
+  var states=[clone(S)];states[0].narr="<b>First entry into depth 1.</b> Its stack was forged by <code>mtx_seed()</code>: four zeros, &amp;mtx_trampoline, arg.";
   for(var i=0;i<steps.length;i++){var n=clone(states[i]);steps[i](n);states.push(n);}
-  var idx=0,scrub=$("stkScrub");scrub.max=states.length-1;
+  var idx=0;
   function stackHTML(title,addrs,s){
     var h="<h4>"+title+"</h4>";
     addrs.forEach(function(ad){
@@ -1734,7 +1546,6 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     rh+='<div class="reg'+(idx>0&&states[idx-1].ctx1!==s.ctx1?" chg":"")+'"><span>ctx[1].esp</span>'+hex(s.ctx1)+'</div>';
     $("stkRegs").innerHTML=rh;
     $("stkNarr").innerHTML=s.narr;
-    scrub.value=idx;$("stkScrubOut").textContent=idx+"/"+(states.length-1);
     placeMark(true);
   }
   var mark=$("stkMark"),markCol=null;
@@ -1750,19 +1561,17 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     markCol=col;
   }
   window.addEventListener("resize",function(){placeMark(false);});
-  var playT=null;
-  $("stkPlay").addEventListener("click",function(){
-    var btn=this;if(playT){clearInterval(playT);playT=null;btn.textContent="Play ▶▶";return;}
-    if(idx>=states.length-1)idx=0;btn.textContent="Stop";show();
-    playT=setInterval(function(){if(idx<states.length-1){idx++;show();}else{clearInterval(playT);playT=null;btn.textContent="Play ▶▶";}},RM?1600:1150);
-  });
-  $("stkStep").addEventListener("click",function(){if(idx<states.length-1)idx++;show();});
-  $("stkBack").addEventListener("click",function(){if(idx>0)idx--;show();});
-  $("stkReset").addEventListener("click",function(){idx=0;show();});
-  scrub.addEventListener("input",function(){idx=+this.value;show();});
+
+  var root=$("stk"),list=[];
+  states.forEach(function(st,k){list.push({ms:k===0?2600:(st.phase===1&&st.pc===0?2400:(k===13||k===8?1900:1150)),run:function(){idx=k;show();}});});
+  list.push({ms:2200,run:function(){}});
+  var player=new Seq(root,{loop:true,reset:function(){idx=0;show();}});
+  root.insertBefore(root.querySelector(".seqc"),$("stkNarr"));
+  player.load(list);
   show();placeMark(false);
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){placeMark(false);});
 })();
+
 
 /* =====================================================================
    HOST STATE INSIDE THE SNAPSHOT
@@ -1777,20 +1586,20 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     function save(st,slot){VARS.forEach(function(v){if(cov(v[0])){st[slot][v[0]]=st.live[v[0]];st.chg[slot+"."+v[0]]=1;st.mv.push({f:"live."+v[0],t:slot+"."+v[0]});}});}
     function load(st,slot,quiet){VARS.forEach(function(v){if(cov(v[0])&&st[slot][v[0]]!==undefined){var d=st.live[v[0]]!==st[slot][v[0]];if(d)st.chg["live."+v[0]]=1;st.live[v[0]]=st[slot][v[0]];if(!quiet)st.mv.push({f:slot+"."+v[0],t:"live."+v[0],red:d&&(v[0]==="ctx0"||v[0]==="ctx1")});}});}
     var out=[s];
-    s.narr="The root is running. mtx_push(1) has seeded depth 1's stack and written <b>ctx[1].esp</b>. The root has never been switched away from, so <b>ctx[0].esp</b> is still 0. Now mtx_switch(1) begins.";
+    s.narr="The root runs. It has never been suspended, so <b>ctx[0].esp</b> is still 0.";
     var t;
-    t=C(out[out.length-1]);save(t,"s0");t.narr="<b>1. save_state(root)</b>: copy every covered byte of live memory into the root's slot."+(bug?" That includes the scheduler's own variables, and ctx[0].esp = 0 goes into the snapshot.":"");out.push(t);
-    t=C(t);t.live.cur=1;t.chg["live.cur"]=1;t.narr="<b>2. mtx_cur = 1</b>: a control write. It belongs to the host, not to any depth.";out.push(t);
-    t=C(t);VARS.forEach(function(v){if(cov(v[0])){t.s1[v[0]]=t.live[v[0]];t.chg["s1."+v[0]]=1;t.mv.push({f:"live."+v[0],t:"s1."+v[0]});}});t.init1=true;load(t,"s1",true);t.narr="<b>3. load_state(depth 1)</b>: first entry, so depth 1's slot is <em>seeded from the live state</em>. The child starts as a copy of its parent.";out.push(t);
-    t=C(t);t.live.ctx0=0x003FFF40;t.chg["live.ctx0"]=1;t.esp=t.live.ctx1;t.mv.push({f:"live.ctx1",t:"live.esp"});t.running="depth 1";t.narr="<b>4. mtx_switch_ctx</b> publishes the root's real stack pointer: <b>ctx[0].esp = 0x003FFF40</b>. Then it loads ctx[1].esp and depth 1 starts running.";out.push(t);
-    t=C(t);t.live.world="DEPTH1 MAP02";t.chg["live.world"]=1;t.narr="Depth 1 runs for a few frames and changes <em>its</em> world. Then its slice is over and mtx_switch(0) begins.";out.push(t);
-    t=C(t);save(t,"s1");t.narr="<b>1. save_state(depth 1)</b>: live memory into depth 1's slot.";out.push(t);
-    t=C(t);t.live.cur=0;t.chg["live.cur"]=1;t.narr="<b>2. mtx_cur = 0</b>.";out.push(t);
+    t=C(out[out.length-1]);save(t,"s0");t.narr="<b>save_state(root)</b>"+(bug?": the scheduler's variables go into the snapshot too.":"");out.push(t);
+    t=C(t);t.live.cur=1;t.chg["live.cur"]=1;t.narr="<b>mtx_cur = 1</b>";out.push(t);
+    t=C(t);VARS.forEach(function(v){if(cov(v[0])){t.s1[v[0]]=t.live[v[0]];t.chg["s1."+v[0]]=1;t.mv.push({f:"live."+v[0],t:"s1."+v[0]});}});t.init1=true;load(t,"s1",true);t.narr="<b>load_state(1)</b>: first entry, so the slot is cloned from the live state.";out.push(t);
+    t=C(t);t.live.ctx0=0x003FFF40;t.chg["live.ctx0"]=1;t.esp=t.live.ctx1;t.mv.push({f:"live.ctx1",t:"live.esp"});t.running="depth 1";t.narr="<b>mtx_switch_ctx</b> publishes ctx[0].esp = 0x003FFF40. Depth 1 runs.";out.push(t);
+    t=C(t);t.live.world="DEPTH1 MAP02";t.chg["live.world"]=1;t.narr="Depth 1 changes its world. Now back to the root.";out.push(t);
+    t=C(t);save(t,"s1");t.narr="<b>save_state(1)</b>";out.push(t);
+    t=C(t);t.live.cur=0;t.chg["live.cur"]=1;t.narr="<b>mtx_cur = 0</b>";out.push(t);
     t=C(t);load(t,"s0");
-    t.narr=bug?"<b>3. load_state(root)</b> copies the root's slot back over live memory, and the slot was taken <em>before</em> step 4 published the real ESP. <b>ctx[0].esp is now 0 again.</b> The world is restored correctly, and the scheduler's state is restored to a stale value.":"<b>3. load_state(root)</b> restores the root's world. The scheduler's variables live in mtx_hs, which no slot covers, so ctx[0].esp keeps the value that was published.";out.push(t);
+    t.narr=bug?"<b>load_state(root)</b> restores the snapshot, taken <em>before</em> the ESP was published. <span class='bad'>ctx[0].esp is 0 again.</span>":"<b>load_state(root)</b> restores the world. ctx[0].esp is not in any slot, so it keeps its value.";out.push(t);
     t=C(t);t.live.ctx1=0x00A5FF30;t.chg["live.ctx1"]=1;t.esp=t.live.ctx0;t.chg.esp=1;t.mv.push({f:"live.ctx0",t:"live.esp",red:t.esp===0});
-    if(t.esp===0){t.crash=true;t.running="nobody";t.narr="<b>4. mtx_switch_ctx</b> publishes depth 1's ESP, then loads <b>ESP = ctx[0].esp = 0</b>. The four pops read from address 0, and the final ret jumps into unmapped memory.";}
-    else{t.ok=true;t.running="root";t.narr="<b>4. mtx_switch_ctx</b> loads ESP = 0x003FFF40. The root resumes inside its own mtx_switch with its world intact (ROOT MAP01), and depth 1's world is waiting in its slot.";}
+    if(t.esp===0){t.crash=true;t.running="nobody";t.narr="<b>mtx_switch_ctx</b> loads ESP = 0. <span class='bad'>The ret jumps into unmapped memory.</span>";}
+    else{t.ok=true;t.running="root";t.narr="<b>mtx_switch_ctx</b> loads ESP = 0x003FFF40. <span class='good'>The root resumes.</span>";}
     out.push(t);
     return out;
   }
@@ -1813,7 +1622,6 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     $("hsS0").innerHTML=box("Root's snapshot slot","s0",s);
     $("hsS1").innerHTML=box("Depth 1's snapshot slot","s1",s);
     $("hsNarr").innerHTML=s.narr;
-    $("hsPos").textContent="step "+idx+"/"+(states.length-1);
     var cr=$("hsCrash"),ok=$("hsOk"),root=$("hs"),endT=0;
     cr.classList.remove("on");ok.classList.remove("on");
     if(fwd&&s.mv&&s.mv.length&&!RM){
@@ -1827,66 +1635,17 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       });
     }
     timers.push(setTimeout(function(){cr.classList.toggle("on",!!s.crash);ok.classList.toggle("on",!!s.ok);},endT));
-    cr.innerHTML="DOSBox: Can't run code in this page!<br>Illegal read/write × 2000 · CS:IP 170:4d4d4d4d<br><span style='font-family:var(--f-body);font-size:15px;color:#f0b4a8'>Measured on the very first real switch. The baseline build has zero.</span>";
-    ok.innerHTML="Root resumed · 0 illegal reads · 0 DYNX86<br><span style='font-family:var(--f-body);font-size:15px;color:#bfe0a6'>Snapshot per depth: 536,262 → 529,468 B, smaller by exactly sizeof(mtx_hs).</span>";
+    cr.innerHTML="DOSBox: Can't run code in this page! · 2000 illegal reads · <span style='color:#f0b4a8'>measured on the first real switch</span>";
+    ok.innerHTML="Root resumed · 0 illegal reads · snapshot smaller by exactly sizeof(mtx_hs)";
   }
-  function reset(){states=build();idx=0;shown=-1;show();}
-  function setBug(b){bug=b;$("hsBug").setAttribute("aria-pressed",b);$("hsFix").setAttribute("aria-pressed",!b);var keep=idx;states=build();idx=Math.min(keep,states.length-1);show();}
-  $("hsBug").addEventListener("click",function(){setBug(true);});
-  $("hsFix").addEventListener("click",function(){setBug(false);});
-  $("hsStep").addEventListener("click",function(){if(idx<states.length-1)idx++;show();});
-  $("hsBack").addEventListener("click",function(){if(idx>0)idx--;show();});
-  $("hsReset").addEventListener("click",reset);
-  reset();
+  var root=$("hs");
+  function mode(b){bug=b;states=build();idx=0;shown=-1;$("hsMode").innerHTML=b?"Layout: <b style='color:#ff8a76'>scheduler state inside the snapshot</b>":"Layout: <b style='color:var(--nukage)'>scheduler state in mtx_hs, outside every snapshot</b>";show();}
+  function seqFor(b){var L=[{ms:2600,run:function(){mode(b);}}];for(var k=1;k<10;k++)(function(k){L.push({ms:k===9?4200:(k===8?2600:1900),run:function(){idx=k;show();}});})(k);return L;}
+  var player=new Seq(root,{loop:true,reset:function(){mode(true);}});
+  root.insertBefore(root.querySelector(".seqc"),$("hsNarr"));
+  player.load(seqFor(true).concat(seqFor(false)));
 })();
 
-/* =====================================================================
-   BUDGET BAR
-   ===================================================================== */
-(function(){
-  var parts=[["Heap (zone)",4194304,"#d1341f","MTX_ZONE_PER_DEPTH"],["Raw pool",2097152,"#ff7b22","MTX_RAW_PER_DEPTH"],
-    ["State snapshot",573933,"#f1b23c","regions + patches"],["Code image",413380,"#7fd23e",".bss + ACE_CODE"],
-    ["Screen region",297472,"#6c9cf0","64000 + 69632 + 0x28000"],["Stack",65536,"#9aa4ae","MTX_STACK_SIZE"]];
-  var tot=parts.reduce(function(a,p){return a+p[1];},0),bar=$("budgetBar"),key=$("budgetKey");
-  parts.forEach(function(p){
-    var d=document.createElement("div");d.style.flex=p[1]+" 0 0";d.style.background=p[2];d.title=p[0]+": "+p[1].toLocaleString("en-US")+" B";
-    if(p[1]/tot>0.06)d.textContent=p[0];bar.appendChild(d);
-    var k=document.createElement("div");
-    k.innerHTML='<span><i class="sw" style="background:'+p[2]+'"></i>'+p[0]+' <span style="color:var(--faint);font-size:13px">('+p[3]+')</span></span><span class="n">'+p[1].toLocaleString("en-US")+' B</span>';
-    key.appendChild(k);
-  });
-  var k2=document.createElement("div");k2.innerHTML='<span><strong>Total per level</strong></span><span class="n">'+tot.toLocaleString("en-US")+' B</span>';key.appendChild(k2);
-})();
-
-/* =====================================================================
-   DECODER
-   ===================================================================== */
-(function(){
-  var chips=[[19796,"lump index"],[1297373266,"raw pool magic"],[1297373264,"params magic"],[1297373255,"guest report"],[1297373267,"screen marker"],[16843009,"VGA readback"],[1296911693,"crash CS:IP"],[1525682085,"1.5 GB request"]];
-  var WHY={19796:"Doom asked for lump 0x4D54, which is 'MT', the top half of a raw-pool header word. Doom was reading pool metadata as if it were data.",
-    1297373266:"'MTXR' is the raw pool's block-in-use magic. Each block header is [size][magic].",
-    1297373264:"'MTXP' is the parameter block's magic. The engine checks it, and the block's own address, before trusting %ebp.",
-    1297373255:"'MTXG' is what the 45-byte guest reports, proving that loaded WAD bytes executed.",
-    1297373267:"'MTXS' is the marker written through Doom's screens[0]. When it shows up on screen, the third pin is working.",
-    16843009:"0x01010101: four pixels of palette index 1, the first dword of the depth's colour-bar pattern, read back from VGA memory.",
-    1296911693:"'MMMM', the fill pattern the host test uses to overwrite a dead stack frame. It also appeared as the crash address, CS:IP 170:4d4d4d4d.",
-    1525682085:"Not a magic word. The raw pool refused this request, which came from the same corruption. The pool logs refusals so that they show up as numbers."};
-  var inp=$("decIn"),out=$("decOut"),cb=$("decChips");
-  chips.forEach(function(c){var b=document.createElement("button");b.textContent=c[1];b.title=String(c[0]);b.addEventListener("click",function(){inp.value=c[0];go();});cb.appendChild(b);});
-  function ch(b){return b>=32&&b<127?String.fromCharCode(b):"·";}
-  function go(){
-    var s=inp.value.trim().replace(/[,_\s]/g,""),v;
-    if(/^0x[0-9a-f]+$/i.test(s))v=parseInt(s,16);else if(/^\d+$/.test(s))v=parseInt(s,10);else{out.innerHTML="Type a decimal number or 0x… hex.";return;}
-    if(!(v>=0&&v<=4294967295)){out.innerHTML="That doesn't fit in 32 bits.";return;}
-    var b=[(v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255],big=b.map(ch).join(""),hx=hex(v,v<65536?4:8);
-    var html='<div>'+v.toLocaleString("en-US")+' = <b style="color:var(--hud);font-weight:400">'+hx+'</b></div>';
-    html+='<div>as text: <span class="big">'+esc(v<65536?ch(b[2])+ch(b[3]):big)+'</span></div>';
-    html+='<div style="color:var(--faint);font-size:17px">bytes in memory (little-endian): '+b.slice().reverse().map(function(x){return (x<16?"0":"")+x.toString(16).toUpperCase();}).join(" ")+'</div>';
-    if(WHY[v])html+='<div class="why">'+WHY[v]+'</div>';
-    out.innerHTML=html;
-  }
-  inp.addEventListener("input",go);go();
-})();
 
 /* =====================================================================
    KEY AUTHORITY TIMELINE
@@ -1937,8 +1696,8 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     $("ktPressOut").textContent=p;$("ktHoldOut").textContent=hd;
     var A=sim(p,hd,rep,"A"),B=sim(p,hd,rep,"B");
     anim(A,B);
-    $("ktVa").textContent="Each copy decides, tracker cleared at slice start: 1 press → "+A.tog.length+" toggle"+(A.tog.length===1?"":"s")+(A.tog.length?" (frames "+A.tog.join(", ")+")":"");
-    $("ktVb").textContent="One authority word, copy forced at slice start: 1 press → "+B.tog.length+" toggle"+(B.tog.length===1?"":"s");
+    $("ktVa").textContent="Each copy decides: 1 press → "+A.tog.length+" toggle"+(A.tog.length===1?"":"s");
+    $("ktVb").textContent="One authority word: 1 press → "+B.tog.length+" toggle"+(B.tog.length===1?"":"s");
   }
   var kraf=null,kvis=false,kseen=false,kpend=null;
   function anim(A,B){
@@ -1955,19 +1714,20 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   else kvis=true;
 })();
 
+
 /* =====================================================================
    COPYLESS: unlocked in the order the project found things out
    ===================================================================== */
 (function(){
   var COLS=64,ROWS=20,N=COLS*ROWS,BLK=32,WARM=6,CAN=8;
   var STG=[
-    {label:"Copy everything",mode:"all",diff:false,txt:"<b>Copy everything.</b> On every switch the outgoing depth's whole registered set is copied out and the incoming depth's is copied in. This is always correct. Watch the written-bytes counter: 80 KB per switch in this model, and about 1.1 MB in the real one."},
-    {label:"What actually differs",mode:"all",diff:true,txt:"<b>What actually differs.</b> Same strategy, but now the grid shows which blocks were really different between live memory and the snapshot. It is a handful. In the real engine, about 4,000 of 572,945 bytes (0.6%) differ, so nearly every copied byte is copied for nothing."},
-    {label:"Cache the hot set",mode:"cache",diff:true,txt:"<b>Cache the hot set.</b> Learn which blocks differ during a warm-up, then copy only those. It looks perfect. <b>Can you break it?</b> Once the warm-up is over, press <b>Late write</b>: a depth writes a block that stayed cold the whole time."},
-    {label:"Compare every switch",mode:"cmp",diff:true,txt:"<b>Compare every switch.</b> Compare every block on every switch and copy only the ones that differ. Nothing is predicted, so a late write is caught by the very next comparison. Try to break this one too."},
-    {label:"What the compare costs",mode:"cmp",diff:true,txt:"<b>What the compare costs.</b> The writes are nearly gone, but every switch now <em>reads</em> the whole set twice. Inside an emulator, the instruction doing that reading matters more than you would expect."}
+    {label:"Copy everything",mode:"all",diff:false,txt:"<b>Copy everything</b>, both ways, on every switch."},
+    {label:"What differs",mode:"all",diff:true,txt:"Only a handful of blocks <b>actually differ</b>. In the real engine: 4,000 of 572,945 bytes."},
+    {label:"Cache the hot set",mode:"cache",diff:true,txt:"<b>Cache</b> the blocks that differed during a warm-up, and copy only those. Then a block that stayed cold gets written…"},
+    {label:"Compare every switch",mode:"cmp",diff:true,txt:"<b>Compare every block on every switch</b>, copy only the differences. A late write is caught at once."},
+    {label:"Cost of the compare",mode:"cmp",diff:true,txt:"The writes are gone. What's left is <b>reading</b> everything twice, and the instruction doing it matters."}
   ];
-  var stage=1,unlocked=1,mode="all",L,S,T,hot,flash,late,bad,promoted,sw,cur,ctr,lastRd,lastWr,lastDf,totBad,canary,lates,running=!RM,note="";
+  var stage=1,unlocked=5,mode="all",L,S,T,hot,flash,late,bad,promoted,sw,cur,ctr,lastRd,lastWr,lastDf,totBad,canary,lates,running=!RM,note="";
   var HOT=[[],[]];
   (function(){var shared=[40,41,42,300,301,302,640,641,903,904],i;for(i=0;i<shared.length;i++){HOT[0].push(shared[i]);HOT[1].push(shared[i]);}
     HOT[0].push(77,78,1100);HOT[1].push(512,513,1201);})();
@@ -2059,13 +1819,10 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     var st=$("clStages");st.innerHTML="";
     STG.forEach(function(g,i){var b=document.createElement("button");b.textContent=(i+1)+" · "+g.label;b.disabled=i+1>unlocked;
       b.setAttribute("aria-pressed",i+1===stage);b.addEventListener("click",function(){setStage(i+1);});st.appendChild(b);});
-    if(unlocked<STG.length){var a=document.createElement("button");a.className="ghost";a.textContent="Show all";
-      a.addEventListener("click",function(){unlocked=STG.length;setStage(stage);});st.appendChild(a);}
     $("clPrompt").innerHTML=STG[s-1].txt;
     $("clAll").hidden=false;$("clCache").hidden=unlocked<3;$("clCmp").hidden=unlocked<4;
     $("clAll").setAttribute("aria-pressed",mode==="all");$("clCache").setAttribute("aria-pressed",mode==="cache");$("clCmp").setAttribute("aria-pressed",mode==="cmp");
     $("clLate").hidden=unlocked<3;
-    $("clNext").hidden=s>=STG.length;if(s<STG.length)$("clNext").textContent="Next: "+STG[s].label+" ▸";
     $("clCost").hidden=s<5;
     legend();reset();
   }
@@ -2082,90 +1839,19 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   if(!running)$("clRun").textContent="Run";
   setStage(1);
   for(var w=0;w<3;w++){note="";step();}
+  var root=$("cl"),player=new Seq(root,{loop:true,reset:function(){setStage(1);}});
+  root.insertBefore(root.querySelector(".seqc"),$("clPrompt").nextSibling);
+  player.load([
+    {ms:6000,run:function(){setStage(1);}},
+    {ms:6000,run:function(){setStage(2);}},
+    {ms:11500,run:function(){setStage(3);}},
+    {ms:3500,run:function(){setStage(4);}},
+    {ms:5500,run:function(){note="";lateWrite(false);draw();stats();}},
+    {ms:7000,run:function(){setStage(5);}}
+  ]);
   setInterval(function(){if(running){note="";step();}},420);
 })();
 
-/* =====================================================================
-   SORT THE BYTES
-   ===================================================================== */
-(function(){
-  var BINS=[
-    {k:"region",name:"Region",what:"Snapshotted data",does:"Saved into the outgoing depth's slot and restored from the incoming depth's slot."},
-    {k:"patch",name:"Patch",what:"Bytes ACE rewrote in Doom",does:"Saved and restored byte for byte. No region covers Doom's code."},
-    {k:"pin",name:"Pin",what:"A pointer to per-depth memory",does:"Restored with the snapshot, then overwritten with this depth's own value."},
-    {k:"private",name:"Private",what:"Separate memory",does:"Nothing happens. It sits at a different address for each depth."},
-    {k:"host",name:"Host",what:"The scheduler's own state",does:"Never saved or restored. It lives in mtx_hs, outside every snapshot."}
-  ];
-  var CARDS=[
-    {t:"gametic",d:"Doom's tic counter",a:"region",why:"Ordinary Doom data at a fixed address. Each depth has its own game clock, so it follows the depth's snapshot."},
-    {t:"gamekeydown[]",d:"Doom's key array",a:"region",why:"It is Doom data, so each depth gets its own copy. That causes the trouble in Map 08: a key press lands in whichever copy is loaded."},
-    {t:"mod_config",d:"in the engine's .data",a:"region",why:"Initialised writable engine data. The engine's .data became its own snapshot region (9,056 B)."},
-    {t:"E8 xx xx xx xx",d:"a CALL ACE wrote into Doom's code",a:"patch",why:"Five bytes in Doom's code segment. The host reads ACE's hook table at boot and saves and restores every patch as raw bytes."},
-    {t:"90 90 90 90",d:"NOPs ACE wrote over Doom code",a:"patch",why:"A SET_NOPS hook. Like any patch, a second instance's ace_main would write it again into code the root is running."},
-    {t:"mainzone",d:"pointer to the heap",a:"pin",why:"A child's snapshot starts as a clone of its parent's. Without the pin, the child would allocate from its parent's heap."},
-    {t:"screens[0]",d:"Doom's own screen pointer",a:"pin",why:"The third pin. ACE's screen_buffer is a copy taken at init, and Doom's renderer keeps drawing through this one."},
-    {t:"heap blocks",d:"the depth's 4 MiB zone",a:"private",why:"They sit at a different address in each depth's arena slot. Copying megabytes on every switch would gain nothing."},
-    {t:"the stack",d:"64 KiB per depth",a:"private",why:"Each depth runs on its own stack slot, and a switch only swaps ESP (Map 02)."},
-    {t:"ctx[0].esp",d:"a suspended depth's stack pointer",a:"host",why:"The scheduler writes it during the switch itself. A snapshot restore would put back a stale value: the ESP = 0 crash in Map 05."},
-    {t:"key_state",d:"one word: is the switch key down?",a:"host",why:"One answer for the whole machine, kept where no restore can rewind it (Map 08)."}
-  ];
-  var WRONG={
-    region:{patch:"Regions cover data. These bytes are in Doom's code segment, which no region covers, so they would leak between depths.",
-      pin:"Restored from the snapshot, a child cloned from its parent would keep the parent's pointer and use the parent's memory.",
-      "private":"Regions are compared and copied on every switch. This is a lot of memory that already sits at a separate address per depth.",
-      host:"If a snapshot covered it, load_state would rewind it in the middle of a switch. That really happened: see the ESP = 0 crash in Map 05."},
-    patch:{region:"Patches are bytes ACE rewrote inside Doom's memory. This is ordinary data, and a region already moves it.",
-      pin:"Restoring the bytes would only bring back whatever pointer the snapshot holds. A pointer to per-depth memory has to be forced to this depth's value.",
-      "private":"Saving and restoring this would copy memory that already sits at a separate address per depth.",
-      host:"A patch is still restored on every switch. This must never be restored at all."},
-    pin:{region:"A pin forces a fixed value per depth. This value changes as the game runs, so it has to follow the depth's snapshot.",
-      patch:"These are code bytes, not a pointer. They need their own bytes put back.",
-      "private":"A pin is the pointer to private memory. This card is the memory itself.",
-      host:"A pin is still rewritten on every switch-in. This must not change during a switch."},
-    "private":{region:"It lives at one address that every depth shares. Nothing makes it separate unless it is copied.",
-      patch:"These bytes are in Doom's code segment, and there is only one copy of it for every depth.",
-      pin:"This pointer is one variable at one shared address. Without a pin every depth would read the same value.",
-      host:"There is exactly one copy and every depth must see that same one, which makes it the host's, not private."},
-    host:{region:"If the host owned it, every depth would see the same value. Each depth needs its own.",
-      patch:"If the host owned it, the root's patch set would leak into every depth.",
-      pin:"If the host owned it, every depth would share one heap or one screen.",
-      "private":"If the host owned it, every depth would share it, and these must be separate."}
-  };
-  var tray=$("sortTray"),bins=$("sortBins"),msg=$("sortMsg"),prog=$("sortProg"),sel=null,placed={},misses=0;
-  function binHTML(b){
-    var items=CARDS.filter(function(c,i){return placed[i]&&c.a===b.k;});
-    return '<b>'+b.name+'</b><span class="bw">'+b.what+'. '+b.does+'</span><ul>'+items.map(function(c){return '<li><code>'+esc(c.t)+'</code><br>'+esc(c.why)+'</li>';}).join("")+'</ul>';
-  }
-  function draw(){
-    tray.innerHTML="";
-    var left=0;
-    CARDS.forEach(function(c,i){if(placed[i])return;left++;
-      var b=document.createElement("button");b.innerHTML=esc(c.t)+"<span>"+esc(c.d)+"</span>";
-      b.setAttribute("aria-pressed",sel===i);
-      b.addEventListener("click",function(){sel=sel===i?null:i;msg.className="sort-msg";msg.textContent=sel===null?"Pick a card above.":"Where does "+c.t+" ("+c.d+") belong?";draw();});
-      tray.appendChild(b);});
-    if(!left){var d=document.createElement("span");d.className="done";d.textContent="All sorted. Each bin now lists what it holds and why.";tray.appendChild(d);}
-    bins.innerHTML="";
-    BINS.forEach(function(b){
-      var el=document.createElement("button");el.className="bin"+(sel!==null?" armed":"");el.innerHTML=binHTML(b);
-      el.setAttribute("aria-label","Bin: "+b.name);
-      el.addEventListener("click",function(){drop(b.k,el);});
-      bins.appendChild(el);});
-    var n=Object.keys(placed).length;
-    prog.textContent=n+" / "+CARDS.length+" sorted"+(misses?" · "+misses+" wrong pick"+(misses>1?"s":""):"");
-  }
-  function drop(k,el){
-    if(sel===null){msg.className="sort-msg";msg.textContent="Pick a card first, then a bin.";return;}
-    var c=CARDS[sel];
-    if(c.a===k){placed[sel]=1;msg.className="sort-msg good";msg.innerHTML="<b>Right.</b> "+esc(c.why);sel=null;draw();}
-    else{misses++;msg.className="sort-msg bad";msg.innerHTML="<b>Not "+BINS.filter(function(b){return b.k===k;})[0].name+".</b> "+esc(WRONG[k][c.a]);
-      el.classList.remove("shake");void el.offsetWidth;el.classList.add("shake");
-      prog.textContent=Object.keys(placed).length+" / "+CARDS.length+" sorted · "+misses+" wrong pick"+(misses>1?"s":"");}
-  }
-  $("sortShow").addEventListener("click",function(){CARDS.forEach(function(c,i){placed[i]=1;});sel=null;msg.className="sort-msg";msg.textContent="Answers shown. Each bin lists its cards and the reason.";draw();});
-  $("sortReset").addEventListener("click",function(){placed={};misses=0;sel=null;msg.className="sort-msg";msg.textContent="Pick a card above.";draw();});
-  draw();
-})();
 
 })();
 </script>
