@@ -2439,9 +2439,60 @@ static void mtx_engine_stack_water(void)
 	mtx_log((const char *)buf);
 }
 
+/* THE EMULATED CLOCK, READ FROM INSIDE THE GUEST.
+   The pace is measured in EMULATED time (cpu_cycles=2000000 gave exactly 1/4 of the rate),
+   and it cannot be the PIT's interrupt rate (that is at least 18.2 Hz, the pace is 16 Hz,
+   and two divisor patches changed nothing). What is still unknown is what the ring waits
+   ON. The PIT's channel-0 counter is the emulated timebase itself - 1.193182 MHz,
+   independent of the divisor, which is why patching the divisor was inert - so reading it
+   at frame boundaries gives the frame period in emulated units directly, and that number
+   names the pace: a count of PIT units, a count of retraces, or a count of BIOS ticks.
+
+   Latch-then-read is the standard sequence and is read-only (no side effect on the timer).
+   BUT THE PIT COUNTER ALIASES: it wraps every divisor counts, and with a 65536 divisor that
+   is 54.9 ms, close to the ~62.5 ms frame period, so a mod-65536 delta cannot say how many
+   wraps passed. The BIOS tick counter at 0040:006C is the same idea without that problem -
+   18.2 Hz, 32-bit, monotonic - so both are logged and the monotonic one is the evidence. */
+static void mtx_outb(uint16_t port, uint8_t val)
+{
+	__asm__ __volatile__("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
+static uint8_t mtx_inb(uint16_t port)
+{
+	uint8_t r;
+	__asm__ __volatile__("inb %1, %0" : "=a"(r) : "Nd"(port));
+	return r;
+}
+
+static uint16_t mtx_pit_counter(void)
+{
+	mtx_outb(0x43, 0x00);              /* latch channel 0 */
+	{
+		uint8_t lo = mtx_inb(0x40);
+		uint8_t hi = mtx_inb(0x40);
+		return (uint16_t)((hi << 8) | lo);
+	}
+}
+
 static void mtx_engine_policy(void)
 {
 	uint8_t buf[144];
+	/* THE INTRA-FRAME TICK DELTA - the last thing needed to pin the clock. The game's
+	   counter advances exactly one per frame, but WHO advances it? Sampling it here, at
+	   the start of the frame's work, and again at the log point below, separates the two:
+	     the delta is sometimes >= 1 -> an IRQ fired while the guest was running: IRQ0 is
+	        live, and it is running at ~16 Hz despite the PIT being programmed for 35 Hz
+	     the delta is ALWAYS 0       -> the counter never moves while the frame's work
+	        runs, so something advances it at a frame boundary, i.e. the engine itself */
+	uint32_t t_frame_start = *(volatile uint32_t *)(uintptr_t)(doom_data_segment + 0x2913cu);
+	/* THE WORK'S SHARE OF THE PERIOD, in the emulated timebase. The tick delta showed the
+	   frame's work never overlaps a tick, but not how LONG the work is: if it is a small
+	   fraction of the ~62 ms period, the pace is a WAIT and the machine is idle most of
+	   the time (and the fix is to remove the wait); if it is most of the period, the ring
+	   is work-bound and the fix is in the ring's own per-frame code. The PIT counter is
+	   1.193182 MHz and does not alias over a few milliseconds, so this measures it. */
+	uint16_t pit_work_start = mtx_pit_counter();
 
 	mtx_frame_no++;
 
@@ -2457,10 +2508,51 @@ static void mtx_engine_policy(void)
 	mtx_engine_probe_check();
 
 	// instrumentation: prove the frame path keeps running after the first switch
+	/* Every 50 frames (and the first 40): a 50-frame sample cannot distinguish "the engine
+	   advances the tick counter itself" from "an independent clock ticks once per frame" -
+	   both average 1.0. That question was settled separately (verify/tick_delta.sh: 215 of
+	   216 consecutive frames advanced exactly one tick), so the sampling is back to sparse. */
 	if(mtx_frame_no <= 40u || (mtx_frame_no % 50u) == 0u)
 	{
-		doom_sprintf(buf, (const uint8_t *)"[MTX] frame %u child=%u\n",
-		             mtx_frame_no, (uint32_t)mtx_child_live);
+		/* I_GetTime() IS THE ENGINE'S TIME SOURCE (a trampoline into the ACE image),
+		   and it belongs in this line.
+		   The frame rate (16/s per instance) does not respond to the emulated CPU's
+		   speed, so it is set by a clock; and it did not respond to two patches of the
+		   base image's PIT divisor either, which says the divisor that matters is not
+		   that one. Comparing the RATE OF CHANGE of this counter with the frame rate
+		   decides it: if t and frame advance together the engine is genuinely one
+		   frame per tick, and the tick rate is what to raise; if t advances faster,
+		   the frames are duplicates and the engine is not tick-gated at all. */
+		/* raw= IS READ STRAIGHT OUT OF THE GAME'S MEMORY, bypassing I_GetTime. The
+		   engine's trampolines are rewritten at load time (asm.S says the I_FinishUpdate
+		   placeholder "will be overwritten by init_draw()"), so I_GetTime may not be the
+		   game's function by the time this runs. If t= and raw= advance together, I_GetTime
+		   really is the game's raw tick counter; if raw= runs faster, the engine
+		   substituted its own clock and the pace is the engine's own loop rate.
+		   The address needs doom_data_segment: the game's image is RELOCATED at load, so
+		   its link-time addresses are not its runtime addresses. Measured: reading flat
+		   0x2913c returned a constant 0xCDCDCDCD (fill memory) - the wrong address, not a
+		   frozen counter. The engine already does this for the game's screen variable
+		   (MTX_DOOM_SCREEN_VAR = 0x74FC4, read as doom_data_segment + offset). */
+		doom_sprintf(buf, (const uint8_t *)"[MTX] frame %u child=%u t=%u raw=%u pit=%u bios=%u gametic=%u lt=%u\n",
+		             mtx_frame_no, (uint32_t)mtx_child_live,
+		             (uint32_t)I_GetTime(),
+		             *(volatile uint32_t *)(uintptr_t)(doom_data_segment + 0x2913cu),
+		             (uint32_t)mtx_pit_counter(),
+		             *(volatile uint32_t *)(uintptr_t)0x46cu,   /* BIOS tick counter, 18.2 Hz, monotonic */
+		             gametic, leveltime);
+		mtx_log((const char *)buf);
+
+		/* the work's duration in emulated time, same sparse schedule */
+		doom_sprintf(buf, (const uint8_t *)"[MTX] work frame %u counts=%u\n",
+		             mtx_frame_no,
+		             (uint32_t)((uint16_t)(pit_work_start - mtx_pit_counter())));
+		mtx_log((const char *)buf);
+
+		/* the intra-frame delta, on the same sparse schedule as the line above */
+		doom_sprintf(buf, (const uint8_t *)"[MTX] intra frame %u d=%u\n",
+		             mtx_frame_no,
+		             *(volatile uint32_t *)(uintptr_t)(doom_data_segment + 0x2913cu) - t_frame_start);
 		mtx_log((const char *)buf);
 	}
 
@@ -2859,11 +2951,19 @@ static void MTX_FRAME_TICK_ABI mtx_engine_self_check(mtx_depth_params_t *me)
 			if(vga[y * SCREENWIDTH + x] == mine[y * SCREENWIDTH + x])
 				same++;
 
+	/* GAMETIC AND LEVELTIME ARE IN THIS LINE ON PURPOSE, and they are the answer to
+	   "what paces the frame rate?". The frame counter alone cannot say: a frame that
+	   repeats the same tic looks identical to a frame that advanced one. Logging
+	   Doom's own tic counter beside the frame number gives the tics-per-frame ratio,
+	   and with the frame rate already measured against the wall clock that yields the
+	   TIC RATE in tics per second - which is what decides whether the tic clock is the
+	   gate (in which case raising it raises the frame rate) or whether the engine is
+	   simply rendering slower than the clock allows (in which case it cannot). */
 	doom_sprintf(buf, (const uint8_t *)
-	             "[MTX] depth %u frame %u: screen region %u, engine screen_buffer %u, "
+	             "[MTX] depth %u frame %u gametic %u leveltime %u: screen region %u, engine screen_buffer %u, "
 	             "doom screens[0] %u; the screen is THIS depth's frame in %u/%u "
 	             "sampled pixels - transport %u, so it %s\n",
-	             (uint32_t)me->depth, me->frames,
+	             (uint32_t)me->depth, me->frames, gametic, leveltime,
 	             (uint32_t)(uintptr_t)mine, (uint32_t)(uintptr_t)sb,
 	             (uint32_t)(uintptr_t)*dv, same, (SCREENHEIGHT / 2u) * (SCREENWIDTH / 2u),
 	             (uint32_t)me->transport,
