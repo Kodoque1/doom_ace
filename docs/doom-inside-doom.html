@@ -449,6 +449,18 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
 .prow.new .v{background:rgba(241,178,60,.28)!important}
 .listing div.cur{background:rgba(241,178,60,.2)!important;box-shadow:inset 3px 0 0 var(--hud)!important}
 .heap{background:color-mix(in srgb,var(--dc) 12%,#0b0807)!important;border-color:color-mix(in srgb,var(--dc) 55%,#000)!important;color:var(--dc)!important}
+
+.predict{margin-top:10px;padding:10px 12px;border:1px dashed var(--hud);border-radius:3px;background:rgba(241,178,60,.06)}
+.pq-q{font-family:var(--f-hud);font-size:21px;color:var(--hud);line-height:1.25}
+.pq-o{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pq-o button{font-size:18px}
+.pq-o button.ok{background:#1c2a12;border-color:var(--nukage);color:#dff7c9;opacity:1}
+.pq-o button.no{background:#3a0b05;border-color:#ff4a32;color:#ffd0c6;opacity:1}
+.pq-o button:disabled{cursor:default}
+.pq-a{margin-top:8px;font-size:16px;color:var(--fg);line-height:1.45}
+.seq-say .good,.pq-a .good{color:var(--nukage)}
+.pq-a .bad{color:#ff8a76}
+.lanesc{width:100%;height:auto;display:block;margin-top:10px;border:1px solid var(--line);border-radius:3px;background:#0b0807}
 </style>
 </head>
 <body>
@@ -483,6 +495,13 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
 </div>
 
 <section class="ch col" data-hud="Taking turns"><p class="sec-tag">Map 02</p><h2>Taking turns</h2><p class="lead1">A paused program is just its stack, plus a pointer to that stack.</p></section>
+<div class="wide console" id="tw">
+  <div class="console-head"><h2 class="console-title">Three stacks, one CPU</h2><span class="badge b-sim">Animation</span></div>
+  <div class="towers" id="twBox"></div>
+  <canvas class="lanesc" id="twLanes" width="1000" height="66" aria-label="Which depth held the CPU, over time"></canvas>
+  <div class="seq-say" id="twSay" aria-live="polite"></div>
+  <figcaption>Amber frames are host code. Function names are from the source.</figcaption>
+</div>
 <div class="wide console" id="stk">
   <div class="console-head">
     <h2 class="console-title">Two stacks, one ESP</h2>
@@ -497,12 +516,6 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
   <div class="narr" id="stkNarr"></div>
   <div class="espmark" id="stkMark" aria-hidden="true">◀ ESP</div>
   <figcaption><span class="badge b-code">Code</span> from <code>mtx_switch.S</code>. Addresses are illustrative.</figcaption>
-</div>
-<div class="wide console" id="tw">
-  <div class="console-head"><h2 class="console-title">Three stacks, one CPU</h2><span class="badge b-sim">Animation</span></div>
-  <div class="towers" id="twBox"></div>
-  <div class="seq-say" id="twSay" aria-live="polite"></div>
-  <figcaption>Amber frames are host code. Function names are from the source.</figcaption>
 </div>
 
 <section class="ch col" data-hud="Only between frames"><p class="sec-tag">Map 03</p><h2>Only between frames</h2><p class="lead1">A switch can be requested at any time. It only happens at a frame boundary.</p></section>
@@ -674,6 +687,7 @@ footer.mini{padding-block:60px 30px;color:var(--faint);font-size:15px}
 <footer class="wrap mini">
   <div class="col">
     <p><span class="badge b-sim">Animation</span> re-enactments written for this page, from the code in <code>nested/</code> and <code>doom_ace/engine/</code>. Lines marked measured come from the project's logs, README, HANDOFF and commits. No game data is used.</p>
+    <p>How the page is built, following that research: you set the pace, each key step asks for a prediction first, every depth keeps one colour, and each scene starts from the previous one's picture. ← and → step the scene on screen.</p>
     <p>Further reading: Hundhausen, Douglas &amp; Stasko, <a href="https://doi.org/10.1006/jvlc.2002.0237">A Meta-Study of Algorithm Visualization Effectiveness</a> (JVLC 2002) · Tversky, Morrison &amp; Bétrancourt, <a href="https://doi.org/10.1006/ijhc.2002.1017">Animation: Can It Facilitate?</a> (IJHCS 2002) · Guo, <a href="https://pg.ucsd.edu/publications/Online-Python-Tutor-web-based-program-visualization_SIGCSE-2013.pdf">Online Python Tutor</a> (SIGCSE 2013) · Lerner, <a href="https://doi.org/10.1145/3313831.3376494">Projection Boxes</a> (CHI 2020) · Kang &amp; Guo, <a href="https://doi.org/10.1145/3126594.3126632">Omnicode</a> (UIST 2017) · Crichton, Gray &amp; Krishnamurthi, <a href="https://doi.org/10.1145/3622841">A Grounded Conceptual Model for Ownership Types in Rust</a> (OOPSLA 2023) · Victor, <a href="http://worrydream.com/ExplorableExplanations/">Explorable Explanations</a> (essay, 2011).</p>
   </div>
 </footer>
@@ -696,28 +710,64 @@ function fly(root,fromEl,toEl,html,cls,delay,dur){
   an.onfinish=function(){g.remove();};
   return (delay||0)+dur*0.85;
 }
-/* A small sequence player: steps run one after another with their own delays,
-   autoplay while the console is on screen, loop if asked. Reduced motion: no
-   autoplay, the reader steps by hand. */
+/* The sequence player. Reader-paced: Next / Back, with Play optional. A step
+   can be a prediction: the scene stops, asks, and reveals the answer when the
+   reader picks one (or presses Next). Back replays the earlier steps instantly. */
+var SEQS=[];
+document.addEventListener("keydown",function(e){
+  if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
+  var t=e.target;if(t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.isContentEditable))return;
+  var best=null;SEQS.forEach(function(q){if(q.ratio>0.5&&(!best||q.ratio>best.ratio))best=q;});
+  if(!best)return;e.preventDefault();best[e.key==="ArrowRight"?"next":"back"]();
+});
 function Seq(root,o){
-  var steps=[],i=0,timer=null,playing=false,want=!RM,vis=false,self=this;
+  var steps=[],i=0,timer=null,playing=false,want=false,vis=false,wait=null,self=this;
   var bar=document.createElement("div");bar.className="seqc";
-  bar.innerHTML='<button class="primary" data-q="play">Pause</button><button data-q="step">Step ▶</button><button data-q="restart">Restart</button><span class="hudtxt" data-q="pos"></span>';
+  bar.innerHTML='<button data-q="back" aria-label="Back one step">◀ Back</button><button class="primary" data-q="next">Next ▶</button><button data-q="play">Play</button><button data-q="restart">Restart</button><span class="hudtxt" data-q="pos"></span>';
   (o.controlsIn||root).appendChild(bar);
+  var pq=document.createElement("div");pq.className="predict";pq.hidden=true;pq.setAttribute("aria-live","polite");bar.parentNode.insertBefore(pq,bar.nextSibling);
+  self.bar=bar;
   var bPlay=bar.querySelector('[data-q=play]'),pos=bar.querySelector('[data-q=pos]');
-  function label(){bPlay.textContent=playing?"Pause":"Play";pos.textContent="step "+Math.min(i,steps.length)+" / "+steps.length;}
-  function one(){
-    if(i>=steps.length){if(o.loop){i=0;if(o.onLoop)o.onLoop();}else{stop();return false;}}
-    var s=steps[i++];if(s.run)s.run();if(s.say!==undefined&&o.say)o.say.innerHTML=s.say;label();return s;
+  function label(){bPlay.textContent=playing?"Pause":"Play";pos.textContent=(i===0&&!wait?"press Next or → · ":"")+"step "+Math.min(i,steps.length)+" / "+steps.length;}
+  function exec(s){if(s.run)s.run();if(s.say!==undefined&&o.say)o.say.innerHTML=s.say;}
+  function ask(p){
+    wait=p;bar.parentNode.insertBefore(pq,bar.nextSibling);pq.hidden=false;
+    pq.innerHTML='<div class="pq-q">Predict: '+p.q+'</div><div class="pq-o">'+p.options.map(function(t,k){return '<button data-k="'+k+'">'+t+'</button>';}).join("")+'</div><div class="pq-a"></div>';
+    pq.querySelectorAll("button").forEach(function(b){b.addEventListener("click",function(){reveal(+b.getAttribute("data-k"));});});
   }
-  function tick(){timer=null;if(!playing)return;var s=one();if(s===false)return;timer=setTimeout(tick,RM?Math.max(s.ms||600,900):(s.ms||600));}
+  function reveal(k){
+    var p=wait;if(!p)return;wait=null;
+    pq.querySelectorAll("button").forEach(function(b,j){b.disabled=true;if(j===p.a)b.className="ok";else if(j===k)b.className="no";});
+    pq.querySelector(".pq-a").innerHTML=(k===p.a?"<b class='good'>Right.</b> ":k<0?"":"<b class='bad'>Not this time.</b> ")+p.why+" Press <b>Next</b> to see it.";
+    label();
+  }
+  function one(){
+    if(wait){reveal(-1);return "wait";}
+    if(i>=steps.length){if(o.loop){i=0;if(o.reset)o.reset();if(o.onLoop)o.onLoop();}else{stop();return false;}}
+    var s=steps[i++];
+    if(s.predict){ask(s.predict);stop();label();return "wait";}
+    pq.hidden=true;exec(s);label();return s;
+  }
+  function tick(){timer=null;if(!playing)return;var s=one();if(s===false||s==="wait")return;timer=setTimeout(tick,RM?Math.max(s.ms||600,900):(s.ms||600));}
   function play(){if(playing)return;playing=true;label();tick();}
   function stop(){playing=false;if(timer){clearTimeout(timer);timer=null;}label();}
-  self.load=function(list){stop();steps=list;i=0;if(o.reset)o.reset();if(o.say)o.say.innerHTML=o.intro||"";label();if(want&&vis)play();};
-  bPlay.addEventListener("click",function(){if(playing){want=false;stop();}else{want=true;if(i>=steps.length&&!o.loop)self.load(steps);play();}});
-  bar.querySelector('[data-q=step]').addEventListener("click",function(){want=false;stop();if(i>=steps.length&&!o.loop){self.load(steps);}one();});
+  function replay(n){
+    var keep=RM;RM=true;stop();wait=null;pq.hidden=true;i=0;if(o.reset)o.reset();if(o.say)o.say.innerHTML=o.intro||"";
+    while(i<n){var s=steps[i++];if(!s.predict)exec(s);}
+    RM=keep;label();
+  }
+  self.load=function(list){stop();steps=list;i=0;wait=null;pq.hidden=true;if(o.reset)o.reset();if(o.say)o.say.innerHTML=o.intro||"";label();};
+  bPlay.addEventListener("click",function(){if(playing){want=false;stop();}else{want=true;if(wait)reveal(-1);play();}});
+  function nextF(){want=false;stop();one();}
+  bar.querySelector('[data-q=next]').addEventListener("click",nextF);
+  function backF(){want=false;var n=wait?i-1:i-1;
+    if(wait){wait=null;}
+    while(n>0&&steps[n-1]&&steps[n-1].predict)n--;
+    replay(Math.max(0,n));}
+  bar.querySelector('[data-q=back]').addEventListener("click",backF);
+  var reg={root:root,ratio:0,next:nextF,back:backF};SEQS.push(reg);
   bar.querySelector('[data-q=restart]').addEventListener("click",function(){self.load(steps);});
-  if("IntersectionObserver" in window)new IntersectionObserver(function(es){es.forEach(function(e){vis=e.isIntersecting;if(vis&&want)play();else if(!vis)stop();});},{threshold:0.35}).observe(root);
+  if("IntersectionObserver" in window)new IntersectionObserver(function(es){es.forEach(function(e){vis=e.isIntersecting;reg.ratio=e.intersectionRatio;if(vis&&want)play();else if(!vis)stop();});},{threshold:[0,0.25,0.5,0.75,1]}).observe(root);
   else vis=true;
   label();
 }
@@ -982,6 +1032,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
         {ms:3200,run:function(){r.setStage(1);}},
         {ms:3000,run:function(){r.setStage(2);}},
         {ms:3400,run:function(){r.teleport();}},
+{predict:{"q": "add a third depth and step into it. What does depth 2's TV show?", "options": ["depth 0", "depth 1", "nothing"], "a": 2, "why": "Depth 2 is the last rung and nothing comes after it, until the ring wraps."}},
         {ms:3000,run:function(){r.setStage(3);r.teleport();}},
         {ms:3200,run:function(){r.teleport();}},
         {ms:3400,run:function(){r.teleport();}},
@@ -1056,6 +1107,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     {ms:4200,say:"DOOM2.EXE runs one loop: think, render, present. Each lap writes Doom's globals and the screen.",run:function(){}},
     {ms:3200,say:"The loop never returns, so there is nothing to call and wait for.",run:function(){st.tag=true;draw();}},
     {ms:4800,say:"Start a second copy of the engine in the same process.",run:function(){st.show2=true;st.on[1]=true;draw();}},
+{predict:{"q": "both copies write <code>gametic</code> every lap. What does that cell hold?", "options": ["each copy's own value", "whichever copy wrote last"], "a": 1, "why": "There is one cell at one address, and both copies use it."}},
     {ms:4200,say:"<span class='bad'>Same code, same addresses.</span> Both copies write the same <code>gametic</code> and the same screen.",run:function(){}},
     {ms:6500,say:"<b>The plan:</b> run one copy at a time, and give each copy its own bytes.",run:function(){st.turn=true;st.turnOf=0;st.frozen=[false,true];st.lapsInTurn=0;g.classList.remove("hit");draw();}}
   ]);
@@ -1095,6 +1147,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       setTimeout(function(){mv("s0.g","live.g","120",0,0);mv("s0.p","live.p","E8 · call",0,120);setTimeout(function(){run=0;runl();},RM?0:900);},RM?0:1000);}},
     {ms:3000,say:"<span class='good'>Measured: depth 1 wrote 204 over 232. The root read 232 back.</span>",run:function(){}},
     {ms:3000,say:"Some globals are pointers. <code>mainzone</code> points at the heap.",run:function(){row("z",true);$("spHeaps").hidden=false;set("s0.z","→ heap 0",0);arrow();}},
+{predict:{"q": "depth 1's snapshot was cloned from depth 0 when it was first entered. Where does its <code>mainzone</code> point?", "options": ["depth 1's heap", "depth 0's heap", "nowhere yet"], "a": 1, "why": "A clone copies the pointer value too."}},
     {ms:3000,say:"Switch to depth 1. Its snapshot was cloned from depth 0, so it brings back <em>depth 0's</em> heap pointer.",run:function(){
       mv("live.g","s0.g","120",0,0);mv("live.z","s0.z","→ heap 0",0,100);
       setTimeout(function(){mv("s1.g","live.g","41",1,0);mv("s1.p","live.p","CC · int3",1,100);mv("s1.z","live.z","→ heap 0",1,200,"red");setTimeout(function(){run=1;runl();c("live.z").classList.add("bad");},RM?0:1000);},RM?0:950);}},
@@ -1119,6 +1172,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   var L=[
     {ms:2600,say:"A nested instance dies on some runs with an error that makes no sense.",run:function(){$("pcLog").textContent="W_CacheLumpNum: 19796 >= numlumps";}},
     {ms:2200,say:"Write the number in hex.",run:function(){$("pcBig").innerHTML='19796 = <span class="x">0x4D54</span>';}},
+{predict:{"q": "read <code>0x4D 0x54</code> as ASCII.", "options": ["'NZ'", "'MT'", "'TM'"], "a": 1, "why": "0x4D is 'M' and 0x54 is 'T'."}},
     {ms:2600,say:"Read the two bytes as letters.",run:function(){$("pcBig").innerHTML='<span class="x">0x4D 0x54</span> = <span class="m">\'M\' \'T\'</span>';}},
     {ms:2800,say:"Every block in a depth's raw memory pool starts with a header: a size, then the magic word <code>'MTXR'</code>.",run:function(){pool(false);}},
     {ms:3200,say:"<span class='bad'>Doom was reading the pool's own header as if it were data.</span>",run:function(){pool(true);}},
@@ -1224,6 +1278,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     {ms:4200,say:"Each slot mirrors every live region and every patched byte.",run:function(){S.arcA=[.35,.35,.35];}},
     {ms:3200,say:"Switch <b class='c0'>0</b> → <b class='c1'>1</b>. Save: the live bytes go into <b class='c0'>depth 0's</b> slot.",run:function(){S.arcA=[1,.18,.18];flow(0,1);}},
     {ms:3600,say:"Load: <b class='c1'>depth 1's</b> slot comes back over the live bytes.",run:function(){S.arcA=[.18,1,.18];flow(1,-1);setTimeout(function(){tint(1);},RM?0:900);}},
+{predict:{"q": "which live region has <em>no</em> arc into the slots?", "options": ["Doom data", ".data", "mtx_hs"], "a": 2, "why": "The host's own state must never be saved or restored, so .bss is registered as two regions around it."}},
     {ms:3800,say:"<b style='color:var(--hud)'>mtx_hs</b> sits inside .bss, and no arc touches it. It is never saved or restored.",run:function(){S.arcA=[.25,.25,.25];S.pulse=[hs];}},
     {ms:3000,say:"Switch <b class='c1'>1</b> → <b class='c2'>2</b>.",run:function(){S.pulse=null;S.arcA=[.18,1,.18];flow(1,1);}},
     {ms:3400,run:function(){S.arcA=[.18,.18,1];flow(2,-1);setTimeout(function(){tint(2);},RM?0:900);}},
@@ -1342,12 +1397,19 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     for(var d=0;d<3;d++){var s=stk(d);s.innerHTML="";stacks[d].forEach(function(f){var e=el(d,f);e.style.animation="none";s.appendChild(e);});}
     status();
   }
+  var hist=[],lc=$("twLanes").getContext("2d"),LCOL=["#e0553c","#7fd23e","#6c9cf0"];
+  function lanes(){var W=lc.canvas.width,H=lc.canvas.height,n=Math.max(60,hist.length+4),cw=(W-70)/n,i,d;
+    lc.fillStyle="#0b0807";lc.fillRect(0,0,W,H);lc.font="16px VT323, monospace";
+    for(d=0;d<3;d++){var y=4+d*20;lc.fillStyle=LCOL[d];lc.fillText("depth "+d,4,y+13);lc.fillStyle="#1a1310";lc.fillRect(66,y,W-70,15);
+      for(i=0;i<hist.length;i++){if(hist[i]===d){lc.fillStyle=LCOL[d];lc.fillRect(66+i*cw,y,Math.max(1,cw-0.5),15);}}}
+    lc.fillStyle="#eadccb";lc.fillRect(66+hist.length*cw,0,2,H);}
   function status(){
     for(var d=0;d<3;d++){
       cols[d].classList.toggle("run",d===run);cols[d].classList.toggle("frozen",d!==run);
       cols[d].querySelector(".st").textContent=d===run?"▶ running":"❄ suspended";
       var ft=cols[d].querySelectorAll(".tfoot b");ft[0].textContent=frames[d];ft[1].textContent=esp[d]?hex(esp[d]):"—";
     }
+    hist.push(run);lanes();
     placeCpu(false);
   }
   function placeCpu(far){
@@ -1369,7 +1431,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   }
   function initState(){
     stacks=[BASE0.slice(),BASEC().concat(diveFrames(1,0),[{n:"mtx_switch_ctx",h:1}]),BASEC().concat(diveFrames(2,0),[{n:"mtx_switch_ctx",h:1}])];
-    frames=[120,40,40];esp=[0,0x00A5FED0,0x00B5FED0];run=0;render();
+    frames=[120,40,40];esp=[0,0x00A5FED0,0x00B5FED0];run=0;hist=[];render();
   }
   var who=function(d){return d===0?"the root":"depth "+d;};
   function runFrames(d,n){
@@ -1401,6 +1463,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     var seq=[],order=[[0,1],[1,0],[0,2],[2,0]];
     order.forEach(function(p){
       seq=seq.concat(runFrames(p[0],4),dive(p[0],p[1]));
+      if(p[0]===0&&p[1]===1)seq.push({predict:{"q": "the CPU is now on depth 1's stack. What runs first?", "options": ["D_DoomLoop, from the top", "the return from depth 1's own mtx_switch_ctx", "mtx_trampoline"], "a": 1, "why": "Depth 1 is frozen inside its switch call, so the first thing it does is finish it."}});
       var r=resume(p[1]);seq=seq.concat(r.first,r.rest());
     });
     return seq;
@@ -1465,6 +1528,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   root.insertBefore(root.querySelector(".seqc"),$("dgSay"));
   function lbl(){$("dgMode").innerHTML=bug?"mtx_init <b style='color:#ff8a76'>keeps the pointer</b>":"mtx_init <b style='color:var(--nukage)'>copies the table</b>";}
   bug=true;var A=steps();bug=false;var B=steps();bug=true;
+  A.splice(4,0,{predict:{"q": "<code>mtx_switch</code> calls through <code>mtx_hs.ops</code>. What runs?", "options": ["mtx_dos_save_state", "whatever is in those stack bytes now"], "a": 1, "why": "The pointer still aims at the dead frame, and the frame has been reused."}});
   function sw(b){return {ms:600,run:function(){bug=b;lbl();reset();}};}
   reset();lbl();player.load([sw(true)].concat(A,[{ms:1200,run:function(){}},sw(false)],B,[{ms:1200,run:function(){}}]));
   window.addEventListener("resize",arrow);
@@ -1539,6 +1603,8 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   root.insertBefore(root.querySelector(".seqc"),$("rlSay"));
   function lbl(m){$("rlMode").innerHTML=m==="ebp"?"Parameter block passed in <b style='color:var(--nukage)'>%ebp</b>":"Parameter block written into <b style='color:#ff8a76'>the instance's .bss</b>";}
   mode="ebp";var A=steps();mode="bss";var B=steps();
+  A.splice(11,0,{predict:{"q": "the entry is about to clear its <code>.bss</code>. Does the block's address in EBP survive?", "options": ["yes", "no"], "a": 0, "why": "A register is not memory, and the clear only writes memory."}});
+  B.splice(11,0,{predict:{"q": "this time the address was written into <code>.bss</code>. Does it survive the clear?", "options": ["yes", "no"], "a": 1, "why": "Clearing .bss is exactly what the entry does first."}});
   function sw(m){return {ms:700,run:function(){reset();lbl(m);}};}
   reset();lbl("ebp");p.load([sw("ebp")].concat(A,[sw("bss")],B));
 })();
@@ -1698,7 +1764,10 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   window.addEventListener("resize",function(){placeMark(false);});
 
   var root=$("stk"),list=[];
-  states.forEach(function(st,k){list.push({ms:k===0?2600:(st.phase===1&&st.pc===0?2400:(k===13||k===8?1900:1150)),run:function(){idx=k;show();}});});
+  states.forEach(function(st,k){
+    if(st.pc===13&&st.phase===0)list.push({predict:{"q": "the <code>ret</code> pops the slot ESP points at. Where does depth 1 land?", "options": ["back in the root", "in mtx_trampoline", "at address 0"], "a": 1, "why": "That slot holds &amp;mtx_trampoline, forged by mtx_seed()."}});
+    if(st.pc===13&&st.phase===1)list.push({predict:{"q": "this <code>ret</code> runs on the root's stack. Where does it return to?", "options": ["mtx_trampoline", "the root's own mtx_switch call", "depth 1's mtx_switch"], "a": 1, "why": "The root's stack still holds the return address of its own call, made long ago."}});
+    list.push({ms:k===0?2600:(st.phase===1&&st.pc===0?2400:(k===13||k===8?1900:1150)),run:function(){idx=k;show();}});});
   list.push({ms:2200,run:function(){}});
   var player=new Seq(root,{loop:true,reset:function(){idx=0;show();}});
   root.insertBefore(root.querySelector(".seqc"),$("stkNarr"));
@@ -1775,7 +1844,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   }
   var root=$("hs");
   function mode(b){bug=b;states=build();idx=0;shown=-1;$("hsMode").innerHTML=b?"Layout: <b style='color:#ff8a76'>scheduler state inside the snapshot</b>":"Layout: <b style='color:var(--nukage)'>scheduler state in mtx_hs, outside every snapshot</b>";show();}
-  function seqFor(b){var L=[{ms:2600,run:function(){mode(b);}}];for(var k=1;k<10;k++)(function(k){L.push({ms:k===9?4200:(k===8?2600:1900),run:function(){idx=k;show();}});})(k);return L;}
+  function seqFor(b){var L=[{ms:2600,run:function(){mode(b);}}];for(var k=1;k<10;k++)(function(k){if(b&&k===8)L.push({predict:{"q": "<code>load_state(root)</code> copies the root's slot over live memory. What is <code>ctx[0].esp</code> afterwards?", "options": ["0x003FFF40, as published", "0, the value in the snapshot", "depth 1's ESP"], "a": 1, "why": "The slot was taken before the real ESP was published, and the scheduler's variables are in the slot."}});L.push({ms:k===9?4200:(k===8?2600:1900),run:function(){idx=k;show();}});})(k);return L;}
   var player=new Seq(root,{loop:true,reset:function(){mode(true);}});
   root.insertBefore(root.querySelector(".seqc"),$("hsNarr"));
   player.load(seqFor(true).concat(seqFor(false)));
@@ -1979,6 +2048,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   player.load([
     {ms:6000,run:function(){setStage(1);}},
     {ms:6000,run:function(){setStage(2);}},
+{predict:{"q": "the cached strategy copies only blocks that differed during its warm-up. Later, a depth writes a block that stayed cold. What happens?", "options": ["it is copied like the others", "the other depth reads those bytes as its own"], "a": 1, "why": "Nobody copies a block that is not in the hot set, so the write leaks across."}},
     {ms:11500,run:function(){setStage(3);}},
     {ms:3500,run:function(){setStage(4);}},
     {ms:5500,run:function(){note="";lateWrite(false);draw();stats();}},
