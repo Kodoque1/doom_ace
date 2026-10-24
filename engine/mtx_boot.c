@@ -1017,6 +1017,7 @@ static void mtx_params_fill(uint8_t d)
 	   exactly like the raw pool and the screen. Filled for every depth, including
 	   depth 0's own block, because a block is a block. */
 	p->key_auth = (uint32_t)(uintptr_t)&mtx_hs.key_state;
+	p->keys = (uint32_t)(uintptr_t)mtx_hs.keys;
 }
 
 /* The pool the CALLING code must allocate from. Host code uses the pool of the
@@ -2934,10 +2935,16 @@ static void mtx_engine_switch(void)
 	   screen, and the host has already named it for every depth (mtx_engine_video):
 	   the switch is a change of WHICH frame that is, not a rectangle drawn inside
 	   another one. */
+	uint32_t live = 0;
+
+	for(dl = 0; dl < MTX_MAX_DEPTH; dl++)
+		if(mtx_alive(dl))
+			live++;
 	for(dl = 1; dl < MTX_MAX_DEPTH; dl++)
 	{
 		if(!mtx_alive(dl))
 			continue;
+		mtx_hs.params[dl].ring       = live;
 		mtx_hs.params[dl].canvas     = (uint32_t)(uintptr_t)mtx_hs.screens[0];
 		mtx_hs.params[dl].transport  = mtx_hs.transport;
 		mtx_hs.params[dl].screen_src =
@@ -3025,6 +3032,162 @@ static void MTX_FRAME_TICK_ABI mtx_engine_self_check(mtx_depth_params_t *me)
 }
 
 /*
+ * ONE KEYBOARD FOR THE WHOLE RING.
+ *
+ * Doom's key array (`gamekeydown`) is Doom DATA, so every depth has its own copy,
+ * and a key event lands in whichever copy is loaded when the interrupt arrives. A
+ * held "forward" therefore walked one depth only: measured, the walking clip's
+ * viewer stood still as soon as it was transported into depth 1. So every depth,
+ * at its frame boundary, pushes what changed in ITS copy since it last looked (an
+ * event that landed here) into one shared state in host memory, then adopts that
+ * state. Every depth sees one keyboard, and the views walk together. The switch
+ * key is left alone: it has its own authority (mtx_key_auth) and edge logic.
+ */
+__attribute__((section(".data"))) static uint8_t mtx_keys_seen[256];
+
+static void mtx_keys_route(mtx_depth_params_t *me)
+{
+	uint8_t *shared = me ? (uint8_t *)(uintptr_t)me->keys : mtx_hs.keys;
+	uint32_t k;
+
+	if(!shared)
+		return;
+	for(k = 0; k < 256u; k++)
+	{
+		uint8_t v = gamekeydown[k] ? 1u : 0u;
+
+		if(k == MTX_SWITCH_KEY)
+			continue;
+		if(v != mtx_keys_seen[k])
+			shared[k] = v;
+		gamekeydown[k] = shared[k];
+		mtx_keys_seen[k] = shared[k];
+	}
+}
+
+/*
+ * THE DEPTH BADGE: which instance a picture is, drawn into the instance's own frame.
+ *
+ * Into the depth's OWN framebuffer, after its screen-walls are painted, on purpose:
+ * that frame is also what the previous depth's screen-walls show, so every nested
+ * picture carries its own label, and a viewer can read the ring - "0 shows 1 shows
+ * 2 shows 0" - off one frame. Top right (Doom's messages are top left), inside the
+ * 3D view, which the renderer redraws every frame. The border is yellow on the
+ * depth the viewer is in and grey on the nested ones; the dots are the ring, this
+ * depth filled; the number under them is this depth's own frame rate, measured on
+ * the BIOS tick (wall time).
+ */
+static const uint8_t mtx_glyphs[][8] =
+{
+	/* char, then 7 rows of 5 bits */
+	{'0', 0x0E,0x11,0x13,0x15,0x19,0x11,0x0E},
+	{'1', 0x04,0x0C,0x04,0x04,0x04,0x04,0x0E},
+	{'2', 0x0E,0x11,0x01,0x02,0x04,0x08,0x1F},
+	{'3', 0x1F,0x02,0x04,0x02,0x01,0x11,0x0E},
+	{'4', 0x02,0x06,0x0A,0x12,0x1F,0x02,0x02},
+	{'5', 0x1F,0x10,0x1E,0x01,0x01,0x11,0x0E},
+	{'6', 0x06,0x08,0x10,0x1E,0x11,0x11,0x0E},
+	{'7', 0x1F,0x01,0x02,0x04,0x08,0x08,0x08},
+	{'8', 0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E},
+	{'9', 0x0E,0x11,0x11,0x0F,0x01,0x02,0x0C},
+	{'D', 0x1C,0x12,0x11,0x11,0x11,0x12,0x1C},
+	{'E', 0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F},
+	{'P', 0x1E,0x11,0x11,0x1E,0x10,0x10,0x10},
+	{'T', 0x1F,0x04,0x04,0x04,0x04,0x04,0x04},
+	{'H', 0x11,0x11,0x11,0x1F,0x11,0x11,0x11},
+	{'F', 0x1F,0x10,0x10,0x1E,0x10,0x10,0x10},
+	{'S', 0x0F,0x10,0x10,0x0E,0x01,0x01,0x1E},
+};
+
+#define MTX_COL_WHITE   4u	/* PLAYPAL indices, read from DOOM2.WAD */
+#define MTX_COL_BLACK   0u
+#define MTX_COL_YELLOW  231u
+#define MTX_COL_GREY    97u
+
+static void mtx_rect(uint8_t *fb, uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint8_t c)
+{
+	uint32_t i, j;
+
+	for(j = y; j < y + h && j < SCREENHEIGHT; j++)
+		for(i = x; i < x + w && i < SCREENWIDTH; i++)
+			fb[j * SCREENWIDTH + i] = c;
+}
+
+static void mtx_text(uint8_t *fb, uint32_t x, uint32_t y, const char *t, uint32_t sc, uint8_t c)
+{
+	for(; *t; t++, x += 6u * sc)
+	{
+		uint32_t g, r, b;
+
+		for(g = 0; g < sizeof(mtx_glyphs) / sizeof(mtx_glyphs[0]); g++)
+			if(mtx_glyphs[g][0] == (uint8_t)*t)
+				break;
+		if(g == sizeof(mtx_glyphs) / sizeof(mtx_glyphs[0]))
+			continue;			/* a space, or a glyph we do not have */
+		for(r = 0; r < 7u; r++)
+			for(b = 0; b < 5u; b++)
+				if(mtx_glyphs[g][1 + r] & (0x10u >> b))
+					mtx_rect(fb, x + b * sc, y + r * sc, sc, sc, c);
+	}
+}
+
+__attribute__((section(".data"))) static uint32_t mtx_badge_frames, mtx_badge_bios, mtx_badge_fps;
+
+static void mtx_badge(mtx_depth_params_t *me)
+{
+	uint8_t *fb = (uint8_t *)screen_buffer;
+	uint32_t d = me ? me->depth : MTX_ROOT_DEPTH;
+	uint32_t viewed = me ? (me->transport == me->depth) : (mtx_hs.transport == MTX_ROOT_DEPTH);
+	uint32_t bios = *(volatile uint32_t *)(uintptr_t)0x46cu;
+	uint32_t i, x0 = 214u, y0 = 4u, ring = 1;
+	char line[8];
+
+	if(!fb)
+		return;
+	if(me)
+		ring = me->ring;
+	else
+		for(i = 0; i < MTX_MAX_DEPTH; i++)
+			if(mtx_alive((uint8_t)i))
+				ring = i + 1u;
+	if(ring < 1u || ring > MTX_MAX_DEPTH)
+		ring = 1u;
+
+	/* frames per second over about a second of wall time (18 BIOS ticks) */
+	mtx_badge_frames++;
+	if(!mtx_badge_bios)
+		mtx_badge_bios = bios;
+	else if(bios - mtx_badge_bios >= 18u)
+	{
+		mtx_badge_fps = (mtx_badge_frames * 182u / (bios - mtx_badge_bios) + 5u) / 10u;
+		mtx_badge_frames = 0;
+		mtx_badge_bios = bios;
+	}
+
+	mtx_rect(fb, x0, y0, 102u, 36u, viewed ? MTX_COL_YELLOW : MTX_COL_GREY);
+	mtx_rect(fb, x0 + 2u, y0 + 2u, 98u, 32u, MTX_COL_BLACK);
+
+	line[0] = 'D'; line[1] = 'E'; line[2] = 'P'; line[3] = 'T'; line[4] = 'H';
+	line[5] = ' '; line[6] = (char)('0' + d % 10u); line[7] = 0;
+	mtx_text(fb, x0 + 6u, y0 + 5u, line, 2u, MTX_COL_WHITE);
+
+	for(i = 0; i < ring; i++)
+	{
+		uint8_t c = (i == d) ? MTX_COL_YELLOW : MTX_COL_GREY;
+
+		mtx_rect(fb, x0 + 6u + i * 10u, y0 + 24u, 7u, 7u, c);
+		if(i != d)
+			mtx_rect(fb, x0 + 7u + i * 10u, y0 + 25u, 5u, 5u, MTX_COL_BLACK);
+	}
+
+	i = mtx_badge_fps > 99u ? 99u : mtx_badge_fps;
+	line[0] = (char)(i >= 10u ? '0' + i / 10u : ' ');
+	line[1] = (char)('0' + i % 10u);
+	line[2] = ' '; line[3] = 'F'; line[4] = 'P'; line[5] = 'S'; line[6] = 0;
+	mtx_text(fb, x0 + 58u, y0 + 24u, line, 1u, MTX_COL_WHITE);
+}
+
+/*
  * EACH DEPTH'S OWN GAME CLOCK.
  *
  * Doom's I_GetTime (load 0x19C10, `mov eax,[0x2913c]; ret`) is redirected here by
@@ -3040,10 +3203,10 @@ static void MTX_FRAME_TICK_ABI mtx_engine_self_check(mtx_depth_params_t *me)
  * 35 tics a second of its world, catching up 4-8 tics in one frame after a slice
  * away, and the tic logic eats the machine.
  *
- * So, per frame: the depth the viewer is IN follows wall time (1..4 tics), which is
- * what makes the picture move at Doom's speed; every other depth moves exactly one
- * tic - slow motion inside the screen-walls, with no catch-up to pay for. Either
- * way a frame always finds a new tic, so nothing waits. Wall time is the BIOS tick
+ * So, per frame: the depth the viewer is IN follows wall time (0..4 tics), which is
+ * what makes the picture move at Doom's speed - it waits only when it is AHEAD of
+ * wall time, like stock Doom; every other depth moves exactly one tic - slow motion
+ * inside the screen-walls, with no catch-up to pay for and no wait. Wall time is the BIOS tick
  * (0040:006C, 18.2065 Hz, outside every snapshot): the game counter runs fast in a
  * ring (measured ~44/s against Doom's 35), so it cannot be the reference.
  *
@@ -3108,8 +3271,12 @@ static void mtx_vtime(mtx_depth_params_t *me)
 		if(!mtx_vt_was_v)
 			mtx_vt_off = t - mtx_vt_now;	/* just became the viewed one: no burst */
 		d = (t - mtx_vt_off) - mtx_vt_now;
-		if((int32_t)d < 1)
-			d = 1;
+		/* AHEAD of wall time (a frame that is quick to draw - a wall filling the
+		   view rendered at 99 frames/s, measured): no new tic, so the game waits in
+		   TryRunTics like stock Doom, and the spin rule above lets time flow. A
+		   minimum of one tic here would run the viewed world faster than real time. */
+		if((int32_t)d < 0)
+			d = 0;
 		if(d > 4u)
 		{
 			d = 4u;
@@ -3138,6 +3305,7 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 	mtx_depth_params_t *me = mtx_self();
 
 	mtx_vtime(me);
+	mtx_keys_route(me);
 
 	if(me)
 	{
@@ -3178,6 +3346,7 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		   from its parent's frame, so the nesting is visible inside the nested
 		   view as well as around it. */
 		mtx_screen_paint();
+		mtx_badge(me);
 
 		if(me->present_src)
 			*((uint32_t *)((uint8_t *)(void *)I_FinishUpdate + 4)) = me->present_src;
@@ -3286,7 +3455,10 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 	}
 
 	if(!mtx_boot_failed)
+	{
 		mtx_engine_policy();
+		mtx_badge(0);
+	}
 
 	mtx_frame_tick();
 }

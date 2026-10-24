@@ -40,7 +40,7 @@ if [ "$NOBUILD" != "--nobuild" ]; then
   # lumps, so a rebuild makes them stale and they would silently test the
   # previous engine.
   ( cd "$ROOT" && python3 verify/mkwadlevels.py --iwad "$REF/DOOM2.WAD" \
-      --loader doom_ace/loader/loader.wad --out verify/levels >/dev/null ) \
+      --loader doom_ace/loader/loader.wad --out verify/levels ${MTX_LEVELARGS:-} >/dev/null ) \
     || { echo "LEVEL WAD BUILD FAILED"; exit 1; }
 fi
 
@@ -127,7 +127,7 @@ ${MTX_CONF_EXTRA:-}
 [autoexec]
 mount c "$D"
 c:
-doom2 -file $WADS -warp 1 > LOG.TXT
+doom2 -file $WADS -warp 1 ${MTX_DOOMARGS:-} > LOG.TXT
 EOF
 
 pkill -f "Xvfb $DISP" 2>/dev/null
@@ -188,14 +188,21 @@ sleep 2
 if [ -z "${MTX_NOCAP:-}" ]; then
   echo "starting the DOSBox capture (Ctrl+F7)"
   xdotool key --clearmodifiers ctrl+F7 2>/dev/null
+  # Ctrl is also Doom's FIRE key, and the game sees the hotkey's Ctrl go down. Tap it
+  # so it ends released - with one keyboard for the whole ring (mtx_keys_route) a
+  # stuck Ctrl would fire in every depth for the rest of the clip.
+  sleep 0.5
+  xdotool key Control_L 2>/dev/null
 fi
 sleep 3
 
 # The switch key, HELD, one press per switch. Movement is optional but makes the
 # transported view visibly RUNNING rather than a still of a still.
+# MTX_WALKKEYS picks the held keys (default: run in a circle); "Up" walks straight at
+# the screen-wall each level plants ahead of the start.
+WALKKEYS="${MTX_WALKKEYS:-Up Right}"
 if [ -n "${MTX_WALK:-}" ]; then
-  xdotool keydown --clearmodifiers Up 2>/dev/null
-  xdotool keydown --clearmodifiers Right 2>/dev/null
+  for k in $WALKKEYS; do xdotool keydown --clearmodifiers "$k" 2>/dev/null; done
 fi
 
 # One switch press, HELD, with the RELEASE VERIFIED against the engine's own log.
@@ -219,7 +226,24 @@ switches()  { local n; n=$(count_of "transport depth"); echo "${n:-0}"; }
 # (the release never arrived, so the next press was not a leading edge). A full
 # press/release cycle is sent before each retry - that re-syncs the state that a lost
 # release leaves stuck, which repeated bare releases did not.
+# MTX_STEPS="Up:1.2 Up:1 Down:1.5 Up:0": the demo choreography, one KEY:SECONDS per
+# stay (before each switch, and after the last). On arriving in a depth, hold KEY for
+# SECONDS, release, then hold still for MTX_LOOK seconds (default 3) so the
+# screen-wall in view - the next depth's picture - can be read before the next
+# switch. Per depth because the maps differ: MAP03 starts 36 units from one of its
+# screens, so that stay backs off instead of walking in.
+STAY=0
+step() {
+  [ -z "${MTX_STEPS:-}" ] && return
+  local s; s=$(echo $MTX_STEPS | cut -d' ' -f$((STAY + 1)))
+  STAY=$((STAY + 1))
+  [ -z "$s" ] && return
+  local k=${s%%:*} t=${s##*:}
+  xdotool keydown --clearmodifiers "$k" 2>/dev/null; sleep "$t"
+  xdotool keyup --clearmodifiers "$k" 2>/dev/null; sleep "${MTX_LOOK:-3}"
+}
 for _s in $(seq 1 "$SWITCHES"); do
+  step
   want=$(( $(switches) + 1 ))
   echo "pressing the switch key (switch $_s of $SWITCHES, held)"
 
@@ -242,12 +266,13 @@ for _s in $(seq 1 "$SWITCHES"); do
     xdotool keyup --clearmodifiers y 2>/dev/null
     sleep 2
   done
-  sleep 2
+  sleep "${MTX_SWITCH_GAP:-2}"   # how long the clip stays in each depth
 done
 
 # The harness checks its own input: how many switches actually happened is in the
 # engine's log, and a clip that was asked for three and shows one must say so rather
 # than look like a working run.
+step
 GOT=$(switches)
 echo "switches asked: $SWITCHES, switches the engine logged: $GOT"
 [ "$GOT" -lt "$SWITCHES" ] && echo "WARNING: fewer switches than asked for - a key release was lost"
