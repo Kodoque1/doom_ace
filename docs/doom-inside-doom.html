@@ -297,6 +297,97 @@ footer h2{font-size:34px}
 #fbLog div:first-child{color:#f1e4d2}
 #fbLog div.bad{color:#ff8a76}
 @media (prefers-reduced-motion:reduce){.espmark{transition:none}.stack .row.chg{animation:none}}
+/* control-flow animations */
+.seqc{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:12px 0 0}
+.seqc .hudtxt{margin-left:auto}
+.seq-say{margin-top:10px;font-size:17px;line-height:1.5;color:#f1e4d2;min-height:3.1em;border-top:1px dashed var(--line);padding-top:10px}
+.seq-say b{color:var(--hud);font-weight:600}
+.seq-say .bad{color:#ff8a76}
+.seq-say .good{color:var(--nukage)}
+/* towers */
+.towers{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tcol{min-width:0}
+.thead{font-family:var(--f-hud);font-size:19px;letter-spacing:.04em;display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;padding:2px 2px 6px}
+.thead .st{color:var(--faint)}
+.tcol.run .thead .st{color:var(--hud)}
+.tstack{display:flex;flex-direction:column-reverse;gap:3px;height:380px;padding:6px;background:#0b0807;border:1px solid var(--line);border-radius:3px;overflow:hidden;transition:filter .35s}
+.tcol.frozen .tstack{filter:saturate(.2) brightness(.7)}
+.fr{flex:none;font-family:var(--f-mono);font-size:12px;line-height:1.35;padding:3px 7px;border-radius:2px;background:#251b16;border-left:4px solid var(--dc,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#d9c6ad;animation:frIn .28s ease-out}
+.fr.h{background:#2e2414;border-left-color:var(--hud);color:#f4dca8}
+.fr.h::after{content:" · host code";color:#8a7340;font-size:11px}
+.fr.out{animation:frOut .25s ease-in forwards}
+.fr.blink{animation:blink .32s}
+.tcol.run .fr:last-child{box-shadow:0 0 0 1px var(--hud),0 0 14px rgba(241,178,60,.4);color:#fff}
+@keyframes frIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes frOut{to{opacity:0;transform:translateY(-10px)}}
+@keyframes blink{50%{background:#6b4d1e;color:#fff}}
+.tfoot{font-family:var(--f-mono);font-size:12px;color:var(--dim);padding:6px 2px 0;display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.tfoot b{color:var(--fg);font-weight:400}
+.tfoot .flash{color:#120b08;background:var(--hud);padding:0 4px;border-radius:2px}
+.cpu{position:absolute;left:0;top:0;z-index:5;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle,#fff 0,#ffd27a 35%,rgba(255,123,34,.0) 70%);box-shadow:0 0 18px 6px rgba(255,170,60,.55);pointer-events:none;transition:transform .32s cubic-bezier(.5,0,.3,1)}
+.cpu.far{transition-duration:.9s}
+@media (max-width:620px){.fr{font-size:10.5px;padding:3px 4px}.fr.h::after{content:""}.tstack{height:340px}.thead{font-size:16px}}
+/* lanes, relay, pointer */
+.lanes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:700px){.lanes{grid-template-columns:minmax(0,1fr)}}
+.lane{background:#0b0807;border:1px solid var(--line);border-radius:3px;padding:10px;min-width:0}
+.lane h4{margin:0 0 8px;font-family:var(--f-hud);font-weight:400;font-size:20px;color:var(--hud)}
+.calls{font-family:var(--f-mono);font-size:12.5px;min-height:150px}
+.calls div{padding:2px 0;color:#bba58c;animation:frIn .25s ease-out}
+.calls div.bad{color:#ff8a76}
+.calls div.ok{color:#b9e88f}
+.world{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-family:var(--f-mono);font-size:12px;padding:3px 8px;border-radius:2px;background:#1c2a12;border:1px solid #3d5a25;color:#cfeeb4;transition:all .3s}
+.chip.dead{background:#3a0b05;border-color:var(--blood);color:#ffb3a6;text-decoration:line-through}
+.chip.off{background:#151010;border-color:#3d2c23;color:#6f5f50;text-decoration:line-through}
+.chip.live{background:#2e2414;border-color:var(--hud);color:#f4dca8}
+.stations{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.stn{font-family:var(--f-mono);font-size:12px;padding:5px 9px;border-radius:2px;background:#1a1310;border:1px solid var(--line);color:var(--faint);transition:all .3s}
+.stn.done{color:var(--dim);border-color:#5a4334}
+.stn.cur{color:#fff;background:#5b160c;border-color:var(--hud);box-shadow:0 0 12px rgba(241,178,60,.35)}
+.stn.fail{color:#fff;background:#3a0b05;border-color:#ff4a32}
+.arrowsep{color:var(--faint);font-family:var(--f-hud)}
+.rgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px;margin-top:12px}
+@media (max-width:700px){.rgrid{grid-template-columns:minmax(0,1fr)}}
+.regchips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+@media (max-width:520px){.regchips{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.rchip{background:#0b0807;border:1px solid var(--line);border-radius:3px;padding:4px 6px;font-family:var(--f-mono);font-size:11.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .3s}
+.rchip span{display:block;font-family:var(--f-hud);font-size:16px;color:var(--faint)}
+.rchip.set{border-color:var(--hud);color:#f4dca8}
+.rchip.glow{border-color:var(--nukage);box-shadow:0 0 14px rgba(127,210,62,.5);color:#dff7c9}
+.membar{display:grid;grid-template-columns:1.3fr 1fr 1.2fr;gap:6px}
+.mseg{position:relative;background:#0b0807;border:1px solid var(--line);border-radius:3px;padding:6px 8px;min-height:74px;font-family:var(--f-mono);font-size:11.5px;color:var(--dim);overflow:hidden;min-width:0}
+.mseg h5{margin:0 0 4px;font-family:var(--f-hud);font-weight:400;font-size:16px;color:var(--hud)}
+.mseg .fill{position:absolute;left:0;bottom:0;height:5px;width:0;background:var(--d1);transition:width .9s}
+.mseg .item{display:inline-block;padding:1px 5px;border-radius:2px;background:#2e2414;color:#f4dca8;margin:2px 0;transition:all .4s}
+.mseg .item.gone{opacity:.35;text-decoration:line-through;background:#3a0b05;color:#ffb3a6}
+.mseg.wipe::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);animation:wipe .9s ease-in-out}
+@keyframes wipe{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.ptr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:40px;position:relative}
+@media (max-width:620px){.ptr{gap:24px}}
+.ptr svg.ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.prow{display:grid;grid-template-columns:6.6em minmax(0,1fr);gap:6px;font-family:var(--f-mono);font-size:12px;padding:3px 8px;border-bottom:1px solid #1f1612;transition:all .3s;min-width:0}
+.prow .a{color:var(--faint)}
+.prow .v{color:#e7cfa9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow.dead{opacity:.45}
+.prow.new .v{color:#fff;background:rgba(209,52,31,.35)}
+.prow.tgt{box-shadow:inset 3px 0 0 var(--hud)}
+.prow.hit{background:rgba(127,210,62,.15)}
+.prow.badhit{background:rgba(255,74,50,.3)}
+/* blit */
+.blit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:700px){.blit{grid-template-columns:minmax(0,1fr)}}
+.bufs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.buf{background:#0b0807;border:1px solid var(--line);border-radius:3px;padding:5px;transition:all .3s;min-width:0}
+.buf.src{border-color:var(--hud);box-shadow:0 0 0 1px var(--hud)}
+.buf canvas,.vga canvas{width:100%;display:block;image-rendering:pixelated;aspect-ratio:16/10;background:#000}
+.buf .hudtxt,.vga .hudtxt{font-size:16px;margin-top:3px}
+.vga{max-width:420px;width:100%;justify-self:center;background:#0b0807;border:1px solid var(--line);border-radius:3px;padding:6px}
+.imm{font-family:var(--f-mono);font-size:14px;background:#0d0908;border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin-bottom:10px;overflow-x:auto;white-space:nowrap}
+.imm .byte{display:inline-block;padding:0 3px;border-radius:2px;color:var(--hud);transition:background .3s}
+.imm .byte.flip{animation:flip .5s}
+@keyframes flip{0%{transform:rotateX(90deg);background:var(--blood);color:#fff}100%{transform:none}}
+@media (prefers-reduced-motion:reduce){.fr,.calls div,.imm .byte.flip,.mseg.wipe::after{animation:none!important}.cpu{transition:none}}
 </style>
 </head>
 <body>
@@ -388,6 +479,17 @@ footer h2{font-size:34px}
 <section class="col" style="padding-top:8px">
   <p>The trick for a fresh depth is a forged suspension. <code>mtx_seed()</code> writes the stack a switched-out depth <em>would</em> have: four zeroed register slots, then the address of <code>mtx_trampoline</code> where a return address would sit, then the entry argument. The first switch into it "restores" the zeros and its <code>ret</code> lands in the trampoline, which calls the depth's entry function. Nothing is special-cased. A new depth looks to the switch exactly like an old one.</p>
   <p>This is also why the code doesn't use <code>setjmp</code>/<code>longjmp</code>. Those need a C runtime, and they assume the jump target's frame is still alive. Here the frames that have to stay alive belong to a game loop that never returns.</p>
+</section>
+
+<div class="wide console" id="tw">
+  <div class="console-head"><h2 class="console-title">Three stacks, one CPU</h2><span class="badge b-sim">Animation</span></div>
+  <div class="towers" id="twBox"></div>
+  <div class="seq-say" id="twSay" aria-live="polite"></div>
+  <figcaption>Each column is one depth's call stack, newest call on top. The glowing dot is the CPU: only one stack has it at a time. A frozen column is a depth suspended inside its own <code>mtx_switch_ctx</code>, and its whole state is the one number in <code>ctx[d].esp</code>. Amber frames are host code. A nested depth reaches the host's switch through <code>host_yield</code> in its parameter block, so host code runs on the depth's own stack. Function names are from the source. The order is the viewer-first schedule with the viewer in depth 0. Each instance's boot (<code>mtx_trampoline</code> … <code>ace_main</code>) is folded into one frame and shown in Map 06.</figcaption>
+</div>
+
+<section class="col" style="padding-top:8px">
+  <p>Read the animation once with one question in mind: what does a depth "remember" while it is frozen? Nothing beyond its stack, and the stack pointer that leads back into it. When control comes back, every function on that stack simply returns, one after another, as if nothing had happened.</p>
 </section>
 
 <!-- ============================================================ 3 -->
@@ -548,6 +650,28 @@ footer h2{font-size:34px}
   <p>Now <code>mtx_init()</code> copies the table into <code>mtx_hs</code>. The first regression test for this also hid the bug: it compared the kept pointer against the dead frame's address, but returning a dead local's address is undefined behavior, so gcc folded it to NULL and the test passed <em>against the buggy code</em>. The test that works today inspects the table the scheduler will actually call. It calls <code>mtx_init</code> from a helper whose frame is then overwritten with <code>0x4D4D4D4D</code>, and asserts that the callbacks still work.</p>
 </section>
 
+<div class="wide console" id="dg">
+  <div class="console-head"><h2 class="console-title">A pointer that outlives its frame</h2><span class="badge b-sim">Animation</span></div>
+  <div class="controls" style="margin-top:0">
+    <span class="seg" role="group" aria-label="mtx_init behaviour">
+      <button id="dgBug" aria-pressed="true">Keep the pointer</button>
+      <button id="dgFix" aria-pressed="false">Copy the table</button>
+    </span>
+  </div>
+  <div class="ptr" id="dgBox">
+    <div class="box"><h4>Root stack</h4><div id="dgStack"></div></div>
+    <div class="box"><h4>mtx_hs (host state)</h4><div id="dgHs"></div></div>
+    <svg class="ov" id="dgSvg" aria-hidden="true"><defs><marker id="dgArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#f1b23c"/></marker><marker id="dgArrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#ff4a32"/></marker></defs><path id="dgPath" fill="none" stroke-width="2"/></svg>
+  </div>
+  <div class="seq-say" id="dgSay" aria-live="polite"></div>
+  <div class="crash" id="dgCrash">exception 06h (invalid opcode) · EIP = 0x4D4D4D4D<br><span style="font-family:var(--f-body);font-size:15px;color:#f0b4a8">Measured in DOSBox: the bad call happens before the stack swap, so ESP is still on the root's stack.</span></div>
+  <div class="okmsg" id="dgOk">save_state runs · the switch goes ahead</div>
+  <figcaption>The addresses are illustrative. The sequence is the one in <code>mtx_init</code> before and after the fix. In the buggy version the arrow keeps pointing at a frame that no longer exists, and the first switch calls whatever has since been written there.</figcaption>
+</div>
+
+<section class="col" style="padding-top:8px">
+</section>
+
 <!-- ============================================================ 6 -->
 <section id="boot" data-hud="Booting a second engine" class="col">
   <p class="sec-tag">Map 06</p>
@@ -563,6 +687,19 @@ footer h2{font-size:34px}
                       uint32_t data_base, uint32_t ace_base);
 } mtx_ldr1n_ops_t;</pre>
   <p>There is no <code>free()</code> and no <code>close()</code>. The loader cannot destroy the parent's state because it has no way to. That is a stronger guarantee than a comment saying "don't free anything here", because it is enforced by what the loader can call. The first stage, <code>ldr0N.S</code>, takes its base addresses as data instead of deriving them from the startup stack, and assembles to 39 bytes, well inside the 256-byte patch budget of the original.</p>
+</section>
+
+<div class="wide console" id="ln">
+  <div class="console-head"><h2 class="console-title">Two second stages, side by side</h2><span class="badge b-sim">Animation</span></div>
+  <div class="lanes">
+    <div class="lane"><h4>Stock ACE_LDR1</h4><div class="calls" id="lnA"></div><div class="hudtxt">Parent's world</div><div class="world" id="lnWA"></div></div>
+    <div class="lane"><h4>LDR1N, the reentrant one</h4><div class="calls" id="lnB"></div><div class="hudtxt">Its whole authority</div><div class="world" id="lnT"></div><div class="hudtxt" style="margin-top:6px">Parent's world</div><div class="world" id="lnWB"></div></div>
+  </div>
+  <div class="seq-say" id="lnSay" aria-live="polite"></div>
+  <figcaption>The stock loader's calls are the ones the README lists. LDR1N's are the two reads and one allocation that host test [8] checks.</figcaption>
+</div>
+
+<section class="col" style="padding-top:8px">
   <details>
     <summary>Deep dive: two loader bugs DOS could never show</summary>
     <p>The original first stage never returned, so it was free to use <code>EBP</code> as scratch. The reentrant copy kept that habit, which meant it destroyed its caller's frame pointer, and nothing that intends to continue can call such a function. It now saves and restores <code>EBP</code>, which costs two instructions and still fits in 39 bytes.</p>
@@ -572,6 +709,30 @@ footer h2{font-size:34px}
   <h3>Telling an instance what it is</h3>
   <p>A nested instance is a relocated <em>copy</em> of the engine with its own <code>.bss</code>. Its <code>mtx_hs</code> is therefore a different, empty object. In the first attempt, the instance's allocator consulted that empty object, decided it was the root, and asked DPMI for 209,184 bytes when only 61,440 were free. Meanwhile its own memory pool sat unused.</p>
   <p>The host now fills a parameter block for each depth inside its <em>own</em> <code>mtx_hs</code> and hands the block's address over in <code>%ebp</code> at the entry. A register is used because the entry clears <code>.bss</code>, which would erase anything the host wrote into the instance beforehand, and <code>EBP</code> is the one register the entry doesn't consume. The engine validates the block by its contents: the magic word <code>'MTXP'</code> plus the block's own address stored inside it. When a root boots, <code>EBP</code> holds whatever the loader left there, the check fails, and a null block is exactly the signal that this copy is the host.</p>
+</section>
+
+<div class="wide console" id="rl">
+  <div class="console-head"><h2 class="console-title">Booting depth 1, hand-off by hand-off</h2><span class="badge b-sim">Animation</span></div>
+  <div class="controls" style="margin-top:0">
+    <span class="seg" role="group" aria-label="How the parameter block travels">
+      <button id="rlEbp" aria-pressed="true">Hand it over in %ebp</button>
+      <button id="rlBss" aria-pressed="false">Write it into the instance's .bss</button>
+    </span>
+  </div>
+  <div class="stations" id="rlSt"></div>
+  <div class="rgrid">
+    <div><div class="hudtxt" style="margin-bottom:4px">Registers at the hand-off</div><div class="regchips" id="rlRegs"></div></div>
+    <div><div class="hudtxt" style="margin-bottom:4px">Memory</div><div class="membar">
+      <div class="mseg" id="rlImg"><h5>Image slot</h5><span data-t></span><i class="fill"></i></div>
+      <div class="mseg" id="rlBssBox"><h5>Instance .bss</h5><span data-t></span></div>
+      <div class="mseg" id="rlPar"><h5>Host: params[1]</h5><span data-t></span></div>
+    </div></div>
+  </div>
+  <div class="seq-say" id="rlSay" aria-live="polite"></div>
+  <figcaption>The order and the registers are from <code>ldr0N.S</code>, <code>mtx_params.h</code> and the README, and the addresses are illustrative. The second option shows why the design avoids it. The instance's entry clears its own <code>.bss</code>, so anything written there beforehand is gone. Its ending (no block, so the instance thinks it is the root and asks DPMI for 209,184 B) is the failure that was measured when an instance had no block at all.</figcaption>
+</div>
+
+<section class="col" style="padding-top:8px">
   <details>
     <summary>Deep dive: the store that landed somewhere else</summary>
     <p>The obvious place to store the pointer was the assembly entry, using the same <code>mov %eax,mtx_params(%ecx)</code> idiom the rest of the entry uses. The assembler records that displacement as a relocation, so the entry's own relocator added the image base to it a <em>second</em> time and the store landed elsewhere. The pointer stayed null through an entire nested boot. The store now happens in C, where it is an ordinary relocated absolute reference.</p>
@@ -628,6 +789,20 @@ footer h2{font-size:34px}
 [MTX] present -> depth 0, buffer 36528 (blit runs this frame; checked next frame)
 [MTX] screen check: depth 0 <span class="hl">CONFIRMED</span> (vga 16843014 vs buffer 16843014)</pre>
   <p class="log-cap"><span class="badge b-meas">Measured</span> MTX.LOG. 16843009 is 0x01010101, the first pixels of the depth's color bars</p>
+</section>
+
+<div class="wide console" id="bl">
+  <div class="console-head"><h2 class="console-title">Choosing what reaches the screen</h2><span class="badge b-sim">Animation</span></div>
+  <div class="imm" id="blImm"></div>
+  <div class="blit">
+    <div><div class="hudtxt" style="margin-bottom:4px">Each depth's framebuffer</div><div class="bufs" id="blBufs"></div></div>
+    <div class="vga"><canvas id="blVga" width="160" height="100"></canvas><div class="hudtxt" id="blVgaT">VGA memory at 0xA0000</div></div>
+  </div>
+  <div class="seq-say" id="blSay" aria-live="polite"></div>
+  <figcaption>The bytes are the routine's real encoding: <code>be</code> is <code>mov $imm32,%esi</code>, and the four bytes after it are the source address, stored little-endian. Depth 0's and depth 1's addresses are the ones in the log above, and depth 2's is illustrative. The pictures are stand-ins for the frames.</figcaption>
+</div>
+
+<section class="col" style="padding-top:8px">
 
   <h3>Screens inside the world</h3>
   <p>Showing one instance at a time proves the plumbing but makes for a dull picture. The finished version is <em>diegetic</em>: one wall surface in each level is a TV, and it shows another instance's frame. Which instance is decided by the ring rule:</p>
@@ -815,6 +990,31 @@ function fly(root,fromEl,toEl,html,cls,delay,dur){
   an.onfinish=function(){g.remove();};
   return (delay||0)+dur*0.85;
 }
+/* A small sequence player: steps run one after another with their own delays,
+   autoplay while the console is on screen, loop if asked. Reduced motion: no
+   autoplay, the reader steps by hand. */
+function Seq(root,o){
+  var steps=[],i=0,timer=null,playing=false,want=!RM,vis=false,self=this;
+  var bar=document.createElement("div");bar.className="seqc";
+  bar.innerHTML='<button class="primary" data-q="play">Pause</button><button data-q="step">Step ▶</button><button data-q="restart">Restart</button><span class="hudtxt" data-q="pos"></span>';
+  (o.controlsIn||root).appendChild(bar);
+  var bPlay=bar.querySelector('[data-q=play]'),pos=bar.querySelector('[data-q=pos]');
+  function label(){bPlay.textContent=playing?"Pause":"Play";pos.textContent="step "+Math.min(i,steps.length)+" / "+steps.length;}
+  function one(){
+    if(i>=steps.length){if(o.loop){i=0;if(o.onLoop)o.onLoop();}else{stop();return false;}}
+    var s=steps[i++];if(s.run)s.run();if(s.say!==undefined&&o.say)o.say.innerHTML=s.say;label();return s;
+  }
+  function tick(){timer=null;if(!playing)return;var s=one();if(s===false)return;timer=setTimeout(tick,RM?Math.max(s.ms||600,900):(s.ms||600));}
+  function play(){if(playing)return;playing=true;label();tick();}
+  function stop(){playing=false;if(timer){clearTimeout(timer);timer=null;}label();}
+  self.load=function(list){stop();steps=list;i=0;if(o.reset)o.reset();if(o.say)o.say.innerHTML=o.intro||"";label();if(want&&vis)play();};
+  bPlay.addEventListener("click",function(){if(playing){want=false;stop();}else{want=true;if(i>=steps.length&&!o.loop)self.load(steps);play();}});
+  bar.querySelector('[data-q=step]').addEventListener("click",function(){want=false;stop();if(i>=steps.length&&!o.loop){self.load(steps);}one();});
+  bar.querySelector('[data-q=restart]').addEventListener("click",function(){self.load(steps);});
+  if("IntersectionObserver" in window)new IntersectionObserver(function(es){es.forEach(function(e){vis=e.isIntersecting;if(vis&&want)play();else if(!vis)stop();});},{threshold:0.35}).observe(root);
+  else vis=true;
+  label();
+}
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 
 /* ---------- tiny highlighter for code blocks ---------- */
@@ -932,7 +1132,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   ];
   var CFG={
     hero:{title:"The ring, built up",stages:true,monitors:false,strip:false,sched:false,wrapCtl:false,stage:1,
-      caption:"Each step adds one instance. In the real project each one is a full copy of the ACE engine inside the same DOOM2.EXE. This page re-enacts them with three small raycasters, and the TV in each world shows another instance's newest frame, as the real screen-walls do. <b>Teleport</b> zooms into the TV, because the picture on that TV <em>is</em> the next depth (a few frames old). The real engine uses a sweep and Doom's teleport sound, and the zoom is this page's own. <b>All controls</b> skips ahead and shows everything at once."},
+      caption:"Each step adds one instance. In the real project each one is a full copy of the ACE engine inside the same DOOM2.EXE. This page re-enacts them with three small raycasters, and the TV in each world shows another instance's newest frame, as the real screen-walls do. <b>Teleport</b> moves you into the next instance, with a sweep like the real engine's. <b>All controls</b> skips ahead and shows everything at once."},
     wrap:{title:"Open the ring, close the ring",monitors:true,strip:false,sched:false,wrapCtl:true,n:3,wrap:true,
       caption:"The three monitors are the three framebuffers. Untick the wrap and depth 2's TV goes to its bezel, as it did before the modulo existed: the chain becomes a ladder. Tick it and the last TV shows the first instance again."},
     full:{title:"One machine, three worlds",monitors:true,strip:true,sched:true,wrapCtl:true,n:3,wrap:true,
@@ -1056,7 +1256,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       self.draw(now);
     };
     self.teleport=function(){if(n<2)return;var from=V;V=(V+1)%n;if(RM)return;
-      var F=inst[from],z=(F.tvBox&&srcFor(from)===inst[V].fb)?F.tvBox:null;
+      var F=inst[from],z=null;
       if(z)snapX.putImageData(F.img,0,0);
       fx={from:from,to:V,t0:performance.now(),zoom:z?{x0:z.x0,y0:z.y0,x1:z.x1,y1:z.y1}:null};
       if(!paused)return;var t0=fx.t0;(function an(){self.draw(performance.now());if(fx&&fx.t0===t0)requestAnimationFrame(an);})();};
@@ -1173,6 +1373,269 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   $("fbPause").addEventListener("click",function(){paused=!paused;this.textContent=paused?"Play":"Pause";});
   if("IntersectionObserver" in window)new IntersectionObserver(function(es){es.forEach(function(e){visible=e.isIntersecting;if(visible)last=null;});}).observe(cv);
   requestAnimationFrame(loop);
+})();
+
+/* =====================================================================
+   THREE STACKS, ONE CPU: the control flow of a switch, as call stacks
+   ===================================================================== */
+(function(){
+  var root=$("tw"),box=$("twBox"),say=$("twSay");
+  var DCV=["var(--d0)","var(--d1)","var(--d2)"];
+  var cols=[],stacks=[[],[],[]],frames=[0,0,0],esp=[0,0x00A5FED0,0x00B5FED0],run=0;
+  var cpu=document.createElement("div");cpu.className="cpu";box.appendChild(cpu);
+  for(var d=0;d<3;d++){
+    var c=document.createElement("div");c.className="tcol";
+    c.innerHTML='<div class="thead"><span style="color:'+DCV[d]+'">DEPTH '+d+(d?'':' · host')+'</span><span class="st"></span></div><div class="tstack"></div><div class="tfoot"><span>frames <b>0</b></span><span>ctx['+d+'].esp <b>—</b></span></div>';
+    box.appendChild(c);cols.push(c);
+  }
+  function stk(d){return cols[d].querySelector(".tstack");}
+  function topEl(d){var e=stk(d).lastElementChild;while(e&&e.classList.contains("out"))e=e.previousElementSibling;return e;}
+  function el(d,f){var e=document.createElement("div");e.className="fr"+(f.h?" h":"");e.style.setProperty("--dc",DCV[d]);e.textContent=f.n;return e;}
+  function render(){
+    for(var d=0;d<3;d++){var s=stk(d);s.innerHTML="";stacks[d].forEach(function(f){var e=el(d,f);e.style.animation="none";s.appendChild(e);});}
+    status();
+  }
+  function status(){
+    for(var d=0;d<3;d++){
+      cols[d].classList.toggle("run",d===run);cols[d].classList.toggle("frozen",d!==run);
+      cols[d].querySelector(".st").textContent=d===run?"▶ running":"❄ suspended";
+      var ft=cols[d].querySelectorAll(".tfoot b");ft[0].textContent=frames[d];ft[1].textContent=esp[d]?hex(esp[d]):"—";
+    }
+    placeCpu(false);
+  }
+  function placeCpu(far){
+    var s=stk(run),top=topEl(run),R=box.getBoundingClientRect();
+    var b=(top||s).getBoundingClientRect();
+    cpu.classList.toggle("far",!!far);
+    cpu.style.transform="translate("+(b.right-R.left-24)+"px,"+(b.top-R.top+(b.height-18)/2)+"px)";
+  }
+  function push(d,f){stacks[d].push(f);stk(d).appendChild(el(d,f));placeCpu(false);}
+  function pop(d){stacks[d].pop();var e=topEl(d);if(e){e.classList.add("out");placeCpu(false);setTimeout(function(){if(e.parentNode)e.parentNode.removeChild(e);placeCpu(false);},RM?0:240);}}
+  function blinkTop(d){var e=topEl(d);if(e){e.classList.remove("blink");void e.offsetWidth;e.classList.add("blink");}}
+  var BASE0=[{n:"D_DoomLoop"},{n:"D_Display"}];
+  function BASEC(){return [{n:"mtx_trampoline … ace_main"},{n:"D_DoomLoop"},{n:"D_Display"}];}
+  function diveFrames(d,to){
+    var a=[{n:"swap_buffers  (ACE's I_FinishUpdate)"},{n:"mtx_engine_frame"}];
+    if(d===0)a.push({n:"mtx_engine_policy",h:1});else a.push({n:"host_yield → mtx_host_take_frame",h:1});
+    a.push({n:"mtx_frame_tick",h:1},{n:"mtx_switch_to("+to+")",h:1},{n:"mtx_switch",h:1});
+    return a;
+  }
+  function initState(){
+    stacks=[BASE0.slice(),BASEC().concat(diveFrames(1,0),[{n:"mtx_switch_ctx",h:1}]),BASEC().concat(diveFrames(2,0),[{n:"mtx_switch_ctx",h:1}])];
+    frames=[120,40,40];esp=[0,0x00A5FED0,0x00B5FED0];run=0;render();
+  }
+  var who=function(d){return d===0?"the root":"depth "+d;};
+  function runFrames(d,n){
+    var out=[];
+    out.push({ms:350,say:"<b>"+who(d).replace(/^t/,"T")+"</b> owns the CPU and runs its own game loop: think, render, present, "+n+" times.",run:function(){}});
+    for(var k=0;k<n;k++)out.push({ms:330,run:function(){frames[d]++;blinkTop(d);status();}});
+    return out;
+  }
+  function dive(d,to){
+    var out=[],fr=diveFrames(d,to);
+    out.push({ms:520,say:"Frame boundary. "+(d===0?"The root's policy has asked for depth "+to+" (every 4 frames, <code>mtx_request_switch</code>).":"Depth "+d+"'s slice is over, so it calls the <b>host's</b> frame service through <code>host_yield</code>. That is host code, running on depth "+d+"'s stack."),run:function(){push(d,fr[0]);}});
+    for(var k=1;k<fr.length;k++)(function(f){out.push({ms:360,run:function(){push(d,f);}});})(fr[k]);
+    out.push({ms:520,say:"<code>mtx_frame_tick</code> clears the request, then <code>mtx_switch</code> saves depth "+d+"'s state and loads depth "+to+"'s.",run:function(){push(d,{n:"save_state("+d+")",h:1});}});
+    out.push({ms:300,run:function(){pop(d);}});
+    out.push({ms:420,run:function(){push(d,{n:"load_state("+to+")",h:1});}});
+    out.push({ms:300,run:function(){pop(d);}});
+    out.push({ms:620,say:"<code>mtx_switch_ctx</code> pushes depth "+d+"'s callee-saved registers and publishes its stack pointer into <b>ctx["+d+"].esp</b>…",run:function(){push(d,{n:"mtx_switch_ctx",h:1});}});
+    out.push({ms:500,run:function(){esp[d]=(d===0?0x003FFE80:(d===1?0x00A5FED0:0x00B5FED0));status();var f=cols[d].querySelectorAll(".tfoot b")[1];f.classList.add("flash");setTimeout(function(){f.classList.remove("flash");},700);}});
+    out.push({ms:1100,say:"…then loads <b>ctx["+to+"].esp</b>. One <code>mov</code> to ESP, and the CPU is on depth "+to+"'s stack. Depth "+d+" is now frozen mid-call.",run:function(){run=to;status();placeCpu(true);}});
+    return out;
+  }
+  function resume(d){
+    var out=[];
+    out.push({ms:620,say:"Depth "+d+"'s own <code>mtx_switch_ctx</code> returns, many frames after it was called. Every frame above <code>D_Display</code> now unwinds as an ordinary return.",run:function(){pop(d);}});
+    var n=stacks[d].length;
+    return {first:out,rest:function(){var o=[],k;var cnt=d===0?6:6;for(k=0;k<cnt;k++)o.push({ms:240,run:function(){pop(d);}});return o;}};
+  }
+  function program(){
+    var seq=[],order=[[0,1],[1,0],[0,2],[2,0]];
+    order.forEach(function(p){
+      seq=seq.concat(runFrames(p[0],4),dive(p[0],p[1]));
+      var r=resume(p[1]);seq=seq.concat(r.first,r.rest());
+    });
+    return seq;
+  }
+  var player=new Seq(root,{loop:true,say:say,reset:initState,controlsIn:root,
+    intro:"The root is running. Depths 1 and 2 are already booted and frozen, each one deep inside its own call to <code>mtx_switch_ctx</code>."});
+  root.insertBefore(root.querySelector(".seqc"),say);
+  initState();player.load(program());
+  window.addEventListener("resize",function(){placeCpu(false);});
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){placeCpu(false);});
+})();
+
+/* =====================================================================
+   A POINTER THAT OUTLIVES ITS FRAME
+   ===================================================================== */
+(function(){
+  var root=$("dg"),bug=true,S;
+  var ADDR=[0x003FFE2C,0x003FFE28,0x003FFE24,0x003FFE20];
+  function reset(){S={rows:[{a:ADDR[0],v:"…",l:"caller"},{a:ADDR[1],v:"",l:""},{a:ADDR[2],v:"",l:""},{a:ADDR[3],v:"",l:""}],ops:"0x00000000",tgt:null,hs:[{k:"ops",v:"NULL"},{k:"host_ops.save",v:"—"},{k:"host_ops.load",v:"—"}],state:"",crash:false,ok:false};draw();}
+  function draw(){
+    var st=$("dgStack"),h="";
+    S.rows.forEach(function(r,i){h+='<div class="prow'+(r.cls?" "+r.cls:"")+'" data-i="s'+i+'"><span class="a">'+hex(r.a)+'</span><span class="v">'+esc(r.v)+(r.l?' <span style="color:#7a6650">· '+esc(r.l)+'</span>':'')+'</span></div>';});
+    st.innerHTML=h;h="";
+    S.hs.forEach(function(r,i){h+='<div class="prow'+(r.cls?" "+r.cls:"")+'" data-i="h'+i+'"><span class="a">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>';});
+    $("dgHs").innerHTML=h;
+    $("dgCrash").classList.toggle("on",S.crash);$("dgOk").classList.toggle("on",S.ok);
+    arrow();
+  }
+  function arrow(){
+    var p=$("dgPath");if(!S.tgt){p.setAttribute("d","");return;}
+    var R=$("dgBox").getBoundingClientRect(),a=root.querySelector('[data-i="h0"]').getBoundingClientRect(),b=root.querySelector('[data-i="'+S.tgt+'"]').getBoundingClientRect();
+    var x1=a.left-R.left+4,y1=a.top-R.top+a.height/2,tgtLeft=S.tgt[0]==="s",x2=tgtLeft?b.right-R.left-4:b.left-R.left+30,y2=b.top-R.top+b.height/2;
+    var d=tgtLeft?"M"+x1+","+y1+" C"+(x1-60)+","+y1+" "+(x2+60)+","+y2+" "+x2+","+y2:"M"+x1+","+y1+" C"+(x1-50)+","+y1+" "+(x1-50)+","+y2+" "+(x2-26)+","+y2;
+    p.setAttribute("d",d);var red=S.crash||S.redArrow;p.setAttribute("stroke",red?"#ff4a32":"#f1b23c");p.setAttribute("marker-end",red?"url(#dgArrR)":"url(#dgArr)");
+  }
+  function steps(){
+    var L=[];
+    L.push({ms:1400,say:"<b>mtx_engine_boot()</b> runs. Its stack frame holds a local table, <code>ops = {save_state, load_state}</code>.",run:function(){
+      S.rows[1]={a:ADDR[1],v:"ret → boot",l:"mtx_engine_boot frame",cls:"new"};S.rows[2]={a:ADDR[2],v:"&mtx_dos_load_state",l:"ops.load",cls:"new"};S.rows[3]={a:ADDR[3],v:"&mtx_dos_save_state",l:"ops.save",cls:"new"};draw();}});
+    if(bug){
+      L.push({ms:1600,say:"<b>mtx_init(&amp;ops)</b> keeps the pointer it was handed: <code>mtx_hs.ops = 0x003FFE20</code>. That address is inside the caller's frame.",run:function(){
+        S.rows.forEach(function(r){r.cls="";});S.hs[0]={k:"ops",v:"0x003FFE20",cls:"new"};S.tgt="s3";S.rows[3].cls="tgt";draw();}});
+    }else{
+      L.push({ms:1600,say:"<b>mtx_init(&amp;ops)</b> <em>copies</em> the table into <code>mtx_hs.host_ops</code> and points at the copy, which lives in host state for the whole run.",run:function(){
+        S.rows.forEach(function(r){r.cls="";});
+        var a=root.querySelector('[data-i="s3"] .v'),b=root.querySelector('[data-i="h1"] .v'),a2=root.querySelector('[data-i="s2"] .v'),b2=root.querySelector('[data-i="h2"] .v');
+        fly(root,a,b,"&amp;mtx_dos_save_state","",0,800);fly(root,a2,b2,"&amp;mtx_dos_load_state","",120,800);
+        setTimeout(function(){S.hs[1]={k:"host_ops.save",v:"&mtx_dos_save_state",cls:"new"};S.hs[2]={k:"host_ops.load",v:"&mtx_dos_load_state",cls:"new"};S.hs[0]={k:"ops",v:"&mtx_hs.host_ops",cls:"new"};S.tgt="h1";draw();},RM?0:780);}});
+    }
+    L.push({ms:1500,say:"<b>mtx_engine_boot returns.</b> Its frame is dead: the stack pointer has moved back up and those bytes belong to whoever calls next."+(bug?" The pointer still aims at them.":""),run:function(){
+      S.hs.forEach(function(r){r.cls="";});for(var i=1;i<4;i++)S.rows[i].cls="dead";S.rows[1].l="(dead)";draw();}});
+    L.push({ms:1600,say:"Frames later, other calls reuse the same stack bytes for their own locals.",run:function(){
+      S.rows[1]={a:ADDR[1],v:"0x0001D4FC",l:"someone else's frame",cls:"new"};S.rows[2]={a:ADDR[2],v:"0x00000140",l:"",cls:"new"};S.rows[3]={a:ADDR[3],v:"0x4D4D4D4D",l:"",cls:"new"+(bug?" tgt":"")};draw();}});
+    L.push({ms:1600,say:"<b>The first real switch.</b> <code>mtx_switch</code> calls <code>mtx_ops-&gt;save_state(...)</code>, through the pointer, before it swaps stacks.",run:function(){
+      S.rows.forEach(function(r){r.cls=r.cls==="dead"?"dead":"";});
+      if(bug){S.rows[3].cls="badhit";S.redArrow=true;}else{S.hs[1].cls="hit";}draw();}});
+    L.push({ms:2600,say:bug?"<span class='bad'>The call jumps to 0x4D4D4D4D.</span> The fix is to own the copy, which makes this mistake impossible instead of merely documented.":"<span class='good'>The call lands in mtx_dos_save_state.</span> Nothing the caller's frame does later can reach the copy.",run:function(){
+      if(bug)S.crash=true;else S.ok=true;draw();}});
+    return L;
+  }
+  var player=new Seq(root,{loop:true,say:$("dgSay"),reset:function(){S&&(S.redArrow=false);reset();},controlsIn:root,onLoop:function(){reset();}});
+  root.insertBefore(root.querySelector(".seqc"),$("dgSay"));
+  function setBug(b){bug=b;$("dgBug").setAttribute("aria-pressed",b);$("dgFix").setAttribute("aria-pressed",!b);player.load(steps());}
+  $("dgBug").addEventListener("click",function(){setBug(true);});
+  $("dgFix").addEventListener("click",function(){setBug(false);});
+  reset();player.load(steps());
+  window.addEventListener("resize",arrow);
+})();
+
+/* =====================================================================
+   TWO SECOND STAGES
+   ===================================================================== */
+(function(){
+  var root=$("ln"),W=["stdin buffer","lump cache","lump table","heap (mainzone)","WAD files"];
+  function chips(id,cls){$(id).innerHTML=W.map(function(w,i){return '<span class="chip'+(cls&&cls[i]?" "+cls[i]:"")+'" data-w="'+i+'">'+w+'</span>';}).join("");}
+  function reset(){$("lnA").innerHTML="";$("lnB").innerHTML="";chips("lnWA");chips("lnWB");
+    $("lnT").innerHTML='<span class="chip live">read()</span><span class="chip live">alloc()</span><span class="chip live">enter()</span><span class="chip off">free()</span><span class="chip off">close()</span>';}
+  function line(id,t,c){var d=document.createElement("div");d.textContent=t;if(c)d.className=c;$(id).appendChild(d);}
+  function kill(i){var c=$("lnWA").querySelector('[data-w="'+i+'"]');if(c)c.classList.add("dead");}
+  var A=[["free(stdin buffer)",0],["free(lumpcache)",1],["free(lumpinfo)",2],["free(mainzone)",3],["close(every WAD descriptor)",4],["jmp engine",-1]];
+  var B=["read(fd, &bss_size, 4)","alloc(bss_size + code) from this depth's slot","read(fd, code, rest)","descriptor list → per-depth scratch","enter(code, bases)",""];
+  var L=[];
+  for(var k=0;k<A.length;k++)(function(k){
+    L.push({ms:1000,say:k===0?"Both loaders start the same job: get an engine image into memory and jump into it.":k===3?"The stock loader frees the heap that the parent is still using. The reentrant one has no <code>free</code> in its table to call.":k===5?"<b>Stock:</b> the parent's world is gone before the child runs. <b>LDR1N:</b> every one of the parent's resources is intact, and nothing in the loader could have touched it.":undefined,
+      run:function(){line("lnA",A[k][0],A[k][1]>=0?"bad":"");if(A[k][1]>=0)kill(A[k][1]);if(B[k])line("lnB",B[k],"ok");}});
+  })(k);
+  L.push({ms:2600,run:function(){}});
+  var p=new Seq(root,{loop:true,say:$("lnSay"),reset:reset,onLoop:reset,controlsIn:root});
+  root.insertBefore(root.querySelector(".seqc"),$("lnSay"));
+  reset();p.load(L);
+})();
+
+/* =====================================================================
+   BOOT RELAY
+   ===================================================================== */
+(function(){
+  var root=$("rl"),mode="ebp";
+  var ST=["mtx_push(1)","mtx_trampoline","mtx_ldr_load","ldr0N","ACE _start","clear .bss","ace_main","D_DoomLoop"];
+  var REG=["ESI","EDI","EBX","ECX","EBP"];
+  function reset(){
+    $("rlSt").innerHTML=ST.map(function(s,i){return (i?'<span class="arrowsep">→</span>':'')+'<span class="stn" data-s="'+i+'">'+s+'</span>';}).join("");
+    $("rlRegs").innerHTML=REG.map(function(r){return '<div class="rchip" data-r="'+r+'"><span>'+r+'</span>—</div>';}).join("");
+    setT("rlImg","empty");setT("rlBssBox","not loaded yet");setT("rlPar","");$("rlImg").querySelector(".fill").style.width="0";
+  }
+  function setT(id,h){$(id).querySelector("[data-t]").innerHTML=h;}
+  function at(i,fail){root.querySelectorAll(".stn").forEach(function(e,k){e.classList.toggle("done",k<i);e.classList.toggle("cur",k===i&&!fail);e.classList.toggle("fail",k===i&&!!fail);});}
+  function reg(r,v,cls){var e=root.querySelector('[data-r="'+r+'"]');e.innerHTML="<span>"+r+"</span>"+v;e.className="rchip "+(cls||"set");}
+  function steps(){
+    var L=[],ebp=mode==="ebp";
+    L.push({ms:1500,say:"<b>The host</b> calls <code>mtx_push(1)</code>. It seeds a fresh stack and switches into it.",run:function(){at(0);}});
+    L.push({ms:1400,say:"<code>mtx_trampoline</code> calls <code>mtx_run_entry</code>, so depth 1 is now running, on its own stack.",run:function(){at(1);}});
+    L.push({ms:1700,say:"<code>mtx_ldr_load</code> reads <code>ACE_CODE</code> out of the WAD, about 400 KB, into this depth's own image slot.",run:function(){at(2);$("rlImg").querySelector(".fill").style.width="100%";setT("rlImg","ACE_CODE<br>relocatable copy");}});
+    L.push({ms:1800,say:"The host fills depth 1's parameter block in <b>its own</b> <code>mtx_hs</code>: magic <code>'MTXP'</code>, its own address, depth, heap, screen, raw pool, log."+(ebp?"":" In this version the host also writes the block's address into the instance's <code>.bss</code>."),run:function(){
+      setT("rlPar",'<span class="item">MTXP · self · depth 1<br>zone · screen · raw</span>');
+      if(!ebp)setT("rlBssBox",'<span class="item" data-x>params → 0x002E6034</span>');}});
+    L.push({ms:1500,say:"<code>ldr0N</code> prints its banner through Doom's <code>printf</code>, and only then loads the hand-off registers, because <code>printf</code> clobbers ECX.",run:function(){at(3);}});
+    REG.forEach(function(r,k){var v=["code base","data base","next stage","entry","&amp;params[1]"][k];
+      L.push({ms:420,run:function(){if(r==="EBP"&&!ebp)reg(r,"(left over)","");else reg(r,v);}});});
+    L.push({ms:1600,say:"<code>jmp *%ebx</code> lands in ACE's <code>_start</code>. It does <code>sub $0x1008,%ecx</code> to recover its own base, and relocates itself.",run:function(){at(4);reg("ECX","base, recovered","set");}});
+    L.push({ms:2000,say:"The entry <b>clears its .bss</b>. "+(ebp?"Registers are not memory, so <b>EBP survives</b>.":"<span class='bad'>The address the host wrote there is wiped.</span>"),run:function(){
+      at(5);var b=$("rlBssBox");b.classList.remove("wipe");void b.offsetWidth;b.classList.add("wipe");
+      var x=b.querySelector("[data-x]");if(x)x.classList.add("gone");else setT("rlBssBox","zeroed");
+      if(ebp)reg("EBP","&amp;params[1]","glow");}});
+    if(ebp){
+      L.push({ms:1900,say:"From C, the engine stores EBP into <code>mtx_params</code> and checks the block: magic <code>'MTXP'</code> ✓, the block's own address ✓. <span class='good'>This copy knows it is depth 1.</span>",run:function(){
+        setT("rlBssBox",'<span class="item">mtx_params → params[1] ✓</span>');var p=$("rlPar").querySelector(".item"),b=$("rlBssBox").querySelector(".item");if(p&&b)fly(root,b,p,"reads through the pointer","",0,900);}});
+      L.push({ms:1900,say:"<code>ace_main</code> → <code>Z_Init</code> takes the nested branch and builds depth 1's heap in its arena slot. <code>ldr_malloc</code> goes to depth 1's raw pool.",run:function(){at(6);}});
+      L.push({ms:2400,say:"<code>D_DoomLoop</code>: depth 1 draws its first frame, and at its next frame boundary it hands the CPU back.",run:function(){at(7);}});
+    }else{
+      L.push({ms:1900,say:"The engine looks for its block: <code>.bss</code> is zero and EBP is whatever the loader left. No valid block means <b>this copy is the root</b>.",run:function(){at(6,true);setT("rlBssBox","zeroed: no block");}});
+      L.push({ms:2800,say:"<span class='bad'>Acting as the root, <code>ldr_malloc</code> asks DPMI for 209,184 B. Free DPMI: 61,440 B. The instance dies in <code>init_render()</code>, with its own pool unused.</span>",run:function(){}});
+    }
+    return L;
+  }
+  var p=new Seq(root,{loop:true,say:$("rlSay"),reset:reset,onLoop:reset,controlsIn:root});
+  root.insertBefore(root.querySelector(".seqc"),$("rlSay"));
+  function setMode(m){mode=m;$("rlEbp").setAttribute("aria-pressed",m==="ebp");$("rlBss").setAttribute("aria-pressed",m!=="ebp");p.load(steps());}
+  $("rlEbp").addEventListener("click",function(){setMode("ebp");});
+  $("rlBss").addEventListener("click",function(){setMode("bss");});
+  reset();p.load(steps());
+})();
+
+/* =====================================================================
+   THE BLIT SOURCE
+   ===================================================================== */
+(function(){
+  var root=$("bl"),ADDR=[36528,4250976,5835328],COLS=[[224,85,60],[127,210,62],[108,156,240]],bufs=[],vga=$("blVga").getContext("2d"),cur=0,raf=null;
+  for(var d=0;d<3;d++){
+    var c=document.createElement("div");c.className="buf";
+    c.innerHTML='<canvas width="160" height="100"></canvas><div class="hudtxt">depth '+d+' · '+hex(ADDR[d])+'</div>';
+    $("blBufs").appendChild(c);var x=c.querySelector("canvas").getContext("2d");
+    var g=x.createLinearGradient(0,0,0,100),k=COLS[d];g.addColorStop(0,"rgb("+(k[0]*0.25|0)+","+(k[1]*0.25|0)+","+(k[2]*0.25|0)+")");g.addColorStop(1,"rgb("+(k[0]*0.7|0)+","+(k[1]*0.7|0)+","+(k[2]*0.7|0)+")");
+    x.fillStyle=g;x.fillRect(0,0,160,100);
+    for(var b=0;b<8;b++){x.fillStyle="rgba("+k[0]+","+k[1]+","+k[2]+","+(0.25+b*0.09)+")";x.fillRect(b*20,62-b*3,18,38+b*3);}
+    x.fillStyle="#000";x.fillRect(4,4,62,16);x.fillStyle="#f1b23c";x.font="14px VT323, monospace";x.fillText("DEPTH "+d,9,17);
+    bufs.push({el:c,cv:c.querySelector("canvas")});
+  }
+  function bytes(a){var b=[a&255,(a>>>8)&255,(a>>>16)&255,(a>>>24)&255];return b.map(function(v){return (v<16?"0":"")+v.toString(16);});}
+  function imm(a,flip){
+    var b=bytes(a);
+    $("blImm").innerHTML='<span style="color:var(--faint)">I_FinishUpdate+3:</span> be '+b.map(function(v){return '<span class="byte'+(flip?" flip":"")+'">'+v+'</span>';}).join(" ")+' <span style="color:#8a7663">  mov $'+hex(a)+',%esi   ← the blit\'s source</span>';
+  }
+  function src(d){bufs.forEach(function(b,i){b.el.classList.toggle("src",i===d);});}
+  function blitAnim(d,done){
+    var t0=performance.now(),dur=RM?0:1100;
+    function f(now){var p=dur?Math.min(1,(now-t0)/dur):1,rows=Math.floor(p*100);
+      vga.drawImage(bufs[d].cv,0,0,160,rows,0,0,160,rows);
+      if(rows<100){vga.fillStyle="rgba(255,255,255,.7)";vga.fillRect(0,rows,160,1);}
+      $("blVgaT").textContent="rep movsl: "+Math.floor(p*16000).toLocaleString("en-US")+" / 16,000 dwords → 0xA0000";
+      if(p<1)raf=requestAnimationFrame(f);else{raf=null;if(done)done();}}
+    if(raf)cancelAnimationFrame(raf);raf=requestAnimationFrame(f);
+  }
+  function reset(){vga.fillStyle="#000";vga.fillRect(0,0,160,100);vga.drawImage(bufs[0].cv,0,0);imm(ADDR[0],false);src(0);$("blVgaT").textContent="VGA memory at 0xA0000 · showing depth 0";}
+  var L=[];
+  [1,2,0].forEach(function(d){
+    L.push({ms:1600,say:"<b>The host decides the screen should show depth "+d+".</b> <code>mtx_present</code> writes depth "+d+"'s buffer address into the routine's own code, at <code>I_FinishUpdate+4</code>.",run:function(){imm(ADDR[d],true);src(d);}});
+    L.push({ms:1700,say:"This frame's blit runs. <code>rep movsl</code> copies 16,000 dwords from the new source to <code>0xA0000</code>. The code did not change shape, only the number inside it.",run:function(){blitAnim(d);}});
+    L.push({ms:1900,say:"<b>Next frame</b>, the host reads the first dword of VGA memory back and compares it with the buffer. Pointing the pointer is not evidence, but the readback is: <span class='good'>screen check: depth "+d+" CONFIRMED</span>.",run:function(){$("blVgaT").textContent="screen check: vga[0] == buffer[0] → depth "+d+" CONFIRMED";}});
+  });
+  var p=new Seq(root,{loop:true,say:$("blSay"),reset:reset,controlsIn:root});
+  root.insertBefore(root.querySelector(".seqc"),$("blSay"));
+  reset();p.load(L);
 })();
 
 /* =====================================================================
@@ -1446,13 +1909,15 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     }
     return {rows:rows,tog:tog};
   }
-  function svg(el,res,mode){
+  function svg(el,res,mode,rev){
+    if(rev===undefined)rev=F;
     var cw=17,lw=118,rh=20,nr=mode==="B"?6:5,W=lw+F*cw+6,H=nr*rh+22,h="";
     var lab=["key held","depth 0 copy","depth 1 copy","depth 2 copy"];if(mode==="B")lab.push("authority");lab.push("toggle");
     el.setAttribute("viewBox","0 0 "+W+" "+H);el.setAttribute("width",W);el.style.minWidth=Math.min(W,560)+"px";
     lab.forEach(function(l,i){h+='<text x="4" y="'+(i*rh+14)+'" fill="#a9957f" font-family="VT323,monospace" font-size="16">'+l+'</text>';});
     res.rows.forEach(function(R,f){
       var x=lw+f*cw;
+      if(f>=rev){if(f%SL===0)h+='<line x1="'+x+'" x2="'+x+'" y1="'+rh+'" y2="'+(nr*rh)+'" stroke="#2a201b" stroke-width="1"/>';return;}
       if(R.held)h+='<rect x="'+x+'" y="4" width="'+cw+'" height="12" fill="#f1b23c"/>';
       for(var d=0;d<3;d++){var y=(d+1)*rh;
         h+='<rect x="'+(x+0.5)+'" y="'+(y+2)+'" width="'+(cw-1)+'" height="'+(rh-4)+'" fill="'+(R.r===d?DC[d]:"#1a1310")+'" opacity="'+(R.r===d?0.35:1)+'"/>';
@@ -1463,18 +1928,31 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       if(f%SL===0){h+='<line x1="'+x+'" x2="'+x+'" y1="'+rh+'" y2="'+(nr*rh)+'" stroke="#3d2c23" stroke-width="1"/>';}
       if(f%8===0)h+='<text x="'+(x+2)+'" y="'+(H-3)+'" fill="#6f5f50" font-family="VT323,monospace" font-size="14">'+f+'</text>';
     });
+    if(rev<F){var px=lw+rev*cw;h+='<line x1="'+px+'" x2="'+px+'" y1="2" y2="'+(nr*rh)+'" stroke="#eadccb" stroke-width="1.5"/>';
+      var R2=res.rows[Math.max(0,rev-1)];if(rev>0&&R2&&(rev-1===+$("ktPress").value||rev-1===+$("ktPress").value+(+$("ktHold").value)))h+='<text x="'+(px-6)+'" y="'+((R2.r+1)*rh+15)+'" fill="#fff" font-size="16" font-family="VT323,monospace">⚡</text>';}
     el.innerHTML=h;
   }
   function go(){
     var p=+$("ktPress").value,hd=+$("ktHold").value,rep=$("ktRep").checked;
     $("ktPressOut").textContent=p;$("ktHoldOut").textContent=hd;
     var A=sim(p,hd,rep,"A"),B=sim(p,hd,rep,"B");
-    svg($("ktA"),A,"A");svg($("ktB"),B,"B");
+    anim(A,B);
     $("ktVa").textContent="Each copy decides, tracker cleared at slice start: 1 press → "+A.tog.length+" toggle"+(A.tog.length===1?"":"s")+(A.tog.length?" (frames "+A.tog.join(", ")+")":"");
     $("ktVb").textContent="One authority word, copy forced at slice start: 1 press → "+B.tog.length+" toggle"+(B.tog.length===1?"":"s");
   }
+  var kraf=null,kvis=false,kseen=false,kpend=null;
+  function anim(A,B){
+    if(kraf)cancelAnimationFrame(kraf);
+    $("ktVa").style.visibility=$("ktVb").style.visibility="hidden";
+    if(RM||!kvis){svg($("ktA"),A,"A");svg($("ktB"),B,"B");$("ktVa").style.visibility=$("ktVb").style.visibility="";if(!kvis)kpend=[A,B];return;}
+    var t0=performance.now(),dur=kseen?900:3200;kseen=true;
+    (function f(now){var r=Math.min(F,Math.floor((now-t0)/dur*F));svg($("ktA"),A,"A",r);svg($("ktB"),B,"B",r);
+      if(r<F)kraf=requestAnimationFrame(f);else{kraf=null;$("ktVa").style.visibility=$("ktVb").style.visibility="";}})(t0);
+  }
   ["ktPress","ktHold","ktRep"].forEach(function(id){$(id).addEventListener("input",go);});
   go();
+  if("IntersectionObserver" in window)new IntersectionObserver(function(es){es.forEach(function(e){kvis=e.isIntersecting;if(kvis&&kpend){kpend=null;go();}});},{threshold:0.4}).observe($("kt"));
+  else kvis=true;
 })();
 
 /* =====================================================================
@@ -1535,13 +2013,20 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     totBad+=nb;if(nb)note+="Depth "+cur+" is now reading "+nb+" block"+(nb>1?"s":"")+" written by the other depth. ";
     lastRd=rd;lastWr=wr;lastDf=df;
     for(i=0;i<N;i++){late[i]*=0.85;if(L[i]===T[cur][i])bad[i]*=0.6;}
-    draw();stats();
+    scan(mode!=="cache"||sw<=WARM||(canary%CAN)===0);stats();
   }
   var cv=$("clGrid"),cx=cv.getContext("2d");
-  function draw(){
-    var W=cv.width,H=cv.height,cw=W/COLS,ch=H/ROWS,i,x,y,dv=STG[stage-1].diff;
+  var scanT=0,scanAll=false,scanRaf=null;
+  function scan(all){
+    scanAll=all;if(RM||!all){draw();return;}
+    scanT=performance.now();if(scanRaf)cancelAnimationFrame(scanRaf);
+    (function f(now){var p=Math.min(1,(now-scanT)/300);draw(p);if(p<1)scanRaf=requestAnimationFrame(f);else scanRaf=null;})(scanT);
+  }
+  function draw(p){
+    var W=cv.width,H=cv.height,cw=W/COLS,ch=H/ROWS,i,x,y,dv=STG[stage-1].diff,lim=p===undefined?N:Math.floor(p*N);
     cx.fillStyle="#0b0807";cx.fillRect(0,0,W,H);
     for(i=0;i<N;i++){x=(i%COLS)*cw;y=Math.floor(i/COLS)*ch;
+      if(i>=lim){cx.fillStyle="#1d1612";cx.fillRect(x+1,y+1,cw-2,ch-2);continue;}
       var c="#2a201b";
       if(hot[i]&&mode!=="all")c="#7a5a22";
       if(flash[i]===1)c="#5a4630";
@@ -1551,6 +2036,8 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       cx.fillStyle=c;cx.fillRect(x+1,y+1,cw-2,ch-2);
       if(promoted[i]){cx.strokeStyle="#7fd23e";cx.lineWidth=2;cx.strokeRect(x+2,y+2,cw-4,ch-4);}
     }
+    if(lim<N){x=(lim%COLS)*cw;y=Math.floor(lim/COLS)*ch;cx.fillStyle="#fff";cx.fillRect(x,y,cw*2,ch);
+      cx.fillStyle="rgba(255,255,255,.12)";cx.fillRect(0,y,W,ch);}
   }
   function fmt(b){return b>=1024*1024?(b/1048576).toFixed(2)+" MB":b>=1024?(b/1024).toFixed(1)+" KB":b+" B";}
   function stats(){
