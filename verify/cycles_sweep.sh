@@ -21,7 +21,7 @@
 # (measured: the SAME build gave 16.0 frames/s earlier and 8-12/s later in one
 # session), so an unbracketed before/after comparison is not evidence.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-30}"
 OUT="$V/cycles_sweep.out"
 : > "$OUT"

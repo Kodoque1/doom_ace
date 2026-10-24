@@ -25,7 +25,7 @@
 # The game's PIT divisor is 34000 (1193182/34000 = 35.09 Hz), so a tick rate near 35 is
 # what the hardware was asked for; anything else is a measurement of what it actually got.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-45}"
 OUT="$V/rate_probe.out"
 : > "$OUT"

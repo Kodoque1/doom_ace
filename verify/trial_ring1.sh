@@ -7,7 +7,7 @@
 # move it. The baseline is the two-depth run from before the change (20 MiB, canvas
 # rule). Only the plan line and addresses are allowed to differ.
 set -u
-cd /home/kodoque/Documents/recursive_doom
+cd "${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 for p in $(pgrep dosbox); do kill -9 $p 2>/dev/null; done
 
 echo "=== rebuild engine + exploit WAD ==="

@@ -19,7 +19,7 @@
 #
 # The counter counts DOWN and wraps, so the delta is (prev - now) mod 65536.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-40}"
 OUT="$V/emuclock.out"
 : > "$OUT"

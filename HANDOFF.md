@@ -59,10 +59,6 @@ makes the nesting visible inside the nested view as well as around it.
 | `doom_ace/` | `inset-wip` | github.com/Kodoque1/doom_ace (PRIVATE) — HEAD `649dfa6`, pushed |
 | `nested/` | `master` | github.com/Kodoque1/nested (PRIVATE) — HEAD `c68cfbe`, pushed |
 
-**Branch:** `inset-wip` is now the repository's default branch. `master` is 34
-commits behind it and contains neither the ring nor the loader nor this brief — if
-you cloned before that change, you are on the wrong branch.
-
 `doom_ace/engine/makefile` has `MTX_DIR ?= ../../nested`, so **clone both side by
 side** (`X/doom_ace`, `X/nested`) or build with
 `make -C doom_ace/engine MTX_DIR=/path/to/nested`.
@@ -102,6 +98,36 @@ readiness signal, not a press count), give the window input focus explicitly
 (there is no window manager under Xvfb, so nothing assigns it), start DOSBox's own
 recorder with Ctrl+F7, optionally hold Up+Right to make the view run, press the
 switch key held, and stop the recorder with Ctrl+F7.
+
+### What you must supply yourself (deliberately not in the repo)
+
+- **Doom 2 version 1.9**: `DOOM2.EXE` and `DOOM2.WAD`. The exploit targets 1.9
+  exactly. They are copyrighted game data and are not committed. Put them in
+  `verify/after/`, or point `MTX_REF` at whatever directory holds them.
+- **DOSBox Staging** (the harness was written against 0.83.0), plus `ffmpeg`,
+  `xdotool` and `Xvfb` for the headless capture, and `python3` (standard library
+  only — no pip installs).
+- The harness locates the tree through **`MTX_ROOT`** (default
+  `$HOME/Documents/recursive_doom`), so it runs from anywhere once that is set.
+
+### First 30 minutes
+
+```
+git clone https://github.com/Kodoque1/doom_ace
+git clone https://github.com/Kodoque1/nested          # must be a SIBLING of doom_ace
+cp <your>/DOOM2.EXE <your>/DOOM2.WAD doom_ace/verify/after/
+make -C doom_ace/engine && make -C doom_ace/loader
+python3 doom_ace/verify/mkwadlevels.py
+export MTX_ROOT=$PWD
+
+./doom_ace/verify/trial_levels3.sh                    # sanity: ring up, three distinct maps
+MTX_WALK=1 ./doom_ace/verify/record.sh walk 30        # a clip and its log
+python3 doom_ace/verify/clip_content_rate.py \
+        doom_ace/verify/rec-walk/cap/*.avi            # distinct pictures/s, lossless
+```
+
+`trial_levels3.sh` is the regression that must stay green: three depths, each on
+its own map, each with its own screen texture, 0 illegal reads, 0 DYNX86.
 
 Measure with `verify/clip_content_rate.py <clip>`: it counts how often the
 **picture changes**, which is the number a viewer perceives. Read the EXACT figure

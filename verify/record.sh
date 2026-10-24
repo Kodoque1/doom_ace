@@ -27,7 +27,7 @@
 set -u
 LABEL="${1:-clip}"; SECS="${2:-20}"; NOBUILD="${3:-}"
 SWITCHES="${MTX_SWITCHES:-1}"
-ROOT="$HOME/Documents/recursive_doom"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 REF="${MTX_REF:-$ROOT/verify/after}"   # MTX_REF picks a variant game image
 D="$ROOT/verify/rec-$LABEL"
 DB="$HOME/Downloads/dosbox-staging-linux-x86_64-0.83.0-7b400/dosbox"

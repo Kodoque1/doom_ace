@@ -23,7 +23,7 @@
 # Stock is run BEFORE and AFTER the patched run: host load drifts (measured: the same build
 # gave 16.0 frames/s early in a session and 8-12/s later), so an unbracketed A/B is not evidence.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-50}"
 OUT="$V/tic_patch_test.out"
 : > "$OUT"

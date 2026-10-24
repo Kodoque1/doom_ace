@@ -7,7 +7,7 @@
 # diegetic surface (the texture it painted before is a MAP01 texture, and MAP01 is
 # no longer what is loaded).
 set -u
-cd /home/kodoque/Documents/recursive_doom
+cd "${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 for p in $(pgrep dosbox); do kill -9 $p 2>/dev/null; done
 
 runone() {   # runone <wad> <tag>

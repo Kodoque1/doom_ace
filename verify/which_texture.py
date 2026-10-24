@@ -8,9 +8,9 @@ to be in view wherever the demo clip starts - and the count is what says so, ins
 of picking a number and hoping.
 """
 import struct
-import sys
+import os, sys
 
-WAD = sys.argv[1] if len(sys.argv) > 1 else "/home/kodoque/Documents/recursive_doom/verify/after/DOOM2.WAD"
+WAD = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.environ.get("MTX_ROOT", os.path.expanduser("~/Documents/recursive_doom")), "verify/after/DOOM2.WAD")
 MAP = (sys.argv[2] if len(sys.argv) > 2 else "MAP01").encode()
 
 raw = open(WAD, "rb").read()

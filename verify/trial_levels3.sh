@@ -16,7 +16,7 @@
 #      whose screen surface was never planted)
 #   5. any illegal read or DYNX86
 set -u
-cd /home/kodoque/Documents/recursive_doom
+cd "${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 for p in $(pgrep dosbox); do kill -9 $p 2>/dev/null; done
 
 echo "=== rebuild (abort on failure: a stale binary makes the run meaningless) ==="

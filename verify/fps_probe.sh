@@ -22,7 +22,7 @@
 # what the machine is doing, so the probe has to run the same thing the clip runs.
 set -u
 LABEL="${1:-fpsprobe}"; SECS="${2:-55}"
-ROOT="$HOME/Documents/recursive_doom"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 D="$ROOT/verify/rec-$LABEL"
 
 # No switch presses: this measures the frame clock, not the input path.

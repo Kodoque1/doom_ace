@@ -14,7 +14,7 @@
 # as d >= 1 on SOME frames and 0 on others (interrupts arrive at arbitrary phases). An
 # engine bump shows up as a constant.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-40}"
 OUT="$V/intra.out"
 : > "$OUT"

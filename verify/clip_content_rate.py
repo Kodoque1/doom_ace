@@ -22,7 +22,7 @@
 #                clip scores 8.47/s exact on the AVI and 28.45/s exact on its mp4, so
 #                quoting the exact number off a lossy file is a false measurement.
 # Always measure the AVI when the question is "how fast does the game update".
-import subprocess, sys, collections
+import os, subprocess, sys, collections
 
 # A change is judged by AMPLITUDE, not by a mean: a mean over the whole frame hides a
 # real change confined to a small part of it (measured: the status-bar digits moving
@@ -36,7 +36,7 @@ STRIDE = 7               # subsample pixels: enough to catch any real change, ch
 
 def main():
     src = sys.argv[1] if len(sys.argv) > 1 else \
-        "/home/kodoque/Documents/recursive_doom/verify/rec-ship-final/cap/video0001.avi"
+        os.path.join(os.environ.get("MTX_ROOT", os.path.expanduser("~/Documents/recursive_doom")), "verify/rec-ship-final/cap/video0001.avi")
     p = subprocess.run(["ffmpeg", "-v", "error", "-i", src,
                         "-pix_fmt", "gray", "-f", "rawvideo", "-"], capture_output=True)
     buf = p.stdout

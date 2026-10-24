@@ -21,7 +21,7 @@
 # The same ratio ALSO verifies the divisor patch: if the patch really moved the guest's
 # clock, the patched run advances ~3x more gametics per frame.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-45}"
 OUT="$V/gametic_probe.out"
 : > "$OUT"
@@ -44,7 +44,7 @@ say "built."
 # so the old after-fast copy is stale and must not be reused.
 python3 - <<'PY' | tee -a "$OUT"
 import os
-R = "/home/kodoque/Documents/recursive_doom"
+R = os.environ.get("MTX_ROOT", "/home/kodoque/Documents/recursive_doom")
 src = f"{R}/verify/after/DOOM2.EXE"
 d = bytearray(open(src, "rb").read())
 off = 0x25fd

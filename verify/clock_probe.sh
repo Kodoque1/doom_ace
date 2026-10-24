@@ -20,7 +20,7 @@
 # Builds engine AND loader (the level WADs are packed from loader.wad - building only the
 # engine leaves the game running the PREVIOUS engine, which looks exactly like "no effect").
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-45}"
 OUT="$V/clock_probe.out"
 : > "$OUT"

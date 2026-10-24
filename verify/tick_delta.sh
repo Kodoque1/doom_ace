@@ -14,7 +14,7 @@
 #   deltas of 0 and 2+      -> (b): an external clock runs, and the engine waits on it
 #   deltas all 0            -> the counter is frozen and the 1.0 average was aliasing
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-40}"
 OUT="$V/tick_delta.out"
 : > "$OUT"

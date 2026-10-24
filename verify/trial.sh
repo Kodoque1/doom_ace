@@ -4,7 +4,7 @@
 # Keeps every trial's db.log / MTX.LOG / LOG.TXT so experiments are comparable.
 set -u
 LABEL="$1"; SECS="${2:-22}"; NOBUILD="${3:-}"
-ROOT="$HOME/Documents/recursive_doom"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 REF="$ROOT/verify/after"
 D="$ROOT/verify/trial-$LABEL"
 

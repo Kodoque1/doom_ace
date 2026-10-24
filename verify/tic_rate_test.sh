@@ -34,7 +34,7 @@
 # so an unbracketed A/B is not evidence. Both runs log gametic, so tics-per-frame comes
 # out of the same runs.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-45}"
 OUT="$V/tic_rate_test.out"
 : > "$OUT"
@@ -42,7 +42,7 @@ say() { echo "$@" | tee -a "$OUT"; }
 
 python3 - <<'PY' | tee -a "$OUT"
 import os
-R = "/home/kodoque/Documents/recursive_doom"
+R = os.environ.get("MTX_ROOT", "/home/kodoque/Documents/recursive_doom")
 src = f"{R}/verify/after/DOOM2.EXE"
 d = bytearray(open(src, "rb").read())
 off = 0x5c95f          # the imm32 of `mov eax,0x84d0`

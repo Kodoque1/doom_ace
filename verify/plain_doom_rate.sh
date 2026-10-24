@@ -14,7 +14,7 @@
 #                           speed, and no amount of engine work will fix that
 set -u
 SECS="${1:-20}"
-ROOT="$HOME/Documents/recursive_doom"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 REF="$ROOT/verify/after"
 D="$ROOT/verify/rec-plain"
 DB="$HOME/Downloads/dosbox-staging-linux-x86_64-0.83.0-7b400/dosbox"

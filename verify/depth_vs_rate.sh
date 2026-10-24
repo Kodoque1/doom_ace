@@ -14,7 +14,7 @@
 # The [dosbox] section is RESTATED IN FULL, not just memsize: a later section replaces
 # the earlier one, so leaving out machine= would silently drop svga_s3.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-45}"
 OUT="$V/depth_vs_rate.out"
 : > "$OUT"

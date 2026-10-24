@@ -20,7 +20,7 @@
 #   raw runs faster than t     -> the engine substituted its own clock; the pace is the
 #                                 engine's own loop rate, and the game's clock is not it
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-40}"
 OUT="$V/rawclock.out"
 : > "$OUT"

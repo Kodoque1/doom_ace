@@ -6,7 +6,7 @@ set -u
 LABEL="${1:-rec}"
 PRE="${2:-8}"
 RECT="${3:-20}"
-ROOT="$HOME/Documents/recursive_doom"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 D="$ROOT/verify/$LABEL"
 SRC="$ROOT/verify/trial-doomscr"
 DB="$HOME/Downloads/dosbox-staging-linux-x86_64-0.83.0-7b400/dosbox"

@@ -1,6 +1,6 @@
 #!/bin/bash
 set -u
-WD="$HOME/Documents/recursive_doom/verify/base"
+WD="${MTX_ROOT:-$HOME/Documents/recursive_doom}/verify/base"
 DB="$HOME/Downloads/dosbox-staging-linux-x86_64-0.83.0-7b400/dosbox"
 DISP=":93"
 pkill -f "Xvfb $DISP" 2>/dev/null

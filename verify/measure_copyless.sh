@@ -6,7 +6,7 @@
 # At a 1-frame slice, which is the regime that needs the saving: every frame is a
 # switch, so the snapshot is copied (or compared) at the frame rate.
 set -u
-ROOT="$HOME/Documents/recursive_doom"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 LABEL="$1"
 SRC="$ROOT/nested/dos_state.c"
 

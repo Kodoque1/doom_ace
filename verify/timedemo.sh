@@ -19,7 +19,7 @@
 #                  never each reach 35, and only more CPU (KVM) or fewer instances can.
 set -u
 CYCLES="${1:-max}"
-ROOT="$HOME/Documents/recursive_doom"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 REF="$ROOT/verify/after"
 D="$ROOT/verify/rec-timedemo"
 DB="$HOME/Downloads/dosbox-staging-linux-x86_64-0.83.0-7b400/dosbox"

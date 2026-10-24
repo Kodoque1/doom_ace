@@ -13,7 +13,7 @@
 #   ~1.14                   -> 16 Hz emulated: the pace is the PIT (impossible: min 18.2 Hz)
 #   much less than 1        -> the pace is faster than the BIOS tick and lives elsewhere
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-40}"
 OUT="$V/biosclock.out"
 : > "$OUT"

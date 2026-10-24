@@ -2,7 +2,7 @@
 # record-test.sh - can DOSBox Staging record a movie, headless, under Xvfb?
 # Reuses the staged trial dir so the WAD/EXE are already in place.
 set -u
-ROOT="$HOME/Documents/recursive_doom"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 D="$ROOT/verify/rec-test"
 SRC="$ROOT/verify/trial-doomscr"
 DB="$HOME/Downloads/dosbox-staging-linux-x86_64-0.83.0-7b400/dosbox"

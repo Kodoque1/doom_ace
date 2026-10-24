@@ -10,7 +10,7 @@
 #   3. the key still switching (one press -> one line)
 #   4. 0 illegal, 0 DYNX86 throughout
 set -u
-cd /home/kodoque/Documents/recursive_doom
+cd "${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 for p in $(pgrep dosbox); do kill -9 $p 2>/dev/null; done
 
 echo "=== rebuild (abort on failure: a stale binary would make the run meaningless) ==="

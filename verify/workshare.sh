@@ -13,7 +13,7 @@
 # The engine reads the PIT counter (1.193182 MHz, emulated) at the start of the frame
 # policy and again at the log point, and reports the difference as counts=.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-40}"
 OUT="$V/workshare.out"
 : > "$OUT"

@@ -10,7 +10,7 @@
 # level<d>.wad), so the root runs alone and its rate IS the engine's own rate.
 # Both runs are in this one session, because host load drifts ~40% between sessions.
 set -u
-ROOT="$HOME/Documents/recursive_doom"; V="$ROOT/verify"
+ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"; V="$ROOT/verify"
 SECS="${SECS:-60}"
 OUT="$V/solo_vs_ring.out"
 : > "$OUT"
