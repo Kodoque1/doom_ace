@@ -134,6 +134,13 @@ typedef struct {
 	                           press" - and the host cannot observe that about a
 	                           suspended instance. Appended, like screen_src, so the
 	                           fields above keep their offsets. */
+	uint32_t   keys;	/* the ADDRESS of the shared key state (`mtx_hs.keys`, 256
+	                           bytes in HOST memory) every depth merges its own key
+	                           events into and adopts at its frame boundary - one
+	                           keyboard for the whole ring. Appended. */
+	uint32_t   ring;	/* how many depths are live, i.e. the size of the ring this
+	                           depth is one of - for the depth badge. Written by the
+	                           host with `transport`. Appended. */
 } mtx_depth_params_t;
 
 #endif /* MATRYOSHKA_PARAMS_H */

@@ -101,6 +101,11 @@ typedef struct mtx_host_state {
 	/* The scheduler's rotation over the depths the viewer is NOT in: the last one
 	   that was given a slot (mtx_boot.c, mtx_sched_next). */
 	uint8_t               sched_other;
+	/* ONE keyboard for every depth: the key state each depth adopts at its frame
+	   boundary (mtx_boot.c, mtx_keys_route). Doom's own key array is snapshot data,
+	   so without this a press only ever reaches the depth that was loaded when it
+	   arrived. */
+	uint8_t               keys[256];
 	/* The teleport effect: while `fx_frames` is non-zero the screen shows a
 	   composite instead of a live frame, and this is its state. `fx_buf` is a
 	   buffer of its own, NOT one of the depths' frames - that is what keeps the
