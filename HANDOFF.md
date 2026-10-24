@@ -59,6 +59,10 @@ makes the nesting visible inside the nested view as well as around it.
 | `doom_ace/` | `inset-wip` | github.com/Kodoque1/doom_ace (PRIVATE) — HEAD `649dfa6`, pushed |
 | `nested/` | `master` | github.com/Kodoque1/nested (PRIVATE) — HEAD `c68cfbe`, pushed |
 
+**Branch:** `inset-wip` is now the repository's default branch. `master` is 34
+commits behind it and contains neither the ring nor the loader nor this brief — if
+you cloned before that change, you are on the wrong branch.
+
 `doom_ace/engine/makefile` has `MTX_DIR ?= ../../nested`, so **clone both side by
 side** (`X/doom_ace`, `X/nested`) or build with
 `make -C doom_ace/engine MTX_DIR=/path/to/nested`.
