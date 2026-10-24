@@ -93,11 +93,8 @@ typedef struct mtx_host_state {
 	uint8_t               doom_screen_ok;	/* Doom's screens[0] pin verified */
 
 	/* --- mtx_boot.c: the switch and the inset. `inset_on` is the state the key
-	       toggles; `key_down` remembers the previous state of that key so one press
-	       is one switch rather than one switch per frame it is held. Host state,
-	       like everything the screen policy depends on. --- */
+	       toggles. Host state, like everything the screen policy depends on. --- */
 	uint8_t               inset_on;
-	uint8_t               key_down;
 	/* WHICH depth the inset shows; 0 = no inset. The key cycles this through the
 	   live depths instead of toggling a flag: with a ring of three, the innermost
 	   view is the one worth looking at, and a bool cannot say which one that is. */
@@ -105,12 +102,16 @@ typedef struct mtx_host_state {
 	uint32_t              inset_frame;	/* frame the inset state last changed */
 	uint32_t              inset_logged;	/* frames composited, for the log */
 
-	/* The key guard's counters. They are HERE, in the host object that no snapshot
-	   covers, and not statics in the engine's .bss: the root is a depth too, so its
-	   .bss is saved and restored on every switch, and a counter that decrements per
-	   frame had its decrements undone every time the depth ran - measured, a
-	   30-frame dead time after a toggle lasted 10 frames. */
-	uint32_t              key_guard;	/* frames left in the dead time */
+	/* THE KEY AUTHORITY: ONE word that says whether the switch key is down, and
+	   the only thing that decides a toggle. It is here, in the host object that no
+	   snapshot covers, because Doom's own key array IS snapshot state - each depth
+	   has a copy and a press lands in whichever copy was loaded at interrupt time,
+	   so "is the key down" has no single answer unless one is kept outside the
+	   snapshots. A depth reaches this word through `params->key_auth`; the root
+	   reaches it directly, because for the root `mtx_hs` IS the host's object.
+	   See the block comment on mtx_key_auth in mtx_boot.c for what the two
+	   mechanisms this replaced got wrong. */
+	uint32_t              key_state;
 	/* One stamp PER DEPTH. With two children the host has to notice WHICH depth
 	   just began a slice, and a single shared stamp let one child's slice start
 	   consume the other child's. */

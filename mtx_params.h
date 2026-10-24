@@ -81,12 +81,17 @@ typedef struct {
 	                           depth's slice is invisible to the host; the depth
 	                           that saw it records the request here, in host
 	                           memory, and the host consumes it. */
-	uint32_t   key_down;	/* this depth's own view of the key, so one press is one
-	                           switch rather than one per frame it is held */
+	uint32_t   key_down;	/* this depth's view of the key, written as a MIRROR of
+	                           the one authority after each observation - kept for
+	                           the log, never the thing that decides. It used to
+	                           decide, per depth, and that is exactly what made one
+	                           held press toggle twice: see mtx_key_auth in
+	                           mtx_boot.c. */
 	uint32_t   slice_gen;	/* incremented by a depth when ITS slice starts. The
-	                           host uses it as the same guard on its own side: a
-	                           slice boundary must not be read as a key press (see
-	                           MTX_KEY_GUARD_FRAMES in the engine). */
+	                           host reads it to notice that a child began a slice
+	                           since it last looked - which is exactly when the
+	                           host's OWN restored key copy became the stale one,
+	                           so it is also when the host adopts the authority. */
 	uint32_t   canvas;	/* the buffer the picture on screen is built in. It is
 	                           the ROOT's framebuffer, and BOTH depths present it
 	                           (present_src), so whichever one runs is the one that
@@ -119,6 +124,12 @@ typedef struct {
 	                           with it the levels close into a cycle, and each
 	                           level's picture contains the whole nest, one lap
 	                           older per frame. */
+	uint32_t   key_auth;	/* the ADDRESS of the one word of key authority, in HOST
+	                           memory (`mtx_hs.key_state`). A depth cannot find the
+	                           host's state object - its own `mtx_hs` is a different,
+	                           empty one - so the address travels in the block, the
+	                           same way the raw pool and the screen do. Appended, so
+	                           every field above keeps its offset. */
 	uint32_t   key_seen;	/* TEMPORARY (diagnosis): how many times THIS depth has
 	                           seen the switch key down in its own copy of Doom's key
 	                           array. Doom's key state is per depth, so "the key
