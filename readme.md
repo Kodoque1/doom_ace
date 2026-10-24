@@ -2,6 +2,20 @@
 
 This is a DOS Doom2 enhancement contained in a single WAD file.
 
+## The matryoshka performance problem — read HANDOFF.md
+
+This fork runs several copies of the engine as nested "depths" that take turns
+(the sibling `nested/` repository holds the scheduler and the guest-state
+snapshot). They work, but each instance renders only ~16 frames/s and the picture
+is not smooth.
+
+If you were sent here to help with that: **[HANDOFF.md](HANDOFF.md)** is the
+brief. It says what is in scope (the frame path) and what is out of scope (the
+exploit entry — it is finished, do not re-derive it), records every measurement
+taken so far, lists the levers already eliminated with the test that eliminated
+each, and states the open hypothesis. The harness that produced those numbers is
+committed under `verify/` (39 probes plus `NEXT.md`).
+
 ## Version
 
 This code only works in Doom 2 version 1.9.
