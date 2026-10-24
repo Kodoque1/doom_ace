@@ -270,12 +270,95 @@ static void mtx_blk_layout(void)
 
 
 
+/*
+ * The index of the first dword that differs between `a` and `b` over `n` dwords,
+ * or `n` when they all agree.
+ *
+ * `repe cmpsl`, not a C loop, and that is the whole reason this exists. The
+ * compare is what a switch costs: 0.6% of the registered set differs, so nearly
+ * every byte is READ and never written, twice per switch. Measured in emulated
+ * time (rdtsc, cputype=pentium) the C loop made one switch cost ~6,500 kcycles -
+ * about two of a depth's own Doom frames - so three switches per round were a
+ * third of the machine. DOSBox executes a string instruction as one tight host
+ * loop instead of decoding a compare-and-branch per dword.
+ */
+static uint32_t mtx_first_diff32(const uint8_t *a, const uint8_t *b, uint32_t n)
+{
+	const uint8_t *sa = a, *sb = b;
+	uint32_t       c  = n, i;
+
+	if(!n)
+		return 0;
+	__asm__ __volatile__("cld\n\trepe cmpsl"
+	                     : "+S"(sa), "+D"(sb), "+c"(c) : : "cc", "memory");
+	/* repe stops one dword past the first mismatch, or at the end: the dword
+	   before ESI is either the mismatch or the last one compared. */
+	i = (uint32_t)(sa - a) / 4u - 1u;
+	return (*(const uint32_t *)(a + i * 4u) != *(const uint32_t *)(b + i * 4u)) ? i : n;
+}
+
+/*
+ * MTX_CP_ALL over one region, scanning for the next difference instead of
+ * comparing block by block. Same result as the block loop below: a block is
+ * marked hot and copied exactly when one of its bytes differs.
+ */
+static void mtx_scan_region(uint32_t r, uint8_t *s, int dir)
+{
+	uint8_t  *base = (uint8_t *)rgn[r].base;
+	uint32_t  size = rgn[r].size;
+	uint32_t  first = rgn_blk ? rgn_blk[r] : 0u;
+	uint8_t  *snap = s + rgn[r].off;
+	uint32_t  nd = size / 4u, off = 0;
+
+	while(off < size)
+	{
+		uint32_t at = size, k, boff, n, b;
+
+		if(first + off / MTX_BLK >= blk_total)
+			break;
+
+		k = mtx_first_diff32(base + off, snap + off, nd - off / 4u);
+		if(k < nd - off / 4u)
+			at = off + k * 4u;
+		else
+			for(k = nd * 4u; k < size; k++)	/* the bytes past the last dword */
+				if(base[k] != snap[k])
+				{
+					at = k;
+					break;
+				}
+		if(at >= size)
+			break;
+
+		boff = at - at % MTX_BLK;
+		n = size - boff < MTX_BLK ? size - boff : MTX_BLK;
+		b = first + boff / MTX_BLK;
+		if(b >= blk_total)
+			break;
+
+		blk_hot[b] = 1;
+		if(dir == 0)
+			mtx_bcopy(snap + boff, base + boff, n);
+		else
+			mtx_bcopy(base + boff, snap + boff, n);
+		if(cl_bytes)
+			*cl_bytes += n;
+		off = boff + MTX_BLK;
+	}
+}
+
 static void mtx_copy_region(uint32_t r, uint8_t *s, int dir, int mode)
 {
 	uint8_t  *base = (uint8_t *)rgn[r].base;
 	uint32_t  size = rgn[r].size;
 	uint32_t  off, first = rgn_blk ? rgn_blk[r] : 0u;
 	uint8_t  *snap = s + rgn[r].off;
+
+	if(mode == MTX_CP_ALL)
+	{
+		mtx_scan_region(r, s, dir);
+		return;
+	}
 
 	for(off = 0; off < size; off += MTX_BLK)
 	{

@@ -98,6 +98,9 @@ typedef struct mtx_host_state {
 	       the depth the viewer is in - i.e. whose frame the screen is - and it is
 	       the single answer every depth's blit source is set from. --- */
 	uint8_t               transport;
+	/* The scheduler's rotation over the depths the viewer is NOT in: the last one
+	   that was given a slot (mtx_boot.c, mtx_sched_next). */
+	uint8_t               sched_other;
 	/* The teleport effect: while `fx_frames` is non-zero the screen shows a
 	   composite instead of a live frame, and this is its state. `fx_buf` is a
 	   buffer of its own, NOT one of the depths' frames - that is what keeps the
