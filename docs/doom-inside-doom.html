@@ -540,6 +540,7 @@ figcaption{font-size:14px!important;color:var(--faint)!important}
   background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px),
   url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.4 0 0 0 0 0.3 0 0 0 .55 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
   mix-blend-mode:overlay;opacity:.55}
+.m3-sim{position:absolute;right:10px;top:8px;font-family:var(--f-hud);font-size:18px;letter-spacing:.06em;color:#ffd0c6;background:repeating-linear-gradient(135deg,rgba(255,74,50,.28) 0 8px,rgba(255,74,50,.12) 8px 16px);border:1px solid #ff4a32;padding:3px 9px;z-index:2}
 </style>
 </head>
 <body>
@@ -806,6 +807,7 @@ figcaption{font-size:14px!important;color:var(--faint)!important}
     <p><span class="badge b-sim">Animation</span> re-enactments written for this page, from the code in <code>nested/</code> and <code>doom_ace/engine/</code>. Lines marked measured come from the project's logs, README, HANDOFF and commits. No game data is used.</p>
     <p>How the page is built, following that research: you set the pace, each key step asks for a prediction first, every depth keeps one colour, and each scene starts from the previous one's picture. ← and → step the scene on screen.</p>
     <p>Further reading: Hundhausen, Douglas &amp; Stasko, <a href="https://doi.org/10.1006/jvlc.2002.0237">A Meta-Study of Algorithm Visualization Effectiveness</a> (JVLC 2002) · Tversky, Morrison &amp; Bétrancourt, <a href="https://doi.org/10.1006/ijhc.2002.1017">Animation: Can It Facilitate?</a> (IJHCS 2002) · Guo, <a href="https://pg.ucsd.edu/publications/Online-Python-Tutor-web-based-program-visualization_SIGCSE-2013.pdf">Online Python Tutor</a> (SIGCSE 2013) · Lerner, <a href="https://doi.org/10.1145/3313831.3376494">Projection Boxes</a> (CHI 2020) · Kang &amp; Guo, <a href="https://doi.org/10.1145/3126594.3126632">Omnicode</a> (UIST 2017) · Crichton, Gray &amp; Krishnamurthi, <a href="https://doi.org/10.1145/3622841">A Grounded Conceptual Model for Ownership Types in Rust</a> (OOPSLA 2023) · Victor, <a href="http://worrydream.com/ExplorableExplanations/">Explorable Explanations</a> (essay, 2011).</p>
+    <p>The 3D scenes borrow from process and factory visualization: token replay of a logged schedule (van der Aalst, Adriansyah &amp; van Dongen, <a href="https://doi.org/10.1002/widm.1045">WIREs DMKD 2012</a>), flow bands for what moves (Xu et al., <a href="https://doi.org/10.1109/TVCG.2016.2598664">ViDX, TVCG 2017</a>), and a marked simulation mode for what-if states, as digital twins do. Notes: <code>docs/viz3d-research.md</code>, <code>docs/sequencing-research.md</code>, <code>docs/visualization-research.md</code>.</p>
   </div>
 </footer>
 
@@ -1466,15 +1468,20 @@ function MachineMap(rootId,open0,build){after3d(function(){
   var ldr=k.box(1.4,1.1,1.4,0x2a2420,-8.4,0,-1,0.05,1,"code");mech("load",ldr,-8.4,1.8,-1);
   var keys=k.box(2.0,0.25,0.9,0x2a2420,-8.4,0,3.0,0.05,1,"keys");mech("keys",keys,-8.4,0.85,3.0);
   var scr=k.box(2.2,1.45,0.25,0x2a2420,8.4,1.0,-1.6,0.05,1,"screen");mech("scr",scr,8.4,3.0,-1.6);
+  var belt=[0,1,2].map(function(d){var a=k.arc(new T.Vector3(3.6-1.6+d*1.6,0.36,3.2),new T.Vector3(TX[d],0.52,1.45),DCHEX[d],1.6);return a;});
+  var beam=k.arc(new T.Vector3(TX[0],2.85,-1),new T.Vector3(8.4,1.75,-1.45),DCHEX[0],2.2);M.belt=belt;M.beam=beam;
+  var banner=document.createElement("div");banner.className="m3-sim";banner.hidden=true;banner.textContent="⚠ SIMULATED: not from the log";stage.appendChild(banner);M.banner=banner;
   /* the CPU: whatever it sits on is running */
   var orb=new T.Mesh(new T.SphereGeometry(0.32,16,12),new T.MeshBasicMaterial({color:0xffffff}));k.scene.add(orb);
   var halo=new T.Mesh(new T.SphereGeometry(0.6,16,12),new T.MeshBasicMaterial({color:0xffd27a,transparent:true,opacity:0.3}));orb.add(halo);
   var cpuL=k.label("CPU",0,0,0,"#ffffff",0.8);k.scene.remove(cpuL);orb.add(cpuL);cpuL.position.set(0,0.95,0);
-  var order=[0,1,0,2],oi=0,ot=0,cur=0,nxt=1,paused=false;
+  var order=[0,1,0,2],oi=0,ot=0,cur=0,nxt=1,paused=false,hopped=false;
+  M.setOrder=function(o){order=o;oi=0;ot=0;};
   function tpos(i){return new T.Vector3(TX[i],3.15,-1);}
   k.frames.push(function(dt){if(!M.cpuOn){orb.visible=false;return;}orb.visible=true;
     var live=M.live||3,ord=live===1?[0]:live===2?[0,1]:order;
-    if(!paused)ot+=dt/1.8;if(ot>=1){ot=0;oi=(oi+1)%ord.length;}cur=ord[oi%ord.length];nxt=ord[(oi+1)%ord.length];
+    if(!paused)ot+=dt/1.8;if(ot>=1){ot=0;oi=(oi+1)%ord.length;hopped=false;}cur=ord[oi%ord.length];nxt=ord[(oi+1)%ord.length];
+    if(ot>=0.6&&!hopped){hopped=true;if(M.open.snap&&ord.length>1&&cur!==nxt){k.flow(belt[cur],DCHEX[cur],1);setTimeout(function(){k.flow(belt[nxt],DCHEX[nxt],-1);},RM?0:500);}}
     var hp=Math.min(1,ot/0.6);head.position.x=X0+(8+hp*4)*SW;
     for(var q=0;q<SEGN;q++){var sl=Math.floor(q/4),dd=ord[((oi-2+sl)%ord.length+ord.length)%ord.length];var shown=(sl<2||q-8<hp*4);segs[q].material.color.setHex(shown?DCHEX[dd]:0x2a2420);segs[q].material.emissive.setHex(shown?DCHEX[dd]:0x000000);segs[q].material.emissiveIntensity=shown?0.25:0;}
     var a=tpos(cur),b=tpos(nxt),p=ot<0.6?0:(ot-0.6)/0.4,mid=new T.Vector3(0,5.9,-1);
@@ -1487,16 +1494,18 @@ function MachineMap(rootId,open0,build){after3d(function(){
     (p.extra||[]).forEach(function(m){m.material.color.setHex(c);m.material.emissive.setHex(c);m.material.emissiveIntensity=0.5;});
     p.mesh.material.color.setHex(key==="snap"?DCHEX[0]:c);p.mesh.material.emissive.setHex(key==="snap"?DCHEX[0]:c);p.mesh.material.emissiveIntensity=flash?0.6:0.25;p.lab.material.opacity=1;M.relabel(key,OVKEYS[key].name,"#f4dca8");
     if(key==="host")M.hostArc.userData.want=0.5;
+    if(key==="snap")belt.forEach(function(b){b.userData.want=0.35;});
+    if(key==="scr"){beam.userData.want=0.7;p.mesh.material.color.setHex(DCHEX[0]);p.mesh.material.emissive.setHex(DCHEX[0]);}
     if(flash)setTimeout(function(){p.mesh.material.emissiveIntensity=0.25;},RM?0:900);};
   M.close=function(key){delete M.open[key];closeP(key);if(key==="snap")slots.forEach(function(s){s.material.color.setHex(0x2a2420);s.material.emissive.setHex(0x2a2420);});};
   M.breakP=function(key,txt){var p=M.parts[key];p.mesh.material.color.setHex(0xff4a32);p.mesh.material.emissive.setHex(0xff4a32);p.mesh.material.emissiveIntensity=0.6;
-    if(M.bl)k.scene.remove(M.bl);var pp=p.mesh.position;M.bl=k.label(txt,pp.x,pp.y+2.2,pp.z+0.6,"#ff8a76",0.75);};
-  M.clearBreak=function(){if(M.bl){k.scene.remove(M.bl);M.bl=null;}Object.keys(M.parts).forEach(function(key){if(M.open[key])M.openP(key);else closeP(key);});};
+    if(M.bl)k.scene.remove(M.bl);var pp=p.mesh.position;M.bl=k.label("⚠ "+txt,pp.x,pp.y+2.2,pp.z+0.6,"#ff8a76",0.8);banner.hidden=false;};
+  M.clearBreak=function(){banner.hidden=true;if(M.bl){k.scene.remove(M.bl);M.bl=null;}Object.keys(M.parts).forEach(function(key){if(M.open[key])M.openP(key);else closeP(key);});};
   M.relabel=function(key,txt,col){var p=M.parts[key],pos=p.lab.position.clone();k.scene.remove(p.lab);p.lab=k.label(txt,pos.x,pos.y,pos.z,col||"#eadccb",0.85);};
   M.focusP=function(key,r){var p=M.parts[key].mesh.position;k.focus(p.x,p.y+0.6,p.z,r||9);};
   M.home=function(){k.focus(-0.2,2.4,0.8,25);};
   M.setLive=function(n){M.live=n;towers.forEach(function(t,i){t.userData.rise=i<n?1:0;tl[i].visible=i<n;});};
-  M.reset=function(){M.clearBreak();M.setLive(3);M.hostArc.userData.want=0;Object.keys(OVKEYS).forEach(function(key){M.relabel(key,OVKEYS[key].name,"#6f5f50");closeP(key);});M.open={};
+  M.reset=function(){M.clearBreak();M.setLive(3);M.hostArc.userData.want=0;belt.forEach(function(b){b.userData.want=0;});beam.userData.want=0;banner.hidden=true;order=[0,1,0,2];Object.keys(OVKEYS).forEach(function(key){M.relabel(key,OVKEYS[key].name,"#6f5f50");closeP(key);});M.open={};
     (open0||[]).forEach(function(key){M.openP(key);});M.home();M.cpuOn=true;};
   M.reset();
   build(M,root,say);
@@ -1518,18 +1527,19 @@ MachineMap("ov0",[],function(M,root,say){
   ]);
 });
 /* --- chapter-end returns: the same map, with what the chapter opened --- */
-function recap(id,before,opened,lines){
+function recap(id,before,opened,lines,extra){
   MachineMap(id,before,function(M,root,say){
     var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset();}});
     root.insertBefore(root.querySelector(".seqc"),say);
     var L=[{ms:2600,say:"Back to the whole machine.",run:function(){M.home();}}];
     opened.forEach(function(key,i){L.push({ms:3200,say:lines[i],run:function(){M.openP(key,true);if(key==="fb")M.k.focus(0,6.2,-2.6,10);else M.focusP(key,10);}});});
+    (extra||[]).forEach(function(x){L.push({ms:x.ms,say:x.say,run:function(){x.run(M);}});});
     L.push({ms:3600,say:"Open so far: "+Object.keys(OVKEYS).filter(function(x){return before.concat(opened).indexOf(x)>=0;}).map(function(x){return OVKEYS[x].name;}).join(" · ")+".",run:function(){M.home();}});
     p.load(L);
   });
 }
-recap("ov2",[],["sw","fb"],["<b>Switch</b>: save the callee-saved registers, publish ESP, load another ESP.","<b>Frame boundary</b>: requests wait, and are consumed at the next one."]);
-recap("ov3",["sw","fb"],["snap","pin","host"],["<b>Snapshots</b>: every switch compares each depth's bytes and copies what differs.","<b>Pins &amp; patches</b>: per-depth pointers are forced, and patched code bytes are restored.","<b>mtx_hs</b>: the switch's own state, outside every snapshot."]);
+recap("ov2",[],["sw","fb"],["<b>Switch</b>: save the callee-saved registers, publish ESP, load another ESP.","<b>Frame boundary</b>: requests wait, and are consumed at the next one."],[{ms:4200,say:"Now the CPU follows the order this run actually logged: "+(RUN?RUN.schedule.slice(0,8).map(function(s){return s.depth;}).join(" → ")+" …":"")+" Every hop lands on a gate post.",run:function(M){if(RUN)M.setOrder(RUN.schedule.slice(0,20).map(function(s){return s.depth;}));M.k.focus(0,4.6,-1.8,14);}}]);
+recap("ov3",["sw","fb"],["snap","pin","host"],["<b>Snapshots</b>: on every hop, the outgoing depth's bytes ride into its slot and the incoming depth's ride back out. Only what differs is copied: "+(RUN&&RUN.copyless.length?RUN.copyless[0].save.toLocaleString("en-US")+" B of "+RUN.copyless[0].of.toLocaleString("en-US"):"about 0.2%")+".","<b>Pins &amp; patches</b>: per-depth pointers are forced, and patched code bytes are restored.","<b>mtx_hs</b>: the switch's own state, outside every snapshot."]);
 recap("ov4",["sw","fb","snap","pin","host"],["load"],["<b>Loader</b>: it can read and allocate, and nothing else, and it passes the parameter block in EBP."]);
 recap("ov5",["sw","fb","snap","pin","host","load"],["scr","keys"],["<b>Screen</b>: chosen by patching four bytes of the blit, the same pattern as the patches.","<b>Keyboard</b>: one word of host state, the same lesson as mtx_hs."]);
 /* --- Map 07: take each mechanism away --- */
