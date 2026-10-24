@@ -92,15 +92,23 @@ typedef struct mtx_host_state {
 	uint32_t              present_frame;	/* frame the source changed (0 = none) */
 	uint8_t               doom_screen_ok;	/* Doom's screens[0] pin verified */
 
-	/* --- mtx_boot.c: the switch and the inset. `inset_on` is the state the key
-	       toggles. Host state, like everything the screen policy depends on. --- */
-	uint8_t               inset_on;
-	/* WHICH depth the inset shows; 0 = no inset. The key cycles this through the
-	   live depths instead of toggling a flag: with a ring of three, the innermost
-	   view is the one worth looking at, and a bool cannot say which one that is. */
-	uint8_t               inset_depth;
-	uint32_t              inset_frame;	/* frame the inset state last changed */
-	uint32_t              inset_logged;	/* frames composited, for the log */
+	/* --- mtx_boot.c: the TRANSPORT. There is no overlay any more: the screen
+	       shows exactly ONE instance's frame, full screen, and the key MOVES the
+	       viewer into the next instance (and back round the ring). `transport` is
+	       the depth the viewer is in - i.e. whose frame the screen is - and it is
+	       the single answer every depth's blit source is set from. --- */
+	uint8_t               transport;
+	/* The teleport effect: while `fx_frames` is non-zero the screen shows a
+	   composite instead of a live frame, and this is its state. `fx_buf` is a
+	   buffer of its own, NOT one of the depths' frames - that is what keeps the
+	   effect from fighting a renderer that is writing into the frame it would
+	   otherwise have to overwrite. */
+	uint32_t              fx_frames;	/* frames left (0 = no effect) */
+	uint32_t              fx_total;		/* what fx_frames started at: the sweep */
+	uint32_t              fx_from;		/* the frame being left */
+	uint32_t              fx_to;		/* the frame being entered */
+	uint32_t              fx_buf;		/* the composite the effect is built into */
+	uint32_t              fx_played;	/* the teleport sound's id, resolved once */
 
 	/* THE KEY AUTHORITY: ONE word that says whether the switch key is down, and
 	   the only thing that decides a toggle. It is here, in the host object that no

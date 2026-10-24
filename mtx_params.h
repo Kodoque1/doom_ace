@@ -96,14 +96,11 @@ typedef struct {
 	                           the ROOT's framebuffer, and BOTH depths present it
 	                           (present_src), so whichever one runs is the one that
 	                           keeps it up to date. */
-	uint32_t   inset_on;	/* mirrors the host's inset flag. With the inset on,
-	                           the running depth paints its own live view into the
-	                           canvas - otherwise the screen shows the root's
-	                           unchanged buffer for the whole of a depth's slice,
-	                           which measured as 3.9 s of a completely still
-	                           screen. The inset rectangle itself is left alone by
-	                           the running depth: it belongs to the host's
-	                           composite, and overwriting it would blink it off. */
+	uint32_t   transport;	/* the depth the viewer is IN, i.e. whose frame the
+	                           screen shows. It replaces the old `inset_on`: there
+	                           is no overlay any more, so what a depth needs to
+	                           know is not "is an inset up" but "am I the one being
+	                           looked at". */
 	uint32_t   present_src;	/* what this depth's frame blit should copy FROM. The
 	                           engine bakes that source into its own code at init
 	                           (the value of `screen_buffer` then), and each depth
