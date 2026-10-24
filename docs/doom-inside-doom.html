@@ -166,7 +166,6 @@ input[type=checkbox]{accent-color:var(--blood)}
 .stack .row .a{color:var(--faint)}
 .stack .row .v{color:#e7cfa9;overflow:hidden;text-overflow:ellipsis}
 .stack .row.sp{background:rgba(241,178,60,.16)}
-.stack .row.sp::after{content:"◀ ESP";position:absolute;right:8px;color:var(--hud);font-family:var(--f-hud);font-size:15px;top:1px}
 .stack .row.chg .v{color:#fff;background:rgba(209,52,31,.35)}
 .regs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:12px}
 @media (max-width:620px){.regs{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -286,6 +285,18 @@ footer h2{font-size:34px}
 .cost-row .bar.rng{background:repeating-linear-gradient(90deg,rgba(127,210,62,.55) 0 4px,rgba(127,210,62,.25) 4px 8px)}
 .cost-row .bar.solid{background:var(--nukage)}
 .cost-row .n{font-family:var(--f-mono);font-size:13px;text-align:right;color:var(--fg);font-variant-numeric:tabular-nums}
+.console{position:relative}
+.ghost{position:absolute;z-index:6;pointer-events:none;font-family:var(--f-mono);font-size:12.5px;line-height:1.5;background:var(--hud);color:#120b08;padding:1px 6px;border-radius:2px;box-shadow:0 4px 14px rgba(0,0,0,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.ghost.red{background:#ff4a32;color:#fff}
+.espmark{position:absolute;left:0;top:0;z-index:4;pointer-events:none;font-family:var(--f-hud);font-size:15px;line-height:1;color:#120b08;background:var(--hud);padding:3px 6px 2px;border-radius:2px;box-shadow:0 0 12px rgba(241,178,60,.5);transition:transform .4s cubic-bezier(.5,0,.3,1),opacity .2s}
+.espmark.far{transition-duration:.9s}
+.stack .row.chg{animation:drop .45s ease-out}
+@keyframes drop{from{transform:translateX(-12px);background:rgba(241,178,60,.35)}to{transform:none}}
+.fb-c{width:100%;display:block;background:#0b0807;border:1px solid var(--line);border-radius:3px}
+#fbLog div{font-family:var(--f-hud);font-size:19px;line-height:1.3;color:var(--dim)}
+#fbLog div:first-child{color:#f1e4d2}
+#fbLog div.bad{color:#ff8a76}
+@media (prefers-reduced-motion:reduce){.espmark{transition:none}.stack .row.chg{animation:none}}
 </style>
 </head>
 <body>
@@ -365,10 +376,12 @@ footer h2{font-size:34px}
   <div class="controls">
     <button id="stkBack">◀ Back</button>
     <button class="primary" id="stkStep">Step ▶</button>
+    <button id="stkPlay">Play ▶▶</button>
     <button id="stkReset">Reset</button>
     <label class="rng">Step <input type="range" id="stkScrub" min="0" max="1" value="0"> <output id="stkScrubOut">0</output></label>
   </div>
   <div class="narr" id="stkNarr"></div>
+  <div class="espmark" id="stkMark" aria-hidden="true">◀ ESP</div>
   <figcaption><span class="badge b-code">Code</span> The instructions are verbatim from <code>mtx_switch.S</code>, and the seeded layout is the one <code>mtx_seed()</code> writes. <span class="badge b-inf">Illustrative</span> The addresses and register values are made up for the walk-through. Part one enters a brand-new depth. Part two is that depth handing control back.</figcaption>
 </div>
 
@@ -399,7 +412,25 @@ footer h2{font-size:34px}
 	else if(k == MTX_REQ_SWITCH)
 		mtx_switch_to(sched_depth);
 }</pre>
-  <p>Notice the line that clears the request <em>before</em> switching. The switch doesn't return until someone switches back, possibly many frames later, and by then the request must already be gone. Otherwise the resumed depth would service it a second time.</p>
+  <p>Notice the line that clears the request <em>before</em> switching. The switch doesn't return until someone switches back, possibly many frames later, and by then the request must already be gone. Otherwise the resumed depth would service it a second time. Try both orders below.</p>
+</section>
+
+<div class="wide console" id="fb">
+  <div class="console-head"><h2 class="console-title">A request waits for the boundary</h2><span class="badge b-sim">Simulation</span></div>
+  <canvas class="fb-c" id="fbCanvas" width="1000" height="160" aria-label="Frames on a timeline, with switch requests"></canvas>
+  <div class="controls">
+    <button class="primary" id="fbReq">Request a switch now</button>
+    <span class="seg" role="group" aria-label="Order inside mtx_frame_tick">
+      <button id="fbOk" aria-pressed="true">Consume, then switch</button>
+      <button id="fbBad" aria-pressed="false">Switch, then consume</button>
+    </span>
+    <button id="fbPause">Pause</button>
+  </div>
+  <div class="narr" id="fbLog" aria-live="polite"></div>
+  <figcaption>Two depths, one frame at a time. Each frame is game logic, then rendering, then the boundary where <code>mtx_frame_tick</code> runs. Press the button at any moment: the request waits, pulsing, until the running depth reaches its next boundary. If you leave it alone, it makes a request now and then by itself. Switch to <em>Switch, then consume</em> to see why the real code clears the request first: the switch only returns when this depth is resumed, so the depth that was switched to finds the same request still set and services it again.</figcaption>
+</div>
+
+<section class="col" style="padding-top:8px">
   <details>
     <summary>Deep dive: finding a hook that actually runs</summary>
     <p>The obvious frame boundary is <code>swap_buffers()</code> in <code>engine/vesa.c</code>, ACE's replacement for Doom's <code>I_FinishUpdate</code>. In the first live boot it never ran, because it is only hooked when VESA activates, and VESA did not activate on DOSBox's emulated S3 card for a 320×200 mode. <code>hook_draw_stbar</code> only runs during levels, while the title screen is a different game state. ACE's assembly <code>I_FinishUpdate</code> runs in every state, but calling C from there crashed the game (<code>Illegal read … CS:IP 170:b02c7d5c</code>, black screen), because it is entered from a Doom path where the C calling convention does not hold.</p>
@@ -773,6 +804,17 @@ footer h2{font-size:34px}
 var RM = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function $(id){return document.getElementById(id);}
 function hex(v,n){v=v>>>0;var s=v.toString(16).toUpperCase();while(s.length<(n||8))s="0"+s;return "0x"+s;}
+function fly(root,fromEl,toEl,html,cls,delay,dur){
+  if(RM||!root||!fromEl||!toEl||!root.animate)return 0;
+  var R=root.getBoundingClientRect(),a=fromEl.getBoundingClientRect(),b=toEl.getBoundingClientRect();
+  var g=document.createElement("div");g.className="ghost"+(cls?" "+cls:"");g.innerHTML=html;
+  g.style.left=(a.left-R.left)+"px";g.style.top=(a.top-R.top)+"px";g.style.minWidth=Math.min(a.width,180)+"px";
+  root.appendChild(g);
+  var dx=b.left-a.left+(b.width-Math.min(a.width,180))/2,dy=b.top-a.top;dur=dur||750;
+  var an=g.animate([{transform:"translate(0,0)",opacity:0},{transform:"translate(0,0)",opacity:1,offset:0.12},{transform:"translate("+dx+"px,"+dy+"px)",opacity:1,offset:0.85},{transform:"translate("+dx+"px,"+dy+"px)",opacity:0}],{duration:dur,delay:delay||0,easing:"cubic-bezier(.5,0,.3,1)",fill:"both"});
+  an.onfinish=function(){g.remove();};
+  return (delay||0)+dur*0.85;
+}
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 
 /* ---------- tiny highlighter for code blocks ---------- */
@@ -842,7 +884,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     I.y=7.0+0.75*Math.sin(t*0.23+ph);
   }
   function render(I,src,n){
-    var fb=I.fb,map=MAPS[I.d],tex=TEX[I.d],half=RH/2,y,x;
+    var fb=I.fb,map=MAPS[I.d],tex=TEX[I.d],half=RH/2,y,x,bx0=RW,by0=RH,bx1=-1,by1=-1;
     var c=CEIL[I.d],f=FLOOR[I.d];
     for(y=0;y<RH;y++){var t=y<half?(half-y)/half:(y-half)/half,cc=y<half?c:f,k=0.22+0.78*t;
       fb.fill(rgb(cc[0]*k|0,cc[1]*k|0,cc[2]*k|0),y*RW,y*RW+RW);}
@@ -861,7 +903,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       if(cell===2){
         var inU=wx>=TU0&&wx<=TU1,su=((wx-TU0)/(TU1-TU0)*RW)|0;if(su>RW-1)su=RW-1;
         for(y=y0;y<=y1;y++){var v=(y-top)/lh,col=BEZ;
-          if(inU&&src&&v>=TV0&&v<=TV1){var sv=((v-TV0)/(TV1-TV0)*RH)|0;if(sv>RH-1)sv=RH-1;col=src[sv*RW+su];}
+          if(inU&&src&&v>=TV0&&v<=TV1){var sv=((v-TV0)/(TV1-TV0)*RH)|0;if(sv>RH-1)sv=RH-1;col=src[sv*RW+su];if(x<bx0)bx0=x;if(x>bx1)bx1=x;if(y<by0)by0=y;if(y>by1)by1=y;}
           fb[y*RW+x]=col;}
       }else{
         var tx=(wx*32)|0;
@@ -869,6 +911,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
           fb[y*RW+x]=rgb((p&255)*sh|0,((p>>>8)&255)*sh|0,((p>>>16)&255)*sh|0);}
       }
     }
+    I.tvBox=(bx1-bx0>8&&by1-by0>5)?{x0:bx0,y0:by0,x1:bx1,y1:by1}:null;
     badge(I,n);
   }
   function badge(I,n){
@@ -889,7 +932,7 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   ];
   var CFG={
     hero:{title:"The ring, built up",stages:true,monitors:false,strip:false,sched:false,wrapCtl:false,stage:1,
-      caption:"Each step adds one instance. In the real project each one is a full copy of the ACE engine inside the same DOOM2.EXE. This page re-enacts them with three small raycasters, and the TV in each world shows another instance's newest frame, as the real screen-walls do. <b>All controls</b> skips ahead and shows everything at once."},
+      caption:"Each step adds one instance. In the real project each one is a full copy of the ACE engine inside the same DOOM2.EXE. This page re-enacts them with three small raycasters, and the TV in each world shows another instance's newest frame, as the real screen-walls do. <b>Teleport</b> zooms into the TV, because the picture on that TV <em>is</em> the next depth (a few frames old). The real engine uses a sweep and Doom's teleport sound, and the zoom is this page's own. <b>All controls</b> skips ahead and shows everything at once."},
     wrap:{title:"Open the ring, close the ring",monitors:true,strip:false,sched:false,wrapCtl:true,n:3,wrap:true,
       caption:"The three monitors are the three framebuffers. Untick the wrap and depth 2's TV goes to its bezel, as it did before the modulo existed: the chain becomes a ladder. Tick it and the last TV shows the first instance again."},
     full:{title:"One machine, three worlds",monitors:true,strip:true,sched:true,wrapCtl:true,n:3,wrap:true,
@@ -930,6 +973,8 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       monC.push(cv.getContext("2d"));monT.push(tx);monBox.push(box);
     }
     var fxBuf=new Uint32Array(RW*RH),fxImg=new ImageData(new Uint8ClampedArray(fxBuf.buffer),RW,RH);
+    var snapC=document.createElement("canvas"),toC=document.createElement("canvas");snapC.width=toC.width=RW;snapC.height=toC.height=RH;
+    var snapX=snapC.getContext("2d"),toX=toC.getContext("2d");
     function srcFor(d){
       if(n<2)return null;var nx=d+1;
       if(nx>=n){if(!wrap)return null;nx=0;}
@@ -974,13 +1019,19 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       }
     }
     self.draw=function(now){
-      if(fx){var p=(now-fx.t0)/550;if(p>=1){fx=null;}else{
+      if(fx&&fx.zoom){var pz=(now-fx.t0)/1000;if(pz>=1){fx=null;}else{
+        var z=fx.zoom,e=pz<0.72?pz/0.72:1;e=e*e*(3-2*e);
+        mainC.imageSmoothingEnabled=false;
+        mainC.drawImage(snapC,z.x0*e,z.y0*e,RW+(z.x1-z.x0+1-RW)*e,RH+(z.y1-z.y0+1-RH)*e,0,0,RW,RH);
+        if(pz>0.72){toX.putImageData(inst[fx.to].img,0,0);mainC.globalAlpha=(pz-0.72)/0.28;mainC.drawImage(toC,0,0);mainC.globalAlpha=1;}
+      }}
+      if(fx&&!fx.zoom){var p=(now-fx.t0)/550;if(p>=1){fx=null;}else{
         var a=inst[fx.from].fb,b=inst[fx.to].fb,bx=Math.floor(p*RW),x,y;
         for(y=0;y<RH;y++)for(x=0;x<RW;x++){var i=y*RW+x;fxBuf[i]=x<bx?b[i]:a[i];}
         for(y=0;y<RH;y++){fxBuf[y*RW+Math.min(RW-1,bx)]=rgb(190,255,140);if(bx>0)fxBuf[y*RW+bx-1]=rgb(127,210,62);}
         mainC.putImageData(fxImg,0,0);}}
       if(!fx)mainC.putImageData(inst[V].img,0,0);
-      q("tag").textContent="VIEWING DEPTH "+V;
+      q("tag").textContent=(fx&&fx.zoom?"ENTERING DEPTH ":"VIEWING DEPTH ")+V;
       if(show.monitors)for(var d=0;d<n;d++){
         monC[d].putImageData(inst[d].img,0,0);
         monBox[d].classList.toggle("run",d===cur&&show.strip);
@@ -1004,7 +1055,11 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       if(!paused)advance(dt);
       self.draw(now);
     };
-    self.teleport=function(){if(n<2)return;var from=V;V=(V+1)%n;if(!RM)fx={from:from,to:V,t0:performance.now()};};
+    self.teleport=function(){if(n<2)return;var from=V;V=(V+1)%n;if(RM)return;
+      var F=inst[from],z=(F.tvBox&&srcFor(from)===inst[V].fb)?F.tvBox:null;
+      if(z)snapX.putImageData(F.img,0,0);
+      fx={from:from,to:V,t0:performance.now(),zoom:z?{x0:z.x0,y0:z.y0,x1:z.x1,y1:z.y1}:null};
+      if(!paused)return;var t0=fx.t0;(function an(){self.draw(performance.now());if(fx&&fx.t0===t0)requestAnimationFrame(an);})();};
     q("tele").addEventListener("click",self.teleport);
     q("wrap").addEventListener("change",function(){wrap=this.checked;if(cfg.stages&&stage>=3)stage=wrap?4:3;sync();});
     function setPol(p){policy=p;q("rr").setAttribute("aria-pressed",p==="rr");q("vw").setAttribute("aria-pressed",p==="viewer");}
@@ -1034,6 +1089,90 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
       var best=null;rings.forEach(function(r){if(r.visible&&(!best||(r.ratio||1)>(best.ratio||1)))best=r;});
       if(best)best.teleport();}
   });
+})();
+
+/* =====================================================================
+   FRAME BOUNDARY: requests wait, and are consumed before the switch
+   ===================================================================== */
+(function(){
+  var cv=$("fbCanvas"),cx=cv.getContext("2d"),W=cv.width,H=cv.height,PX=150,HX=700;
+  var COL=["224,85,60","127,210,62"];
+  var t,run,reqs,pending,owes,log,bug=false,paused=RM,lastUser=-99,visible=true,last=null,nextAuto;
+  function reset(){t=0;run=[0];reqs=[];pending=null;owes=[false,false];log=[];nextAuto=1.55;}
+  function say(s,bad){log.unshift({s:s,bad:!!bad});if(log.length>3)log.length=3;
+    $("fbLog").innerHTML=log.map(function(l){return '<div'+(l.bad?' class="bad"':'')+'>'+l.s+'</div>';}).join("");}
+  function request(user){
+    if(pending){if(user)say("A request is already waiting. A new one would just overwrite it.");return;}
+    var f=Math.floor(t),r=run[f];
+    pending={t:t,by:r,done:[]};reqs.push(pending);
+    say("Request set during depth "+r+"'s "+(t-f<0.45?"game logic":"rendering")+". It waits for the boundary.");
+    if(user)lastUser=t;
+  }
+  function boundary(f){
+    var r=run[f],nx=r;
+    if(pending){
+      var p=pending;
+      if(!bug){pending=null;nx=1-r;p.done.push({t:f+1,from:r,to:nx,bad:false});
+        say("Boundary: depth "+r+" clears the request, then switches to depth "+nx+".");}
+      else{nx=1-r;var again=p.done.length>0;p.done.push({t:f+1,from:r,to:nx,bad:again});owes[r]=true;
+        say(again?"Boundary: depth "+r+" finds the <b>same</b> request still set and switches again, to depth "+nx+". One request, two switches.":"Boundary: depth "+r+" switches to depth "+nx+" first. The clear will only run when depth "+r+" is resumed.",again);}
+    }
+    run[f+1]=nx;
+    if(owes[nx]){owes[nx]=false;if(pending){pending=null;say("Depth "+nx+" resumes inside its own switch and clears the request, too late.",true);}}
+  }
+  function advance(dt){
+    var t2=t+dt;
+    while(Math.floor(t2)>Math.floor(t)){var f=Math.floor(t);t=f+1;boundary(f);}
+    t=t2;
+    if(t>=nextAuto){if(t-lastUser>6&&!pending)request(false);nextAuto=t+4+Math.random()*2;}
+    if(reqs.length>30)reqs.splice(0,reqs.length-30);
+  }
+  function draw(now){
+    cx.fillStyle="#0b0807";cx.fillRect(0,0,W,H);
+    var f0=Math.floor(t-HX/PX)-1,f1=Math.ceil(t+(W-HX)/PX)+1,f,x;
+    cx.font="16px VT323, monospace";cx.textBaseline="alphabetic";
+    for(f=Math.max(0,f0);f<=f1;f++){
+      x=HX+(f-t)*PX;var r=run[f];
+      if(r===undefined){cx.strokeStyle="#2a201b";cx.strokeRect(x+1,58,PX-2,44);continue;}
+      cx.fillStyle="rgba("+COL[r]+",.25)";cx.fillRect(x+1,58,PX*0.45-1,44);
+      cx.fillStyle="rgba("+COL[r]+",.6)";cx.fillRect(x+PX*0.45,58,PX*0.53,44);
+      cx.fillStyle="#eadccb";cx.fillText("depth "+r,x+6,74);
+      cx.fillStyle="#a9957f";cx.fillText("logic",x+6,96);cx.fillText("render",x+PX*0.45+6,96);
+      cx.fillStyle="#f1b23c";cx.fillRect(x+PX-2,50,3,60);
+      cx.fillStyle="#6f5f50";cx.fillText("boundary",x+PX-30,126);
+    }
+    var pulse=0.5+0.5*Math.sin(now/140);
+    reqs.forEach(function(q){
+      var qx=HX+(q.t-t)*PX;
+      var endx=q.done.length?HX+(q.done[q.done.length-1].t-t)*PX:HX;
+      if(q===pending){cx.setLineDash([5,5]);cx.strokeStyle="rgba(241,178,60,"+(0.5+0.5*pulse)+")";}else{cx.setLineDash([]);cx.strokeStyle="#7a5a22";}
+      cx.lineWidth=2;cx.beginPath();cx.moveTo(qx,36);cx.lineTo(q===pending?HX:endx,36);cx.stroke();cx.setLineDash([]);
+      cx.fillStyle=q===pending?"rgba(241,178,60,"+(0.6+0.4*pulse)+")":"#f1b23c";
+      cx.beginPath();cx.moveTo(qx,28);cx.lineTo(qx+8,36);cx.lineTo(qx,44);cx.lineTo(qx-8,36);cx.closePath();cx.fill();
+      q.done.forEach(function(d){var dx=HX+(d.t-t)*PX;
+        cx.fillStyle=d.bad?"#ff4a32":"#7fd23e";cx.beginPath();cx.arc(dx,36,7,0,7);cx.fill();
+        cx.fillText(d.from+"→"+d.to+(d.bad?" again":""),dx+10,24);});
+    });
+    cx.fillStyle="#a9957f";cx.fillText("request",6,24);
+    cx.strokeStyle="#eadccb";cx.lineWidth=1;cx.beginPath();cx.moveTo(HX,14);cx.lineTo(HX,H-14);cx.stroke();
+    cx.fillStyle="#eadccb";cx.fillText("now",HX+4,H-4);
+    cx.fillStyle="#6f5f50";cx.fillText("time →",W-60,H-4);
+  }
+  function loop(now){
+    if(last===null)last=now;var dt=Math.min(0.1,(now-last)/1000);last=now;
+    if(visible){if(!paused)advance(dt/1.1);draw(now);}
+    requestAnimationFrame(loop);
+  }
+  reset();advance(2.6);request(false);advance(1.0);draw(0);
+  if(paused)$("fbPause").textContent="Play";
+  $("fbReq").addEventListener("click",function(){request(true);if(paused)draw(performance.now());});
+  function setBug(b){bug=b;$("fbOk").setAttribute("aria-pressed",!b);$("fbBad").setAttribute("aria-pressed",b);
+    say(b?"Now the request is cleared only after the switch returns. Make a request and watch.":"Back to the shipped order: clear the request, then switch.",b);}
+  $("fbOk").addEventListener("click",function(){setBug(false);});
+  $("fbBad").addEventListener("click",function(){setBug(true);});
+  $("fbPause").addEventListener("click",function(){paused=!paused;this.textContent=paused?"Play":"Pause";});
+  if("IntersectionObserver" in window)new IntersectionObserver(function(es){es.forEach(function(e){visible=e.isIntersecting;if(visible)last=null;});}).observe(cv);
+  requestAnimationFrame(loop);
 })();
 
 /* =====================================================================
@@ -1133,12 +1272,33 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
     $("stkRegs").innerHTML=rh;
     $("stkNarr").innerHTML=s.narr;
     scrub.value=idx;$("stkScrubOut").textContent=idx+"/"+(states.length-1);
+    placeMark(true);
   }
+  var mark=$("stkMark"),markCol=null;
+  function placeMark(anim){
+    var root=$("stk"),row=root.querySelector(".row.sp");
+    if(!row){mark.style.opacity=0;return;}
+    var R=root.getBoundingClientRect(),b=row.getBoundingClientRect(),col=row.parentNode.id;
+    mark.classList.toggle("far",anim&&markCol!==null&&col!==markCol);
+    if(!anim){mark.style.transition="none";}
+    mark.style.opacity=1;
+    mark.style.transform="translate("+(b.right-R.left-mark.offsetWidth-6)+"px,"+(b.top-R.top+1)+"px)";
+    if(!anim){void mark.offsetWidth;mark.style.transition="";}
+    markCol=col;
+  }
+  window.addEventListener("resize",function(){placeMark(false);});
+  var playT=null;
+  $("stkPlay").addEventListener("click",function(){
+    var btn=this;if(playT){clearInterval(playT);playT=null;btn.textContent="Play ▶▶";return;}
+    if(idx>=states.length-1)idx=0;btn.textContent="Stop";show();
+    playT=setInterval(function(){if(idx<states.length-1){idx++;show();}else{clearInterval(playT);playT=null;btn.textContent="Play ▶▶";}},RM?1600:1150);
+  });
   $("stkStep").addEventListener("click",function(){if(idx<states.length-1)idx++;show();});
   $("stkBack").addEventListener("click",function(){if(idx>0)idx--;show();});
   $("stkReset").addEventListener("click",function(){idx=0;show();});
   scrub.addEventListener("input",function(){idx=+this.value;show();});
-  show();
+  show();placeMark(false);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){placeMark(false);});
 })();
 
 /* =====================================================================
@@ -1150,51 +1310,64 @@ document.querySelectorAll("pre.code[data-hl]").forEach(function(p){
   function build(){
     var cov=function(k){return k==="world"||bug;};
     var s={live:{world:"ROOT MAP01",cur:0,ctx0:0,ctx1:0x00A5FFE8},s0:{},s1:{},esp:0x003FFF50,running:"root",crash:false,ok:false,chg:{},narr:"",init1:false};
-    function C(o){return {live:Object.assign({},o.live),s0:Object.assign({},o.s0),s1:Object.assign({},o.s1),esp:o.esp,running:o.running,crash:false,ok:false,chg:{},narr:"",init1:o.init1};}
-    function save(st,slot){VARS.forEach(function(v){if(cov(v[0])){st[slot][v[0]]=st.live[v[0]];st.chg[slot+"."+v[0]]=1;}});}
-    function load(st,slot){VARS.forEach(function(v){if(cov(v[0])&&st[slot][v[0]]!==undefined){if(st.live[v[0]]!==st[slot][v[0]])st.chg["live."+v[0]]=1;st.live[v[0]]=st[slot][v[0]];}});}
+    function C(o){return {live:Object.assign({},o.live),s0:Object.assign({},o.s0),s1:Object.assign({},o.s1),esp:o.esp,running:o.running,crash:false,ok:false,chg:{},narr:"",init1:o.init1,mv:[]};}
+    function save(st,slot){VARS.forEach(function(v){if(cov(v[0])){st[slot][v[0]]=st.live[v[0]];st.chg[slot+"."+v[0]]=1;st.mv.push({f:"live."+v[0],t:slot+"."+v[0]});}});}
+    function load(st,slot,quiet){VARS.forEach(function(v){if(cov(v[0])&&st[slot][v[0]]!==undefined){var d=st.live[v[0]]!==st[slot][v[0]];if(d)st.chg["live."+v[0]]=1;st.live[v[0]]=st[slot][v[0]];if(!quiet)st.mv.push({f:slot+"."+v[0],t:"live."+v[0],red:d&&(v[0]==="ctx0"||v[0]==="ctx1")});}});}
     var out=[s];
     s.narr="The root is running. mtx_push(1) has seeded depth 1's stack and written <b>ctx[1].esp</b>. The root has never been switched away from, so <b>ctx[0].esp</b> is still 0. Now mtx_switch(1) begins.";
     var t;
     t=C(out[out.length-1]);save(t,"s0");t.narr="<b>1. save_state(root)</b>: copy every covered byte of live memory into the root's slot."+(bug?" That includes the scheduler's own variables, and ctx[0].esp = 0 goes into the snapshot.":"");out.push(t);
     t=C(t);t.live.cur=1;t.chg["live.cur"]=1;t.narr="<b>2. mtx_cur = 1</b>: a control write. It belongs to the host, not to any depth.";out.push(t);
-    t=C(t);VARS.forEach(function(v){if(cov(v[0])){t.s1[v[0]]=t.live[v[0]];t.chg["s1."+v[0]]=1;}});t.init1=true;load(t,"s1");t.narr="<b>3. load_state(depth 1)</b>: first entry, so depth 1's slot is <em>seeded from the live state</em>. The child starts as a copy of its parent.";out.push(t);
-    t=C(t);t.live.ctx0=0x003FFF40;t.chg["live.ctx0"]=1;t.esp=t.live.ctx1;t.running="depth 1";t.narr="<b>4. mtx_switch_ctx</b> publishes the root's real stack pointer: <b>ctx[0].esp = 0x003FFF40</b>. Then it loads ctx[1].esp and depth 1 starts running.";out.push(t);
+    t=C(t);VARS.forEach(function(v){if(cov(v[0])){t.s1[v[0]]=t.live[v[0]];t.chg["s1."+v[0]]=1;t.mv.push({f:"live."+v[0],t:"s1."+v[0]});}});t.init1=true;load(t,"s1",true);t.narr="<b>3. load_state(depth 1)</b>: first entry, so depth 1's slot is <em>seeded from the live state</em>. The child starts as a copy of its parent.";out.push(t);
+    t=C(t);t.live.ctx0=0x003FFF40;t.chg["live.ctx0"]=1;t.esp=t.live.ctx1;t.mv.push({f:"live.ctx1",t:"live.esp"});t.running="depth 1";t.narr="<b>4. mtx_switch_ctx</b> publishes the root's real stack pointer: <b>ctx[0].esp = 0x003FFF40</b>. Then it loads ctx[1].esp and depth 1 starts running.";out.push(t);
     t=C(t);t.live.world="DEPTH1 MAP02";t.chg["live.world"]=1;t.narr="Depth 1 runs for a few frames and changes <em>its</em> world. Then its slice is over and mtx_switch(0) begins.";out.push(t);
     t=C(t);save(t,"s1");t.narr="<b>1. save_state(depth 1)</b>: live memory into depth 1's slot.";out.push(t);
     t=C(t);t.live.cur=0;t.chg["live.cur"]=1;t.narr="<b>2. mtx_cur = 0</b>.";out.push(t);
     t=C(t);load(t,"s0");
     t.narr=bug?"<b>3. load_state(root)</b> copies the root's slot back over live memory, and the slot was taken <em>before</em> step 4 published the real ESP. <b>ctx[0].esp is now 0 again.</b> The world is restored correctly, and the scheduler's state is restored to a stale value.":"<b>3. load_state(root)</b> restores the root's world. The scheduler's variables live in mtx_hs, which no slot covers, so ctx[0].esp keeps the value that was published.";out.push(t);
-    t=C(t);t.live.ctx1=0x00A5FF30;t.chg["live.ctx1"]=1;t.esp=t.live.ctx0;t.chg.esp=1;
+    t=C(t);t.live.ctx1=0x00A5FF30;t.chg["live.ctx1"]=1;t.esp=t.live.ctx0;t.chg.esp=1;t.mv.push({f:"live.ctx0",t:"live.esp",red:t.esp===0});
     if(t.esp===0){t.crash=true;t.running="nobody";t.narr="<b>4. mtx_switch_ctx</b> publishes depth 1's ESP, then loads <b>ESP = ctx[0].esp = 0</b>. The four pops read from address 0, and the final ret jumps into unmapped memory.";}
     else{t.ok=true;t.running="root";t.narr="<b>4. mtx_switch_ctx</b> loads ESP = 0x003FFF40. The root resumes inside its own mtx_switch with its world intact (ROOT MAP01), and depth 1's world is waiting in its slot.";}
     out.push(t);
     return out;
   }
   function cellRow(id,k,label,v,covered,chg,host){
-    return '<div class="cell'+(covered?" cov":"")+(chg?" chg":"")+(host?" host":"")+'"><span class="k">'+esc(label)+'</span><span class="v">'+esc(v===undefined?"—":(typeof v==="number"?(k==="cur"?String(v):hex(v)):v))+'</span></div>';
+    return '<div data-c="'+id+'.'+k+'" class="cell'+(covered?" cov":"")+(chg?" chg":"")+(host?" host":"")+'"><span class="k">'+esc(label)+'</span><span class="v">'+esc(v===undefined?"—":(typeof v==="number"?(k==="cur"?String(v):hex(v)):v))+'</span></div>';
   }
   function box(title,slot,s){
     var h="<h4>"+title+"</h4>";
     VARS.forEach(function(v){var covered=v[0]==="world"||bug;
       if(slot!=="live"&&!covered){h+=cellRow(slot,v[0],v[1],"(not in slot)",false,false,false);return;}
       h+=cellRow(slot,v[0],v[1],s[slot][v[0]],covered,s.chg[slot+"."+v[0]],v[2]);});
-    if(slot==="live")h+='<div class="cell'+(s.chg.esp?" chg":"")+'"><span class="k">CPU ESP · running: '+esc(s.running)+'</span><span class="v">'+hex(s.esp)+'</span></div>';
+    if(slot==="live")h+='<div data-c="live.esp" class="cell'+(s.chg.esp?" chg":"")+'"><span class="k">CPU ESP · running: '+esc(s.running)+'</span><span class="v">'+hex(s.esp)+'</span></div>';
     return h;
   }
+  var shown=-1,timers=[];
   function show(){
-    var s=states[idx];
+    var s=states[idx],fwd=idx===shown+1;shown=idx;
+    timers.forEach(clearTimeout);timers=[];
     $("hsLive").innerHTML=box("Live memory","live",s);
     $("hsS0").innerHTML=box("Root's snapshot slot","s0",s);
     $("hsS1").innerHTML=box("Depth 1's snapshot slot","s1",s);
     $("hsNarr").innerHTML=s.narr;
     $("hsPos").textContent="step "+idx+"/"+(states.length-1);
-    var cr=$("hsCrash"),ok=$("hsOk");
-    cr.classList.toggle("on",!!s.crash);ok.classList.toggle("on",!!s.ok);
+    var cr=$("hsCrash"),ok=$("hsOk"),root=$("hs"),endT=0;
+    cr.classList.remove("on");ok.classList.remove("on");
+    if(fwd&&s.mv&&s.mv.length&&!RM){
+      s.mv.forEach(function(m,i){
+        var a=root.querySelector('[data-c="'+m.f+'"] .v'),b=root.querySelector('[data-c="'+m.t+'"] .v');
+        if(!a||!b)return;
+        var val=b.textContent;b.style.visibility="hidden";
+        var e=fly(root,a,b,esc(val),m.red?"red":"",i*110,m.red?1100:750);
+        endT=Math.max(endT,e);
+        timers.push(setTimeout(function(){b.style.visibility="";},e));
+      });
+    }
+    timers.push(setTimeout(function(){cr.classList.toggle("on",!!s.crash);ok.classList.toggle("on",!!s.ok);},endT));
     cr.innerHTML="DOSBox: Can't run code in this page!<br>Illegal read/write × 2000 · CS:IP 170:4d4d4d4d<br><span style='font-family:var(--f-body);font-size:15px;color:#f0b4a8'>Measured on the very first real switch. The baseline build has zero.</span>";
     ok.innerHTML="Root resumed · 0 illegal reads · 0 DYNX86<br><span style='font-family:var(--f-body);font-size:15px;color:#bfe0a6'>Snapshot per depth: 536,262 → 529,468 B, smaller by exactly sizeof(mtx_hs).</span>";
   }
-  function reset(){states=build();idx=0;show();}
+  function reset(){states=build();idx=0;shown=-1;show();}
   function setBug(b){bug=b;$("hsBug").setAttribute("aria-pressed",b);$("hsFix").setAttribute("aria-pressed",!b);var keep=idx;states=build();idx=Math.min(keep,states.length-1);show();}
   $("hsBug").addEventListener("click",function(){setBug(true);});
   $("hsFix").addEventListener("click",function(){setBug(false);});
