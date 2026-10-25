@@ -228,3 +228,17 @@ Applied after retest round 4 (R34–R39), plus a visibility check:
 | R43 | The switch is described by labels, not shown as work. It is host code: EIP moves into it (depth 0's ACE), and each beat is an instruction card that enters the CPU before its data moves. Drop the beat banner. |
 
 Worked: Q4 (the simulation banner), Q3 (with the reader's nuance: EIP works, what it points to is wrong).
+
+Applied after retest round 5 (R40–R43):
+- New order for steps 6–10:
+  - 6: turns at their simplest (the clock and check in mtx_hs, and a switch that swaps only the CPU's state).
+  - 7: watch what breaks.
+  - 8: fix 1, data, with depth 2 booting and its slot filled from the live data; its copy names its parent's screen.
+  - 9: fix 2, patches.
+  - 10: fix 3, pins.
+  The banner names what is not kept apart yet.
+- The switch runs as host code: EIP goes into depth 0's ACE, each step is an instruction card from there, and the data moves through the CPU. The beat banner is gone. The frame-boundary check is an instruction card as well.
+- Each game shows "its game: health N", and a mismatch between what it left and what it reads is flagged.
+- Failures name what the player sees ("the player sees it jump", "the player sees the wrong game").
+- Draw writes wherever Doom's shared screen pointer names: a booting depth points it at itself, snapshots carry it, and pins force it. That makes the pin failure real: a seeded child draws into its parent's buffer.
+- Warnings are keyed, so several can show at once.

@@ -1663,7 +1663,7 @@ function MachineMap(rootId,build){after3d(function(){
   var BZ=2.9,BX=[-4.7,0,4.7],B=[];
   for(d=0;d<3;d++)(function(d){var x=BX[d],o={};B.push(o);var G=new T.Group();k.scene.add(G);o.G=G;k.layer=G;
     o.base=k.plate(4.5,3.3,DCHEX[d],x,0,BZ,null,0.16);
-    o.title=L(d?"depth "+d:"depth 0 · DOOM2.EXE",x,0.35,BZ+1.95,DCCSS[d],0.58);o.sub=L("its own memory",x,0.3,BZ+2.4,DCCSS[d],0.36);
+    o.title=L(d?"depth "+d:"depth 0 · DOOM2.EXE",x,0.35,BZ+1.95,DCCSS[d],0.58);o.sub=L("its own memory",x,0.3,BZ+2.4,DCCSS[d],0.36);o.gameL=L("",x-1.45,0.32,BZ+1.55,DCCSS[d],0.38);o.gameL.visible=false;o.gameL.userData.pri=4;
     var sh=side(SZ_HEAP),sa=side(SZ_ACE),ss=side(SZ_SNAP),sk=side(SZ_STK),sc=side(SZ_SCR);
     o.heap=k.plate(sh,sh,DCHEX[d],x+1.05,0.02,BZ+0.75,"heap",0.7);L("heap "+kb2(SZ_HEAP),x+1.05,0.3,BZ+0.75,DCCSS[d],0.4);
     o.ace=k.plate(sa,sa,DCHEX[d],x,CSY,CZ-1.75,"code",0.8);o.aceL=L("depth "+d+"'s ACE code · "+kb2(SZ_ACE),x,CSY+0.35,CZ-1.75,DCCSS[d],0.4);
@@ -1772,7 +1772,7 @@ function MachineMap(rootId,build){after3d(function(){
   var S,Q=[],op=null;
   function fresh(){S={n:1,cur:0,viewer:0,other:0,ace:[0,0,0],cell:100,inp:"–",slot:[null,null,null],tray:[0,0,0],patchOwner:-1,pinOwner:0,regOwner:0,regsIn:true,
     frames:[0,0,0],game:[100,67,34],node:0,f:0,mode:"run",next:0,hold:false,turns:false,cfg:{snap:1,patch:1,pin:1,regs:1,host:1,fb:1,keys:1},
-    mech:false,slots:false,slotV:[0,0,0],patched:[0,0,0],wadReads:0,order:null,oi:0,crashed:false,keyPending:0,espSaved:[0,0,0],dead:[0,0,0],half:-1,viewOn:false};Q=[];op=null;}
+    mech:false,slots:false,slotV:[0,0,0],livePtr:0,slotPtr:[0,0,0],known:[1,0,0],patched:[0,0,0],wadReads:0,order:null,oi:0,crashed:false,keyPending:0,espSaved:[0,0,0],dead:[0,0,0],half:-1,viewOn:false};Q=[];op=null;}
   fresh();
   var BEATS={b1:"1 · data: save the changed bytes, load the other's",b2:"2 · patches: take back, put the other's in",b3:"3 · pins: re-point at the other's memory",b4:"4 · registers onto its own stack; ESP into mtx_hs"};
   function aceAddr(d){if(!RUN)return "";var v=d===0?RUN.ace_seg:(RUN.depths[d]&&RUN.depths[d].image&&RUN.depths[d].image[0]);return v?hx(v):"";}
@@ -1790,6 +1790,7 @@ function MachineMap(rootId,build){after3d(function(){
       o.mark.visible=!!(S.viewOn&&d===S.viewer&&on);
       if(sl)setText(o.slotL,running?"saved: live now":S.slot[d]===null?"saved: empty":"saved: health "+S.slot[d],DCCSS[d]);
       glow(o.tray,S.tray[d]?DCHEX[d]:0x3d332a,S.tray[d]?0.5:0.02);o.tray.material.opacity=S.tray[d]?0.9:0.3;
+      o.gameL.visible=!!(on&&S.n>1&&S.known[d]);if(o.gameL.visible)setText(o.gameL,"its game: health "+S.game[d],DCCSS[d]);
       o.regs.visible=!!S.espSaved[d];o.col.position.y=o.col.scale.y/2;o.regs.position.y=o.col.scale.y+0.08;});
     NOTCH.forEach(function(nm){glow(nm,S.patchOwner<0?0x2a2420:DCHEX[S.patchOwner],S.patchOwner<0?0.05:0.6);});
     notchL.visible=S.patchOwner>=0;
@@ -1798,26 +1799,28 @@ function MachineMap(rootId,build){after3d(function(){
     setText(rowEsp,"saved ESP:"+[0,1,2].slice(0,S.n).map(function(d){return " d"+d+(S.espSaved[d]?" ✓":" –");}).join(""),"#f4dca8");
     setText(rowView,S.viewOn?"viewer ▼: depth "+S.viewer:"viewer: depth 0","#f4dca8");
     setText(cellL,"health "+S.cell,"#f4dca8");setText(cInL,"input cmd "+S.inp,"#f4dca8");
-    pinCab.forEach(function(c,j){var o=B[S.pinOwner],t=j===0?o.heap.position:o.buf.position;rewire(c,SOCK[j].position.clone(),V(t.x+(j-1)*0.15,0.05,t.z),0.9+j*0.15,DCHEX[S.pinOwner]);c.material.opacity=S.mech?0.35:0;});
+    pinCab.forEach(function(c,j){var o=B[S.livePtr],t=j===0?o.heap.position:o.buf.position;rewire(c,SOCK[j].position.clone(),V(t.x+(j-1)*0.15,0.05,t.z),0.9+j*0.15,DCHEX[S.livePtr]);c.material.opacity=S.turns?0.35:0;});
     var ring3=S.n>1&&S.ace[1];rowWall.visible=ring3;if(ring3)setText(rowWall,"screen-wall source:"+[0,1,2].slice(0,S.n).map(function(d){return " d"+d+"→d"+ring(d);}).join(" ·"),"#f4dca8");
     wallPtr.forEach(function(w,d){var on=ring3&&d<S.n;w.material.opacity=on?0.3:0;if(on){var b=B[ring(d)].buf.position;rewire(w,V(LX+1.2,0.1,HZ+1.65),V(b.x+(d-1)*0.12,0.05,b.z),0.5+d*0.12,DCHEX[d]);}});
     zoomPaint();
-    sockL.visible=S.mech;nowB.position.set(XN+RW/2+0.05,TRK(S.cur),FZ);glow(nowB,DCHEX[S.cur],0.9);nowB.visible=S.mode!=="switch";}
+    sockL.visible=S.turns;nowB.position.set(XN+RW/2+0.05,TRK(S.cur),FZ);glow(nowB,DCHEX[S.cur],0.9);nowB.visible=S.mode!=="switch";}
   /* a finished frame slides into "who ran"; a switch leaves a gap */
   function filmPush(kind,d){lanePush("run",kind==="f"?{k:"f",d:d}:{k:"sw"});}
   /* what the screen showed slides up into "on the screen" */
   function screenPush(d){var img=snap(scv);send("fly",DCHEX[d],V(SX,SY0,SCZ),V(slotX("scr"),LANES.scr.y,FZ),TY+2.0,0.6,img,function(){lanePush("scr",{k:"f",d:d,img:img});});}
   function tickClock(f){ticks.forEach(function(m,j){glow(m,j<f?HUDHEX:0x3d332a,j<f?0.8:0.05);});}
-  function drawTarget(d){return S.mech&&!S.cfg.pin?S.pinOwner:d;}
+  function drawTarget(d){return S.n>1?S.livePtr:d;}
   function heat(o){o.hot=1;}
   k.frames.push(function(dt){B.forEach(function(o){if(o.hot>0)o.hot=Math.max(0,o.hot-dt*0.6);o.view.material.opacity=0.35+0.65*Math.min(1,o.hot*1.6);});});
   function render(d,wall){var tgt=drawTarget(d),o=B[tgt];heat(o);drawView(o.cv,d,S.cell,S.frames[d],S.half===d,S.dead[d],wall?B[ring(d)].cv:null);o.tex.needsUpdate=true;
-    if(tgt!==d)warn(o,"depth "+d+" drew into depth "+tgt+"'s screen buffer");}
+    if(tgt!==d)wk("px"+d,"depth "+d+" drew into depth "+tgt+"'s screen buffer: the player sees the wrong game",o.base.position.x,2.9,BZ-0.8);else wclear("px"+d);}
   function copySrc(){return S.viewOn?S.viewer:S.cur;}
   function present(src){var g=scv.getContext("2d");g.drawImage(B[src].cv,0,0);stex.needsUpdate=true;}
   function warn(o,t){if(o.warn){o.G.remove(o.warn);}k.layer=o.G;o.warn=L("⚠ "+t,o.base.position.x,3.0,BZ-0.8,"#ff8a76",0.52);k.layer=null;}
-  function clearWarn(){B.forEach(function(o){if(o.warn){o.G.remove(o.warn);o.warn=null;}});if(M.cw){k.scene.remove(M.cw);M.cw=null;}}
-  function cwarn(t,x,y,z){if(M.cw)k.scene.remove(M.cw);M.cw=L("⚠ "+t,x,y,z,"#ff8a76",0.56);}
+  var W={};function wk(key,t,x,y,z){if(W[key])k.scene.remove(W[key]);W[key]=L("⚠ "+t,x,y,z,"#ff8a76",0.48);W[key].userData.pri=6.5;}
+  function wclear(key){if(key){if(W[key]){k.scene.remove(W[key]);delete W[key];}return;}Object.keys(W).forEach(function(q){k.scene.remove(W[q]);});W={};}
+  function clearWarn(){B.forEach(function(o){if(o.warn){o.G.remove(o.warn);o.warn=null;}});wclear();}
+  function cwarn(t,x,y,z){wk("misc",t,x,y,z);}
   function schedNext(c){if(S.order){return S.order[(S.oi+1)%S.order.length];}var n=S.n,v=Math.min(S.viewer,n-1);if(c!==v)return v;var q=S.other;for(var i=0;i<3;i++){q=(q+1)%n;if(q!==v)break;}S.other=q;return q;}
   function O(dur,s,e){return {d:dur,s:s,e:e};}
   /* an instruction: a card leaves the code, enters the CPU and becomes its order */
@@ -1836,9 +1839,10 @@ function MachineMap(rootId,build){after3d(function(){
         L2.push(instr(np,"call ACE (patched)"));
         L2.push(O(0.6,function(){aimEIP(ap,DCHEX[po]);send("card",0,ap,PORT.code,"code",0.6,"ACE: game logic");if(po!==d)cwarn("depth "+d+" is running depth "+po+"'s ACE code",np.x,1.2,np.z);},function(){say2("▶ depth "+po+"'s ACE "+aceAddr(po),po===d?DCCSS[d]:"#ff8a76");}));}
       L2.push(instr(src,"read input, health"));
-      L2.push(O(0.5,function(){send("bead",0xd8c39a,ci,PORT.data,"data",0.5,S.inp);send("bead",0xd8c39a,cp,PORT.data,"data",0.5,S.cell);}));
+      L2.push(O(0.5,function(){send("bead",0xd8c39a,ci,PORT.data,"data",0.5,S.inp);send("bead",0xd8c39a,cp,PORT.data,"data",0.5,S.cell);},
+        function(){if(S.known[d]&&S.cell!==S.game[d])wk("hp"+d,"depth "+d+" left health "+S.game[d]+", reads "+S.cell+": the player sees it jump",cell.position.x,1.3+d*0.45,DZ);else wclear("hp"+d);}));
       var nv;L2.push(instr(src,"write health"));
-      L2.push(O(0.5,function(){S.game[d]=S.cell;nv=S.cell-3<12?100:S.cell-3;send("bead",0xd8c39a,PORT.data,cp,"data",0.5,nv);},function(){S.cell=nv;paint();}));}
+      L2.push(O(0.5,function(){nv=S.cell-3<12?100:S.cell-3;send("bead",0xd8c39a,PORT.data,cp,"data",0.5,nv);},function(){S.cell=nv;S.game[d]=nv;S.known[d]=1;paint();}));}
     if(name==="draw"){var tg;L2.push(instr(src,"read health, textures"));
       L2.push(O(0.5,function(){send("bead",0xd8c39a,cp,PORT.data,"data",0.5,S.cell);send("bead",DCHEX[d],P(o.heap),PORT.pix,"pix",0.5,"tex");}));
       L2.push(instr(src,"write pixels"));
@@ -1852,27 +1856,42 @@ function MachineMap(rootId,build){after3d(function(){
       L2.push(O(0.5,function(){cs=copySrc();heat(B[cs]);send("bead",DCHEX[cs],P(B[cs].buf),PORT.pix,"pix",0.5,"px");}));
       L2.push(instr(src,"write the screen"));
       L2.push(O(0.6,function(){send("bead",DCHEX[cs],V(CPX+1.3,MY+0.25,CPZ),V(SX-1.4,MY+0.6,SCZ),"dev",0.6,"px");},function(){present(cs);screenPush(cs);}));}
-    var last=L2[L2.length-1],e0=last.e;last.e=function(){if(e0)e0();ret(d);S.node++;if(S.node>=JOBS.length){S.node=0;Q.push(boundary());}};
+    var last=L2[L2.length-1],e0=last.e;last.e=function(){if(e0)e0();ret(d);S.node++;if(S.node>=JOBS.length){S.node=0;var bo=boundary();Q.push(bo);}};
     return L2;}
   /* at a frame boundary the CPU looks for a request in mtx_hs */
-  function boundary(){return O(0.5,function(){job("check");S.frames[S.cur]++;filmPush("f",S.cur);S.f++;tickClock(S.turns?S.f:0);say2("frame boundary: any request?");
-      if(S.turns&&gH.visible){send("bead",HUDHEX,P(host),PORT.host,"host",0.5,"?");}},
+  function boundary(){var chk=S.turns&&gH.visible;if(chk)Q.push(instr(P(B[0].ace,CSY+0.1),"count the frame; any request?",DCHEX[0]));
+    return O(0.5,function(){job("check");S.frames[S.cur]++;filmPush("f",S.cur);S.f++;tickClock(S.turns?S.f:0);if(!chk)say2("frame boundary");
+      if(chk){send("bead",HUDHEX,P(host),PORT.host,"host",0.5,"?");}},
     function(){var last=S.turns&&S.n>1&&S.f>=4;
       if(last){S.next=schedNext(S.cur);setText(rowReq,"request: switch → depth "+S.next+(S.order?" (logged order)":S.viewOn&&S.next===S.viewer?" (the one you watch)":S.viewOn?" (others take turns)":""),"#ffd27a");S.mode="switch";}
       else setText(rowReq,S.turns?"request: none (frame "+S.f+" of 4)":"request: none","#f4dca8");});}
-  function switchOps(){var o=S.cur,n=S.next,Bo=B[o],Bn=B[n],L2=[];
-    function beat(b){job(b);beatL.hidden=false;beatL.textContent="switch · "+BEATS[b];say2("switch: depth "+o+" → depth "+n);}
-    L2.push(O(0.5,function(){job("b0");say2("switch: host code, in depth 0's ACE");aimEIP(P(B[0].ace,CSY+0.1),DCHEX[0]);paint();}));
-    L2.push(O(0.8,function(){beat("b1");if(S.mech&&S.cfg.snap){S.slot[o]=S.cell;send("band",DCHEX[o],P(cell),P(Bo.slot),"band",0.8);}else if(S.mech)cwarn("no snapshot: the games share one health",cell.position.x,1.2,DZ);},function(){paint();}));
-    var nv=null;L2.push(O(0.8,function(){if(S.mech&&S.cfg.snap){if(S.slot[n]!==null){nv=S.slot[n];send("band",DCHEX[n],P(Bn.slot),P(cell),"band",0.8);}else S.slot[n]=S.cell;}},function(){if(nv!==null)S.cell=nv;paint();}));
-    var pt=S.mech&&S.cfg.patch&&S.ace[n];
-    L2.push(O(0.6,function(){beat("b2");if(pt){S.tray[o]=1;send("tile",DCHEX[o],P(NOTCH[HOT],CSY+0.1),P(Bo.tray),"band",0.6);}},function(){paint();}));
-    L2.push(O(0.6,function(){if(pt)send("tile",DCHEX[n],P(Bn.tray),P(NOTCH[HOT],CSY+0.1),"band",0.6);},function(){if(pt){S.patchOwner=n;S.tray[n]=0;}paint();}));
-    L2.push(O(0.7,function(){beat("b3");},function(){if(S.mech&&S.cfg.pin)S.pinOwner=n;paint();}));
-    L2.push(O(0.7,function(){beat("b4");S.regsIn=false;paint();send("regs",DCHEX[o],V(CPX,MY,CPZ),stackTop(o),"code",0.7);},function(){S.espSaved[o]=1;paint();}));
-    L2.push(O(0.5,function(){if(gH.visible)send("bead",DCHEX[o],PORT.host,P(host),"host",0.5,"ESP");}));
-    L2.push(O(0.5,function(){if(!S.cfg.host){crash();return;}if(gH.visible)send("bead",DCHEX[n],P(host),PORT.host,"host",0.5,"ESP");}));
-    L2.push(O(0.7,function(){if(S.crashed)return;S.espSaved[n]=0;paint();send("regs",DCHEX[n],stackTop(n),V(CPX,MY,CPZ),"code",0.7);},function(){if(S.crashed)return;S.regsIn=true;S.regOwner=n;endSwitch();}));
+  function switchOps(){var o=S.cur,n=S.next,Bo=B[o],Bn=B[n],L2=[],sw=P(B[0].ace,CSY+0.1),C0=DCHEX[0];
+    function I(b,txt){var x=instr(sw,txt,C0),s0=x.s;x.s=function(){job(b);s0();};return x;}
+    L2.push(O(0.5,function(){job("b0");say2("the switch: host code, in depth 0's ACE");aimEIP(sw,C0);paint();}));
+    if(S.cfg.snap){var cp=P(cell),nv=null,np=0;
+      L2.push(I("b1","save the changed data, depth "+o));
+      L2.push(O(0.45,function(){send("band",DCHEX[o],cp,PORT.data,"data",0.45);}));
+      L2.push(O(0.45,function(){send("band",DCHEX[o],PORT.data,P(Bo.slot),"data",0.45);},function(){S.slot[o]=S.cell;S.slotPtr[o]=S.livePtr;paint();}));
+      L2.push(I("b1","load depth "+n+"'s data"));
+      L2.push(O(0.45,function(){if(S.slot[n]!==null){nv=S.slot[n];np=S.slotPtr[n];send("band",DCHEX[n],P(Bn.slot),PORT.data,"data",0.45);}}));
+      L2.push(O(0.45,function(){if(nv!==null)send("band",DCHEX[n],PORT.data,cp,"data",0.45);},function(){if(nv!==null){S.cell=nv;S.livePtr=np;}paint();}));}
+    if(S.cfg.patch&&S.ace[n]){var hp=P(NOTCH[HOT],CSY+0.1);
+      L2.push(I("b2","put depth "+o+"'s patch bytes in its tray"));
+      L2.push(O(0.4,function(){send("tile",DCHEX[o],hp,PORT.code,"code",0.4);}));
+      L2.push(O(0.4,function(){send("tile",DCHEX[o],PORT.data,P(Bo.tray),"data",0.4);},function(){S.tray[o]=1;paint();}));
+      L2.push(I("b2","put depth "+n+"'s patch bytes in the code"));
+      L2.push(O(0.4,function(){send("tile",DCHEX[n],P(Bn.tray),PORT.data,"data",0.4);}));
+      L2.push(O(0.4,function(){send("tile",DCHEX[n],PORT.code,hp,"code",0.4);},function(){S.patchOwner=n;S.tray[n]=0;paint();}));}
+    if(S.cfg.pin){L2.push(I("b3","re-point the pins at depth "+n));
+      L2.push(O(0.5,function(){SOCK.forEach(function(sk){send("bead",DCHEX[n],PORT.data,P(sk),"data",0.5);});},function(){S.livePtr=n;paint();}));}
+    L2.push(I("b4","push the registers"));
+    L2.push(O(0.6,function(){S.regsIn=false;paint();send("regs",DCHEX[o],V(CPX,MY,CPZ),stackTop(o),"code",0.6);},function(){S.espSaved[o]=1;paint();}));
+    L2.push(I("b4","store ESP in mtx_hs"));
+    L2.push(O(0.45,function(){if(gH.visible)send("bead",DCHEX[o],PORT.host,P(host),"host",0.45,"ESP");}));
+    L2.push(I("b4","load depth "+n+"'s ESP"));
+    L2.push(O(0.45,function(){if(!S.cfg.host){crash();return;}if(gH.visible)send("bead",DCHEX[n],P(host),PORT.host,"host",0.45,"ESP");}));
+    L2.push(I("b4","pop its registers"));
+    L2.push(O(0.6,function(){if(S.crashed)return;S.espSaved[n]=0;paint();send("regs",DCHEX[n],stackTop(n),V(CPX,MY,CPZ),"code",0.6);},function(){if(S.crashed)return;S.regsIn=true;S.regOwner=n;endSwitch();}));
     return L2;}
   function crash(){S.crashed=true;S.mode="dead";Q=[];glow(cpu,0xff4a32,0.6);cwarn("ESP = 0: the switch loaded its own stale copy",0,MY+2.2,CPZ);say2("crashed","#ff8a76");beatL.textContent="crashed";paint();}
   function endSwitch(){S.cur=S.next;S.f=0;S.mode="run";S.node=0;beatL.hidden=true;if(S.order)S.oi=(S.oi+1)%S.order.length;
@@ -1910,20 +1929,26 @@ function MachineMap(rootId,build){after3d(function(){
     SQ.push(instr(src,"copy the live Doom data",DCHEX[0]));
     for(var j=0;j<3;j++)(function(j){var x=-3.3+j*2.2;
       SQ.push(O(0.4,function(){send("bead",0xd8c39a,V(x,0.3,DZ),PORT.data,"data",0.4,j?"":S.cell);}));
-      SQ.push(O(0.4,function(){send("bead",0xd8c39a,PORT.data,P(B[d].slot),"data",0.4,j?"":S.cell);},function(){if(j===2){S.slot[d]=S.cell;paint();}}));})(j);
+      SQ.push(O(0.4,function(){send("bead",0xd8c39a,PORT.data,P(B[d].slot),"data",0.4,j?"":S.cell);},function(){if(j===2){S.slot[d]=S.cell;S.slotPtr[d]=S.livePtr;S.game[d]=S.cell;S.known[d]=1;paint();}}));})(j);
     SQ.push(O(0.5,function(){say2("depth "+d+" starts as a copy of its parent");}));flushRM();};
   M.patch=function(d){Q=[];op=null;var ap=P(B[d].ace,CSY+0.1);
     SQ.push(O(0.8,function(){job("boot");S.cur=d;S.regOwner=d;paint();say2("depth "+d+"'s ACE runs: it patches Doom's code");aimEIP(ap,DCHEX[d]);}));
     NOTCH.forEach(function(nm,j){SQ.push(O(0.22,function(){send("tile",DCHEX[d],ap,P(nm,CSY+0.1),"band",0.5);},function(){glow(nm,DCHEX[d],0.6);}));});
-    SQ.push(O(0.4,function(){},function(){S.patchOwner=d;S.patched[d]=1;S.node=0;paint();}));
+    SQ.push(O(0.4,function(){},function(){S.patchOwner=d;S.patched[d]=1;S.livePtr=d;S.game[d]=S.cell;S.known[d]=1;S.node=0;paint();}));
     SQ.push(O(2.0,function(){say2("patched: 406 places now call depth "+d+"'s ACE");},function(){M.home();}));flushRM();};
   M.boot=function(d,patch){M.load(d);if(patch)M.patch(d);};
   M.queue=function(fn){SQ.push(O(0.1,function(){},fn));flushRM();};
   /* when the player jumps to a later step it replays the earlier ones instantly: apply their events now, don't queue them */
   function flushRM(){if(!RM)return;while(SQ.length){var o2=SQ.shift();if(o2.s)o2.s();if(o2.e)o2.e();}}
-  M.mechOn=function(){S.mech=true;S.slots=true;banner.hidden=true;clearWarn();for(var q=0;q<S.n;q++)S.patched[q]=1;S.zoomShut=1;
-    for(var d=0;d<S.n;d++){S.slot[d]=d===S.cur?null:S.slot[d]!==null?S.slot[d]:S.game[d];S.tray[d]=d===S.cur?0:1;S.espSaved[d]=d===S.cur?0:1;}S.patchOwner=S.cur;S.pinOwner=S.cur;S.regOwner=S.cur;S.regsIn=true;paint();};
-  M.naive=function(on){S.mech=false;banner.hidden=!on;banner.textContent="⚠ SIMULATED: what would happen with nothing kept apart";if(!on)clearWarn();};
+  function simBanner(){var off=["snap","patch","pin"].filter(function(x){return !S.cfg[x];});banner.hidden=!off.length;
+    banner.textContent=off.length===3?"⚠ SIMULATED: only the CPU's own state is switched":"⚠ SIMULATED: not yet kept apart: "+off.map(function(x){return {snap:"data",patch:"patches",pin:"pins"}[x];}).join(", ");}
+  M.fix=function(x){S.cfg[x]=1;S.zoomShut=1;
+    if(x==="snap"){S.slots=true;for(var d=0;d<S.n;d++){if(d!==S.cur&&S.slot[d]===null){S.slot[d]=S.known[d]?S.game[d]:S.cell;S.slotPtr[d]=d;}}["hp0","hp1","hp2"].forEach(wclear);}
+    if(x==="patch"){for(var q=0;q<S.n;q++){S.patched[q]=1;S.tray[q]=q===S.patchOwner?0:1;}wclear("misc");}
+    if(x==="pin")["px0","px1","px2"].forEach(wclear);simBanner();paint();};
+  M.mechOn=function(){S.mech=true;S.slots=true;S.cfg.snap=S.cfg.patch=S.cfg.pin=1;banner.hidden=true;clearWarn();for(var q=0;q<S.n;q++)S.patched[q]=1;S.zoomShut=1;
+    for(var d=0;d<S.n;d++){S.slot[d]=d===S.cur?null:S.slot[d]!==null?S.slot[d]:S.game[d];S.slotPtr[d]=d;S.tray[d]=d===S.cur?0:1;S.espSaved[d]=d===S.cur?0:1;}S.patchOwner=S.cur;S.livePtr=S.cur;S.regOwner=S.cur;S.regsIn=true;paint();};
+  M.naive=function(on){S.mech=true;S.cfg.snap=S.cfg.patch=S.cfg.pin=on?0:1;if(on)simBanner();else{banner.hidden=true;clearWarn();}};
   M.turns=function(on){S.turns=on;tickClock(0);};
   M.setLive=function(n){S.n=n;paint();};
   M.viewOn=function(on){S.viewOn=on;keyB.hidden=!on;paint();};
@@ -1992,11 +2017,11 @@ MachineMap("ov0",function(M,root,say){
     {ms:12000,say:"What is ACE? A mod for DOS Doom 2 that comes as one "+Lk("wad","WAD file")+". Opened with Doom, a trick in how Doom reads WAD files makes it load ACE's code. ACE adds features (a new map format, scripting), and the code that runs every copy lives in ACE too. Watch the loader bring "+Lk("ace","ACE's code")+" from the WAD into depth 0's own memory.",run:function(){M.show(["keys","wad"]);M.load(0);}},
     {ms:14000,say:"To take control, ACE <b>patches Doom's code</b>: 406 places (12 drawn) now hold a call into ACE. The close-up shows one: before, Doom's own instruction; after, <code>E8</code> and an offset, a call into depth 0's ACE code. Watch "+J("update","update")+": EIP reaches a "+Lk("patches","patched place")+" and jumps into ACE's code.",run:function(){M.patch(0);}},
     {ms:12000,say:"Load a second copy, depth 1. It gets its own memory: its own "+Lk("ace","ACE code")+" (at a different address, "+(RUN&&RUN.depths[1]?hx(RUN.depths[1].image[0]):"")+"), heap, stack and screen buffer. Booting, it <b>patches the same 406 places</b>, with calls into <i>its</i> ACE: different bytes. And now Doom runs inside Doom: "+J("draw","draw")+" also paints a <b>screen-wall</b> in each picture with the next depth's last frame.",run:function(){M.boot(1,true);}},
-    {ms:16000,say:"Now let them take turns with nothing kept apart. Depth 0 comes back: at the patched place in "+J("update","update")+" it runs <b>depth 1's</b> ACE code. And both games use the same "+Lk("health","health")+" address in Doom data, so each sees the other's value.",run:function(){M.naive(true);M.home();M.turns(true);}},
-    {ms:12000,say:"Here is how they are really kept apart. Each depth gets a "+Lk("slot","saved data")+" slot and a "+Lk("tray","patch bytes")+" tray in its own memory. A third copy, depth 2, boots the same way. Watch what a new depth's slot is filled with on its first turn.",run:function(){M.naive(false);M.turns(false);M.load(2);M.seed(1);M.seed(2);M.queue(M.mechOn);M.look("bodies");}},
-    {ms:16000,say:"Turns are set by a clock: host code counts frames in "+Lk("clock","mtx_hs")+" (amber, left). At every "+J("check","frame boundary")+" the CPU checks the request word there. Frames 1 to 3: none, so it carries on. After the 4th: <b>switch</b>.",run:function(){M.show(["wad","host","keys"]);M.turns(true);M.look("left");M.later(M.home,5000);}},
-    {ms:16000,say:"A <b>switch</b> is host code (EIP jumps into depth 0's ACE) and runs four beats, in the code's order. "+J("b1","1 · data")+": the outgoing depth's data is saved into its "+Lk("slot","slot")+", the incoming one's loaded; only changed bytes are copied. "+J("b2","2 · patches")+": its own back to its tray, the other's into the code. "+J("b3","3 · pins")+": the shared heap and screen pointers re-pointed at the incoming depth's memory.",run:function(){M.look("sw");}},
-    {ms:14000,say:J("b4","4 · registers")+": the CPU pushes its registers onto the outgoing depth's own "+Lk("stack","stack")+" (the column grows) and writes only the stack pointer, ESP, into "+Lk("host","mtx_hs")+". Then it loads the incoming depth's ESP: the ESP needle jumps to that stack, its registers come back, and EIP is exactly where that depth stopped.",run:function(){M.look("bodies");M.later(M.home,6000);}},
+    {ms:20000,say:"Two depths, one CPU: they take turns. A clock, host code, counts frames in "+Lk("clock","mtx_hs")+" (amber, left), and at every "+J("check","frame boundary")+" the CPU asks it for a request. After the 4th frame: a <b>switch</b>. The switch is host code too: EIP goes into depth 0's ACE, and at its simplest it "+J("b4","swaps the CPU's own state")+": push the registers onto the outgoing depth's own "+Lk("stack","stack")+", store ESP in mtx_hs, load the other depth's ESP, pop its registers. That depth carries on exactly where it stopped.",run:function(){M.show(["wad","host","keys"]);M.naive(true);M.turns(true);M.look("left");M.later(M.home,6000);}},
+    {ms:20000,say:"That is all that is kept apart so far, so watch what breaks. Both games use the same "+Lk("health","health")+" in Doom data, so each reads the other's value. At the patched place in "+J("update","update")+", depth 0 runs <b>depth 1's</b> ACE code. And Doom's shared screen pointer still names depth 1's buffer, so depth 0 "+J("draw","draws")+" into it.",run:function(){M.home();}},
+    {ms:20000,say:"Fix 1, "+J("b1","data")+". Each depth gets a "+Lk("slot","saved data")+" slot: the switch saves the live Doom data into the outgoing depth's slot and loads the incoming one's. Only changed bytes are copied. The health stops jumping. A third copy, depth 2, boots now: on its first turn its slot is filled with a copy of the live data. Its copy names its parent's screen, so it draws into the parent's buffer.",run:function(){M.fix("snap");M.load(2);M.seed(2);M.look("bodies");M.later(M.home,8000);}},
+    {ms:16000,say:"Fix 2, "+J("b2","patches")+". The switch puts the outgoing depth's patch bytes in its "+Lk("tray","tray")+" and the incoming depth's back into the code, so each depth runs its own ACE.",run:function(){M.fix("patch");M.look("code");M.later(M.home,6000);}},
+    {ms:16000,say:"Fix 3, "+J("b3","pins")+". The switch re-points Doom's shared heap and screen "+Lk("pins","pointers")+" at the incoming depth's own memory, whatever its saved data said. Every depth now draws into its own buffer.",run:function(){M.fix("pin");M.look("data");M.later(M.home,6000);}},
     {ms:16000,say:"The keyboard picks <b>where</b> the CPU goes, not when. <button class=\"press-y\" type=\"button\">Press y</button> (or the y key). The press waits until the running depth's "+J("input","input")+" job reads it; that depth records it in "+Lk("host","mtx_hs")+", and the ▼ moves. The depth you watch gets every other turn, and "+J("copy","copy to screen")+" now reads its buffer.",run:function(){M.viewOn(true);M.home();}},
     {ms:9000,say:"Everything the switch itself needs, the request, the viewer, the saved ESPs, lives in "+Lk("host","mtx_hs")+", fenced off: no snapshot ever copies over it.",run:function(){M.look("host");}},
     {ms:9000,say:"Each chapter opens one of these parts, and this machine comes back at the end of each. One question to hold: of the four beats, which one would you remove first, and what would break?",run:function(){M.home();}}
@@ -2007,7 +2032,7 @@ function recap(id,items,extra){
   MachineMap(id,function(M,root,say){
     var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset(3);M.viewOn(true);},onStep:function(){M.step();}});
     root.insertBefore(root.querySelector(".seqc"),say);
-    var Ls=[{ms:5000,say:"Back to the whole machine: three depths, all four beats running.",run:function(){M.home();}}];
+    var Ls=[{ms:5000,say:"Back to the whole machine: three depths, the switch doing all its work.",run:function(){M.home();}}];
     items.forEach(function(it){Ls.push({ms:10000,say:it[1],run:function(){M.hl(it[0]);}});});
     (extra||[]).forEach(function(x){Ls.push({ms:x.ms,say:x.say,run:function(){x.run(M);}});});
     Ls.push({ms:5000,say:"Back to the whole machine.",run:function(){M.home();}});
