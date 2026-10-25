@@ -570,6 +570,10 @@ em,i{font-style:normal;color:#f4dca8}
 .m3-ctl button{font-size:16px;padding:3px 9px 2px;background:rgba(20,14,11,.85)}
 .m3-ctl button b{color:var(--hud)}
 .m3-stage .m3-hint{left:10px;right:auto}
+.m3-tl{position:absolute;left:10px;right:10px;bottom:44px;height:14px;display:flex;gap:1px;overflow-x:auto;overflow-y:hidden;z-index:3;scrollbar-width:none}
+.m3-tl i{flex:0 0 5px;height:9px;border-bottom:3px solid;opacity:.75;cursor:pointer}.m3-tl i:hover{opacity:1;transform:scaleY(1.4)}
+.m3-tl i:last-child{opacity:1;outline:1px solid #fff}
+.m3-beat{bottom:64px!important}
 </style>
 </head>
 <body>
@@ -1507,16 +1511,20 @@ function K3(stage,cv,o){
     var m=new T.Mesh(geo,new T.MeshStandardMaterial({color:c,map:texK(T,kind),transparent:true,opacity:op||0.5,emissive:c,emissiveIntensity:0.35,roughness:1,metalness:0,depthWrite:false}));
     m.position.set(x,y+0.02,z);var e=new T.LineSegments(new T.EdgesGeometry(geo),new T.LineBasicMaterial({color:c}));m.add(e);
     m.userData={h:0.04,y0:y,rise:1,cur:1,edge:e};(k.layer||scene).add(m);return m;};
-  function drawLabel(c,txt,col){var g=c.getContext("2d");g.clearRect(0,0,640,96);
-    g.font="56px VT323, 'IBM Plex Mono', monospace";g.textAlign="center";g.textBaseline="middle";
-    var w=Math.min(630,g.measureText(txt).width+34);g.fillStyle="rgba(14,9,7,.88)";g.fillRect(320-w/2,10,w,76);g.strokeStyle="rgba(241,178,60,.55)";g.lineWidth=3;g.strokeRect(320-w/2+1.5,11.5,w-3,73);g.fillStyle="rgba(255,255,255,.06)";g.fillRect(320-w/2+3,13,w-6,4);
-    g.fillStyle=col||"#eadccb";g.fillText(txt,320,50);}
+  /* labels size their canvas to the text, so nothing is ever cut off */
+  function drawLabel(c,txt,col){var g=c.getContext("2d");g.font="56px VT323, 'IBM Plex Mono', monospace";
+    var w=Math.ceil(g.measureText(txt).width+34),W=Math.max(256,w+12);if(c.width!==W){c.width=W;g=c.getContext("2d");}else g.clearRect(0,0,c.width,c.height);
+    g.font="56px VT323, 'IBM Plex Mono', monospace";g.textAlign="center";g.textBaseline="middle";var cx=W/2;
+    g.fillStyle="rgba(14,9,7,.88)";g.fillRect(cx-w/2,10,w,76);g.strokeStyle="rgba(241,178,60,.55)";g.lineWidth=3;g.strokeRect(cx-w/2+1.5,11.5,w-3,73);g.fillStyle="rgba(255,255,255,.06)";g.fillRect(cx-w/2+3,13,w-6,4);
+    g.fillStyle=col||"#eadccb";g.fillText(txt,cx,50);return W;}
   k.label=function(txt,x,y,z,col,size){
-    var c=document.createElement("canvas");c.width=640;c.height=96;drawLabel(c,txt,col);
+    var c=document.createElement("canvas");c.width=640;c.height=96;var W=drawLabel(c,txt,col);
     var s=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(c),transparent:true,depthTest:false}));
-    var q=(size||1)*1.75;s.position.set(x,y,z);s.scale.set(q*640/96*0.5,q*0.5,1);s.renderOrder=10;(k.layer||scene).add(s);return s;};
+    var q=(size||1)*1.75;s.userData.q=q;s.position.set(x,y,z);s.scale.set(q*W/96*0.5,q*0.5,1);s.renderOrder=10;(k.layer||scene).add(s);return s;};
   /* change a label's text in place: no new sprite, so it can tick every frame boundary */
-  k.setLabel=function(s,txt,col){drawLabel(s.material.map.image,txt,col);s.material.map.needsUpdate=true;};
+  k.setLabel=function(s,txt,col){var c=s.material.map.image,W0=c.width,W=drawLabel(c,txt,col);
+    if(W!==W0){s.material.map.dispose();s.material.map=new T.CanvasTexture(c);s.material.needsUpdate=true;}else s.material.map.needsUpdate=true;
+    var q=s.userData.q||1.75;s.scale.set(q*W/96*0.5,q*0.5,1);};
   k.arc=function(a,b,c,h){var cu=new T.CubicBezierCurve3(a,new T.Vector3(a.x,a.y+h,a.z),new T.Vector3(b.x,b.y+h,b.z),b);
     var m=new T.Mesh(new T.TubeGeometry(cu,60,0.04,6,false),new T.MeshBasicMaterial({color:c,transparent:true,opacity:0}));m.userData={curve:cu,want:0};scene.add(m);return m;};
   k.show=function(m,on){m.userData.rise=on?1:0;};
@@ -1638,7 +1646,7 @@ function MachineMap(rootId,build){after3d(function(){
     o.title=L(d?"depth "+d:"depth 0 · DOOM2.EXE",x,0.35,BZ+1.95,DCCSS[d],0.58);
     var sh=side(SZ_HEAP),sa=side(SZ_ACE),ss=side(SZ_SNAP),sk=side(SZ_STK),sc=side(SZ_SCR);
     o.heap=k.plate(sh,sh,DCHEX[d],x+1.05,0.02,BZ+0.75,"heap",0.7);L("heap "+kb2(SZ_HEAP),x+1.05,0.3,BZ+0.75,DCCSS[d],0.4);
-    o.ace=k.plate(sa,sa,DCHEX[d],x-1.45,0.02,BZ-0.55,"code",0.75);o.aceL=L("ACE "+kb2(SZ_ACE),x-1.45,0.3,BZ-0.55,DCCSS[d],0.4);
+    o.ace=k.plate(sa,sa,DCHEX[d],x-1.45,0.02,BZ-0.55,"code",0.75);o.aceL=L("ACE code "+kb2(SZ_ACE),x-1.45,0.3,BZ-0.55,DCCSS[d],0.4);
     o.slot=k.plate(ss,ss,DCHEX[d],x-1.45,0.02,BZ+0.95,"slot",0.75);o.slotL=L("saved data",x-1.45,0.32,BZ+0.95,DCCSS[d],0.4);
     o.stack=k.plate(sk,sk,DCHEX[d],x-0.25,0.02,BZ-0.95,"stack",0.75);L("stack "+kb2(SZ_STK),x-0.25,0.12,BZ-0.35,DCCSS[d],0.38);
     o.col=new T.Mesh(new T.BoxGeometry(sk*0.8,1,sk*0.8),k.mat(DCHEX[d],0.35));o.col.position.set(x-0.25,0.2,BZ-0.95);o.col.scale.y=0.4;G.add(o.col);o.h0=0.4;
@@ -1676,23 +1684,39 @@ function MachineMap(rootId,build){after3d(function(){
   var SX=6.4,SCZ=-1.4,SY0=MY+1.25,scr=new T.Mesh(new T.PlaneGeometry(3.2,2.1),new T.MeshBasicMaterial({map:stex,side:T.DoubleSide}));scr.position.set(SX+0.05,SY0,SCZ+0.16);scr.rotation.y=-0.3;k.scene.add(scr);
   var sfr=k.box(3.4,2.3,0.12,0x2a2420,SX+0.03,SY0-1.15,SCZ-0.05,0.05);sfr.rotation.y=-0.3;L("the one real screen",SX,SY0+1.45,SCZ,"#eadccb",0.46);
   var pinCab=SOCK.map(function(){return wire(DCHEX[0],0.022,0);});
-  /* --- time layer: a filmstrip of finished frames, the one being made on the right --- */
-  var NF=10,FW=1.0,film=[],FZ=-3.4;
-  for(i=0;i<=NF;i++){var c2=document.createElement("canvas");c2.width=80;c2.height=52;var tx=new T.CanvasTexture(c2);
-    var pl=new T.Mesh(new T.PlaneGeometry(FW*0.92,FW*0.6),new T.MeshBasicMaterial({map:tx,side:T.DoubleSide,transparent:true}));pl.position.set(0,TY+0.4,FZ);pl.visible=false;k.scene.add(pl);
-    var bd=new T.Mesh(new T.BoxGeometry(FW,FW*0.68,0.04),k.mat(0x2a2420,0.3));bd.position.set(0,TY+0.4,FZ-0.04);bd.visible=false;k.scene.add(bd);film.push({pl:pl,bd:bd,cv:c2,tx:tx});}
-  var nowFrame=film[NF];nowFrame.pl.material.map=B[0].tex;
-  L("time →  finished frames",-2.0,TY+1.25,FZ,"#a89884",0.5);L("being made ↓",5.6,TY+1.25,FZ,"#a89884",0.42);var rail=k.box(12.5,0.05,0.5,0x3d332a,0,TY-0.05,FZ,0.05);
-  var hist=[];
+  /* --- time layer, two lanes: what reached the screen, and who ran --- */
+  var NF=9,FW=1.0,FZ=-3.4,XN=5.6,LANES={scr:{y:TY+1.4,slots:[],hist:[]},run:{y:TY+0.15,slots:[],hist:[]}};
+  function mkSlot(y){var c2=document.createElement("canvas");c2.width=80;c2.height=52;var tx=new T.CanvasTexture(c2);
+    var pl=new T.Mesh(new T.PlaneGeometry(FW*0.92,FW*0.6),new T.MeshBasicMaterial({map:tx,side:T.DoubleSide}));pl.position.set(0,y,FZ);pl.visible=false;k.scene.add(pl);
+    var bd=new T.Mesh(new T.BoxGeometry(FW,FW*0.68,0.04),k.mat(0x2a2420,0.3));bd.position.set(0,y,FZ-0.04);bd.visible=false;k.scene.add(bd);return {pl:pl,bd:bd,cv:c2,tx:tx};}
+  Object.keys(LANES).forEach(function(n){for(i=0;i<NF;i++)LANES[n].slots.push(mkSlot(LANES[n].y));});
+  var nowFrame=mkSlot(LANES.run.y);nowFrame.pl.material.map=B[0].tex;
+  L("on the screen",-6.9,LANES.scr.y,FZ,"#a89884",0.46);L("who ran",-6.9,LANES.run.y,FZ,"#a89884",0.46);L("time →",-6.9,TY+2.2,FZ,"#a89884",0.46);L("being made",XN,TY-0.55,FZ,"#a89884",0.38);
+  k.box(13.5,0.05,0.5,0x3d332a,-0.6,TY-0.45,FZ,0.05);
+  function snap(cv){var c=document.createElement("canvas");c.width=80;c.height=52;c.getContext("2d").drawImage(cv,0,0,80,52);return c;}
+  function slotX(lane){return lane==="run"?XN-FW*1.15:XN;}
+  function layout(lane){var Ln=LANES[lane],x=slotX(lane),j=0;
+    for(var h=Ln.hist.length-1;h>=0&&j<NF;h--){var e=Ln.hist[h];if(e.k==="sw"){x-=0.35;continue;}var f=Ln.slots[j++];f.cv.getContext("2d").drawImage(e.img,0,0);f.tx.needsUpdate=true;
+      f.pl.position.x=f.bd.position.x=x;f.pl.visible=f.bd.visible=x>-6.2;glow(f.bd,DCHEX[e.d],0.3);x-=FW*1.08;}
+    for(;j<NF;j++){Ln.slots[j].pl.visible=Ln.slots[j].bd.visible=false;}}
+  function lanePush(lane,e){var Ln=LANES[lane];Ln.hist.push(e);if(Ln.hist.length>30)Ln.hist.shift();if(!S.ff)layout(lane);}
+  var hist=LANES.run.hist;
   var banner=document.createElement("div");banner.className="m3-sim";banner.hidden=true;stage.appendChild(banner);
   var beatL=document.createElement("div");beatL.className="m3-beat";beatL.hidden=true;stage.appendChild(beatL);
-  var ctl=document.createElement("div");ctl.className="m3-ctl";ctl.innerHTML='<button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" data-c="step">step one job</button><button type="button" data-c="speed">speed 1×</button><button type="button" data-c="y" hidden>press <b>y</b></button>';stage.appendChild(ctl);
+  var ctl=document.createElement("div");ctl.className="m3-ctl";ctl.innerHTML='<button type="button" data-c="back" aria-label="One op back">◀</button><button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" data-c="fwd" aria-label="One op forward">▶|</button><button type="button" data-c="step">one job</button><button type="button" data-c="speed">speed 1×</button><button type="button" data-c="y" hidden>press <b>y</b></button>';stage.appendChild(ctl);
   ["pointerdown","pointermove"].forEach(function(ev){ctl.addEventListener(ev,function(e){e.stopPropagation();});});
-  var paused=false,stepping=false,speed=1,SPEEDS=[0.5,1,2,4];
+  var paused=false,speed=1,SPEEDS=[0.5,1,2,4];
   function ctlLabel(){ctl.querySelector('[data-c=pause]').textContent=paused?"▶":"❚❚";ctl.querySelector('[data-c=speed]').textContent="speed "+(speed===0.5?"½":speed)+"×";}
   ctl.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;e.stopPropagation();var c=b.getAttribute("data-c");
-    if(c==="pause"){paused=!paused;stepping=false;}if(c==="step"){paused=false;stepping=true;}if(c==="speed"){speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];}if(c==="y")M.press();ctlLabel();});
+    if(c==="pause"){paused=!paused;stepMode="";}if(c==="step"){paused=false;stepMode="job";}if(c==="fwd"){paused=false;stepMode="op";}if(c==="back"){seek(Math.max(0,opLog.length-1));}if(c==="speed"){speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];}if(c==="y")M.press();ctlLabel();});
   var keyB=ctl.querySelector('[data-c=y]');
+  var tl=document.createElement("div");tl.className="m3-tl";tl.setAttribute("aria-label","Everything this step has run so far; click to go back to that moment");stage.appendChild(tl);
+  ["pointerdown","pointermove"].forEach(function(ev){tl.addEventListener(ev,function(e){e.stopPropagation();});});
+  tl.addEventListener("click",function(e){var t=e.target.closest("i");if(!t)return;e.stopPropagation();seek(+t.getAttribute("data-n"));});
+  var TLC={input:"#9a948c",update:"#ffd27a",draw:"#d8c39a",copy:"#eadccb",check:"#f1b23c",load:"#8a7d6c",boot:"#8a7d6c",b0:"#f1b23c",b1:"#f1b23c",b2:"#f1b23c",b3:"#f1b23c",b4:"#f1b23c"};
+  var tlN=-1;function tlDraw(){if(S&&S.ff)return;if(opLog.length===tlN)return;var h="";for(var j=Math.max(0,opLog.length-240);j<opLog.length;j++){var o=opLog[j];
+      h+='<i data-n="'+(j+1)+'" title="'+(o.t||"")+'" style="background:'+(TLC[o.t]||"#5a4a3c")+';border-bottom-color:'+DCCSS[o.d]+'"></i>';}
+    tl.innerHTML=h;tlN=opLog.length;tl.scrollLeft=tl.scrollWidth;}
 
   /* ===== moving things: one event, one glyph, on a right-angled route, leaving a short trail ===== */
   var toks=[];
@@ -1702,15 +1726,17 @@ function MachineMap(rootId,build){after3d(function(){
     tile:function(c){return new T.Mesh(new T.BoxGeometry(0.32,0.08,0.32),k.mat(c,0.6));},
     band:function(c){var g=new T.Group();for(var j=0;j<4;j++){var m=new T.Mesh(new T.BoxGeometry(0.22,0.22,0.22),k.mat(c,0.5));m.position.set((j-1.5)*0.27,0,0);g.add(m);}return g;},
     regs:function(c){return valTag(new T.Mesh(new T.BoxGeometry(0.6,0.16,0.45),k.mat(c,0.5)),"regs");},
-    key:function(){return valTag(new T.Mesh(new T.BoxGeometry(0.45,0.25,0.45),k.mat(0xeadccb,0.5)),"y");}};
+    key:function(){return valTag(new T.Mesh(new T.BoxGeometry(0.45,0.25,0.45),k.mat(0xeadccb,0.5)),"y");},
+    fly:function(c,img){var t=new T.CanvasTexture(img);var g=new T.Group();var pl=new T.Mesh(new T.PlaneGeometry(FW*0.92,FW*0.6),new T.MeshBasicMaterial({map:t,side:T.DoubleSide}));g.add(pl);
+      var bd=new T.Mesh(new T.BoxGeometry(FW,FW*0.68,0.04),k.mat(c,0.4));bd.position.z=-0.04;g.add(bd);return g;}};
   /* lanes keep each kind of traffic on its own level under the machine */
   var LANE={code:MY-0.6,data:MY-1.0,pix:MY-1.4,host:MY-1.8,dev:MY+0.25,band:1.6};
-  function send(kind,c,a,b,lane,dur,txt){if(RM)return;var m=GL[kind](c,txt);var path=route(a,b,LANE[lane]||lane);
+  function send(kind,c,a,b,lane,dur,txt,done){if(RM){if(done)done();return;}var m=GL[kind](c,txt);var path=route(a,b,LANE[lane]||lane);
     var pts=path.getSpacedPoints(60),g=new T.BufferGeometry().setFromPoints(pts),tr=new T.Line(g,new T.LineBasicMaterial({color:kind==="card"?0xffd27a:c,transparent:true,opacity:0.75}));g.setDrawRange(0,0);k.scene.add(tr);
-    m.position.copy(a);k.scene.add(m);toks.push({m:m,path:path,t:0,dur:dur||0.6,tr:tr,fade:0});}
+    m.position.copy(a);k.scene.add(m);toks.push({m:m,path:path,t:0,dur:dur||0.6,tr:tr,fade:0,done:done});}
   function tokTick(dt){toks=toks.filter(function(o){if(o.fade){o.fade-=dt*2;o.tr.material.opacity=Math.max(0,o.fade*0.75);if(o.fade<=0){k.scene.remove(o.tr);o.tr.geometry.dispose();return false;}return true;}
     o.t+=dt/o.dur;var p=Math.min(1,o.t),e=p<0.5?2*p*p:1-2*(1-p)*(1-p);o.m.position.copy(o.path.getPointAt(e));o.tr.geometry.setDrawRange(0,Math.ceil(61*e));
-    if(p>=1){k.scene.remove(o.m);o.fade=1;}return true;});}
+    if(p>=1){k.scene.remove(o.m);o.fade=1;if(o.done)o.done();}return true;});}
 
   /* ===== the model ===== */
   var S,Q=[],op=null;
@@ -1721,14 +1747,14 @@ function MachineMap(rootId,build){after3d(function(){
   var BEATS={b1:"1 · data: save the changed bytes, load the other's",b2:"2 · patches: take back, put the other's in",b3:"3 · pins: re-point at the other's memory",b4:"4 · registers onto its own stack; ESP into mtx_hs"};
   function aceAddr(d){if(!RUN)return "";var v=d===0?RUN.ace_seg:(RUN.depths[d]&&RUN.depths[d].image&&RUN.depths[d].image[0]);return v?hx(v):"";}
   function setText(l,t,c){k.setLabel(l,t,c);}
-  function job(name){root.querySelectorAll("[data-job]").forEach(function(el){el.classList.toggle("now",el.getAttribute("data-job")===name);});}
+  var curTag="";function job(name){curTag=name;root.querySelectorAll("[data-job]").forEach(function(el){el.classList.toggle("now",el.getAttribute("data-job")===name);});}
   function say2(t,c){setText(order,t,c||"#ffd27a");}
   var PORT={code:V(CPX-0.8,MY,CPZ),data:V(CPX,MY,CPZ+0.5),pix:V(CPX+0.8,MY,CPZ+0.5),host:V(CPX-1.2,MY,CPZ+0.5),dev:V(CPX-1.3,MY+0.25,CPZ)};
   function P(o,y){return V(o.position.x,y===undefined?0.3:y,o.position.z);}
   function stackTop(d){var o=B[d];return V(o.col.position.x,o.col.scale.y+(o.regs.visible?0.16:0),o.col.position.z);}
   function aimEIP(p,c){rewire(nEIP,V(CPX-0.6,MY,CPZ),p,MY-0.35,c===undefined?0xffffff:c);}
   function ring(d){for(var j=1;j<3;j++){var c=(d+j)%3;if(c<S.n)return c;}return d;}
-  function paint(){B.forEach(function(o,d){var on=d<S.n;o.G.visible=on;o.ace.visible=o.aceL.visible=!!(on&&S.ace[d]);
+  function paint(){if(S.ff)return;B.forEach(function(o,d){var on=d<S.n;o.G.visible=on;o.ace.visible=o.aceL.visible=!!(on&&S.ace[d]);
       var sl=S.slots&&on;o.slot.visible=o.slotL.visible=o.tray.visible=o.trayL.visible=sl;
       var running=d===S.cur&&S.mode!=="switch";o.base.material.opacity=running?0.34:0.12;o.run.visible=running&&S.n>1;
       o.mark.visible=!!(S.viewOn&&d===S.viewer&&on);
@@ -1744,13 +1770,12 @@ function MachineMap(rootId,build){after3d(function(){
     setText(cellL,"health "+S.cell,"#ffd27a");setText(cInL,"input cmd "+S.inp,"#f4dca8");
     pinCab.forEach(function(c,j){var o=B[S.pinOwner],t=j===0?o.heap.position:o.buf.position;rewire(c,SOCK[j].position.clone(),V(t.x+(j-1)*0.15,0.05,t.z),0.9+j*0.15,DCHEX[S.pinOwner]);c.material.opacity=S.mech?0.35:0;});
     sockL.visible=S.mech;nowFrame.pl.material.map=B[S.cur].tex;nowFrame.pl.material.needsUpdate=true;glow(nowFrame.bd,DCHEX[S.cur],0.4);nowFrame.pl.visible=nowFrame.bd.visible=true;
-    var xr=5.6;nowFrame.pl.position.x=nowFrame.bd.position.x=xr;}
-  /* a finished frame slides into the strip; switches leave a gap */
-  function filmPush(kind,d){if(kind==="f"){var src=B[d].cv;hist.push({k:"f",d:d,img:(function(){var c=document.createElement("canvas");c.width=80;c.height=52;c.getContext("2d").drawImage(src,0,0,80,52);return c;})()});}else hist.push({k:"sw"});
-    if(hist.length>30)hist.shift();var x=5.6-FW*1.15,j=0;
-    for(var h=hist.length-1;h>=0&&j<NF;h--){var e=hist[h];if(e.k==="sw"){x-=0.35;continue;}var f=film[j++];f.cv.getContext("2d").drawImage(e.img,0,0);f.tx.needsUpdate=true;
-      f.pl.position.x=f.bd.position.x=x;f.pl.visible=f.bd.visible=x>-6.2;glow(f.bd,DCHEX[e.d],0.3);x-=FW*1.08;}
-    for(;j<NF;j++){film[j].pl.visible=film[j].bd.visible=false;}}
+    nowFrame.pl.position.x=nowFrame.bd.position.x=XN;}
+  /* a finished frame slides into "who ran"; a switch leaves a gap */
+  function filmPush(kind,d){if(kind!=="f"){lanePush("run",{k:"sw"});return;}var img=snap(B[d].cv),vp=B[d].view.position;
+    send("fly",DCHEX[d],V(vp.x,vp.y,vp.z),V(slotX("run"),LANES.run.y,FZ),TY-1.0,0.6,"",function(){lanePush("run",{k:"f",d:d,img:img});});}
+  /* what the screen showed slides up into "on the screen" */
+  function screenPush(d){var img=snap(scv);send("fly",DCHEX[d],V(SX,SY0,SCZ),V(slotX("scr"),LANES.scr.y,FZ),TY+2.0,0.6,"",function(){lanePush("scr",{k:"f",d:d,img:img});});}
   function tickClock(f){ticks.forEach(function(m,j){glow(m,j<f?HUDHEX:0x3d332a,j<f?0.8:0.05);});}
   function drawTarget(d){return S.mech&&!S.cfg.pin?S.pinOwner:d;}
   function render(d,wall){var tgt=drawTarget(d),o=B[tgt];drawView(o.cv,d,S.cell,S.frames[d],S.half===d,S.dead[d],wall?B[ring(d)].cv:null);o.tex.needsUpdate=true;
@@ -1791,7 +1816,7 @@ function MachineMap(rootId,build){after3d(function(){
     if(name==="copy"){var cs;L2.push(instr(src,"read the buffer"));
       L2.push(O(0.5,function(){cs=copySrc();send("bead",DCHEX[cs],P(B[cs].buf),PORT.pix,"pix",0.5,"px");}));
       L2.push(instr(src,"write the screen"));
-      L2.push(O(0.6,function(){send("bead",DCHEX[cs],V(CPX+1.3,MY+0.25,CPZ),V(SX-1.4,MY+0.6,SCZ),"dev",0.6,"px");},function(){present(cs);}));}
+      L2.push(O(0.6,function(){send("bead",DCHEX[cs],V(CPX+1.3,MY+0.25,CPZ),V(SX-1.4,MY+0.6,SCZ),"dev",0.6,"px");},function(){present(cs);screenPush(cs);}));}
     var last=L2[L2.length-1],e0=last.e;last.e=function(){if(e0)e0();ret(d);S.node++;if(S.node>=JOBS.length){S.node=0;Q.push(boundary());}};
     return L2;}
   /* at a frame boundary the CPU looks for a request in mtx_hs */
@@ -1817,22 +1842,35 @@ function MachineMap(rootId,build){after3d(function(){
   function crash(){S.crashed=true;S.mode="dead";Q=[];glow(cpu,0xff4a32,0.6);cwarn("ESP = 0: the switch loaded its own stale copy",0,MY+2.2,CPZ);say2("crashed","#ff8a76");beatL.textContent="crashed";paint();}
   function endSwitch(){S.cur=S.next;S.f=0;S.mode="run";S.node=0;beatL.hidden=true;if(S.order)S.oi=(S.oi+1)%S.order.length;
     filmPush("sw");setText(rowReq,"request: none","#f4dca8");tickClock(0);paint();}
-  k.frames.push(function(dt){if(paused)return;dt*=speed;tokTick(dt);if(S.hold||S.mode==="dead")return;
-    if(!op){if(!Q.length)Q=S.mode==="switch"?switchOps():jobOps();op=Q.shift();op.t=0;if(op.s)op.s();}
-    op.t+=dt;if(op.t>=op.d){var e=op.e;op=null;if(e)e();
-      if(stepping&&!Q.length&&S.mode!=="switch"){paused=true;stepping=false;ctlLabel();}}});
+  /* every animation is an op; scripted events (loading, patching) wait in SQ and run before the jobs */
+  var SQ=[],opLog=[],MAXLOG=600,stepMode="";
+  function nextOp(){if(!Q.length)Q=SQ.length?SQ.splice(0,SQ.length):S.mode==="switch"?switchOps():jobOps();op=Q.shift();op.t=0;if(op.s)op.s();}
+  function endOp(){var e=op.e;op=null;if(e)e();if(opLog.length<MAXLOG)opLog.push({t:curTag,d:S.cur});}
+  k.frames.push(function(dt){if(paused)return;dt*=speed;tokTick(dt);if(S.mode==="dead")return;
+    if(!op)nextOp();
+    op.t+=dt;if(op.t>=op.d){endOp();tlDraw();
+      if(stepMode==="op"||(stepMode==="job"&&!Q.length&&!SQ.length&&S.mode!=="switch")){paused=true;stepMode="";ctlLabel();}}});
 
   /* ===== scripted events ===== */
-  M.boot=function(d,patch){S.hold=true;S.n=Math.max(S.n,d+1);paint();var o=B[d];o.ace.visible=o.aceL.visible=false;
-    say2(d?"loader: depth "+d+"'s ACE from the WAD":"loader: ACE from the WAD");job("load");
-    function done(){S.ace[d]=1;if(patch){S.patchOwner=d;S.cur=d;S.regOwner=d;}S.hold=false;Q=[];op=null;S.node=0;paint();}
-    if(RM){done();return;}
-    send("band",DCHEX[d],P(wad,MY),P(o.ace),"band",1.4);
-    setTimeout(function(){S.ace[d]=1;paint();if(!patch){done();return;}
-      say2("depth "+d+"'s ACE boots: it patches Doom's code");aimEIP(P(o.ace,0.1),DCHEX[d]);
-      var ap=P(o.ace,0.1);NOTCH.forEach(function(nm,j){setTimeout(function(){send("tile",DCHEX[d],ap,P(nm,0.1),"band",0.6);setTimeout(function(){glow(nm,DCHEX[d],0.6);},600);},j*90);});
-      setTimeout(done,NN*90+800);},1500/speed);};
-  M.mechOn=function(){S.mech=true;S.slots=true;banner.hidden=true;clearWarn();
+  /* scripted events are ops too, so they can be stepped and rewound */
+  var zoomA=L("",0,0,0,"#eadccb",0.5),zoomB=L("",0,0,0,"#ffd27a",0.5);zoomA.visible=zoomB.visible=false;
+  function hideZoom(){zoomA.visible=zoomB.visible=false;}
+  M.load=function(d){Q=[];op=null;
+    SQ.push(O(0.4,function(){job("load");S.n=Math.max(S.n,d+1);paint();say2(d?"loader: depth "+d+"'s ACE code, from the WAD":"loader: ACE's code, from the WAD");}));
+    SQ.push(O(1.6,function(){send("band",DCHEX[d],P(wad,MY),P(B[d].ace),"band",1.6);},function(){S.ace[d]=1;paint();say2(d?"depth "+d+"'s ACE code is in its memory":"ACE's code is in depth 0's memory");}));
+    SQ.push(O(0.6,function(){}));flushRM();};
+  M.patch=function(d){Q=[];op=null;var ap=P(B[d].ace,0.1);
+    SQ.push(O(0.8,function(){job("boot");S.cur=d;S.regOwner=d;paint();say2("depth "+d+"'s ACE runs: it patches Doom's code");aimEIP(ap,DCHEX[d]);}));
+    NOTCH.forEach(function(nm,j){SQ.push(O(0.22,function(){send("tile",DCHEX[d],ap,P(nm,0.1),"band",0.5);},function(){glow(nm,DCHEX[d],0.6);}));});
+    SQ.push(O(0.4,function(){},function(){S.patchOwner=d;S.node=0;paint();
+      var np=NOTCH[HOT].position;zoomA.position.set(np.x-1.2,2.5,np.z+0.4);zoomB.position.set(np.x-1.2,2.0,np.z+0.4);
+      setText(zoomA,"one patch · before: Doom's own instruction","#eadccb");setText(zoomB,"after: E8 + offset = call depth "+d+"'s ACE "+aceAddr(d),DCCSS[d]);zoomA.visible=zoomB.visible=true;}));
+    SQ.push(O(2.0,function(){say2("patched: 406 places now call depth "+d+"'s ACE");}));flushRM();};
+  M.boot=function(d,patch){M.load(d);if(patch)M.patch(d);};
+  M.queue=function(fn){SQ.push(O(0.1,function(){},fn));flushRM();};
+  /* when the player jumps to a later step it replays the earlier ones instantly: apply their events now, don't queue them */
+  function flushRM(){if(!RM)return;while(SQ.length){var o2=SQ.shift();if(o2.s)o2.s();if(o2.e)o2.e();}}
+  M.mechOn=function(){S.mech=true;S.slots=true;banner.hidden=true;clearWarn();hideZoom();
     for(var d=0;d<S.n;d++){S.slot[d]=d===S.cur?null:S.game[d];S.tray[d]=d===S.cur?0:1;S.espSaved[d]=d===S.cur?0:1;}S.patchOwner=S.cur;S.pinOwner=S.cur;S.regOwner=S.cur;S.regsIn=true;paint();};
   M.naive=function(on){S.mech=false;banner.hidden=!on;banner.textContent="⚠ SIMULATED: what would happen with nothing kept apart";if(!on)clearWarn();};
   M.turns=function(on){S.turns=on;tickClock(0);};
@@ -1844,7 +1882,7 @@ function MachineMap(rootId,build){after3d(function(){
   root.addEventListener("click",function(e){var t=e.target.closest&&e.target.closest(".press-y");if(t){e.preventDefault();M.press();}});
   document.addEventListener("keydown",function(e){if(!S.viewOn||(e.key!=="y"&&e.key!=="Y")||/INPUT|TEXTAREA/.test((e.target||{}).tagName||""))return;var r=stage.getBoundingClientRect();if(r.bottom>0&&r.top<innerHeight)M.press();});
   var PARTS={cpu:[cpu,rEIP,rESP],code:[code],data:[data],stack:B.map(function(o){return o.col;}),heap:B.map(function(o){return o.heap;}),buffer:B.map(function(o){return o.buf;}),ace:B.map(function(o){return o.ace;}),
-    slot:B.map(function(o){return o.slot;}),tray:B.map(function(o){return o.tray;}),host:[host],clock:ticks,keys:[kb],wad:[wad],screen:[sfr],time:film.map(function(f){return f.bd;}),health:[cell],pins:SOCK,patches:NOTCH};
+    slot:B.map(function(o){return o.slot;}),tray:B.map(function(o){return o.tray;}),host:[host],clock:ticks,keys:[kb],wad:[wad],screen:[sfr],time:LANES.run.slots.concat(LANES.scr.slots).map(function(f){return f.bd;}),health:[cell],pins:SOCK,patches:NOTCH};
   function flash(key){(PARTS[key]||[]).forEach(function(m){if(!m.material||!m.material.emissive)return;var e0=m.material.emissiveIntensity;m.material.emissiveIntensity=1.2;setTimeout(function(){m.material.emissiveIntensity=e0;},900);});}
   root.addEventListener("mouseover",function(e){var t=e.target.closest&&e.target.closest("[data-look]");if(t&&!t.contains(e.relatedTarget))flash(t.getAttribute("data-look"));});
   root.addEventListener("click",function(e){var t=e.target.closest&&e.target.closest("[data-look]");if(!t)return;var key=t.getAttribute("data-look");flash(key);M.look(LOOKS[key]||key);});
@@ -1861,9 +1899,24 @@ function MachineMap(rootId,build){after3d(function(){
   M.clearBreak=function(){banner.hidden=true;clearWarn();S.cfg={snap:1,patch:1,pin:1,regs:1,host:1,fb:1,keys:1};S.half=-1;S.dead=[0,0,0];
     if(S.crashed){S.crashed=false;S.mode="run";Q=[];op=null;S.node=0;glow(cpu,STEEL,0.15);}if(S.mech){M.mechOn();}};
   M.relabel=function(){};
+  var CP=null,timers=[];
+  function grab(cv){return cv.getContext("2d").getImageData(0,0,cv.width,cv.height);}
+  M.later=function(fn,ms){if(RM){return;}timers.push(setTimeout(fn,ms));};
+  /* called by the step player after each step's own setup: everything after this point can be rewound */
+  M.step=function(){timers.forEach(clearTimeout);timers=[];Q=[];op=null;
+    CP={S:JSON.stringify(S),SQ:SQ.slice(),cv:B.map(function(o){return grab(o.cv);}),scr:grab(scv),run:LANES.run.hist.slice(),scrh:LANES.scr.hist.slice(),
+      cols:B.map(function(o){return o.col.scale.y;})};opLog=[];tlN=-1;tlDraw();};
+  function seek(n){if(!CP)return;toks.forEach(function(o){k.scene.remove(o.m);k.scene.remove(o.tr);});toks=[];
+    S=JSON.parse(CP.S);SQ=CP.SQ.slice();Q=[];op=null;B.forEach(function(o,d){o.cv.getContext("2d").putImageData(CP.cv[d],0,0);o.tex.needsUpdate=true;o.col.scale.y=CP.cols[d];});
+    scv.getContext("2d").putImageData(CP.scr,0,0);stex.needsUpdate=true;LANES.run.hist.length=0;[].push.apply(LANES.run.hist,CP.run);LANES.scr.hist.length=0;[].push.apply(LANES.scr.hist,CP.scrh);
+    NOTCH.forEach(function(nm){glow(nm,S.patchOwner<0?0x2a2420:DCHEX[S.patchOwner],0.6);});
+    var keep=RM;RM=true;S.ff=true;opLog=[];
+    try{for(var j=0;j<n&&S.mode!=="dead";j++){nextOp();endOp();}}finally{RM=keep;S.ff=false;}
+    paused=true;stepMode="";ctlLabel();layout("run");layout("scr");paint();tlN=-1;tlDraw();}
+  M.seek=seek;
   var PART={wad:gW,keys:gK,host:gH};
   M.show=function(list){Object.keys(PART).forEach(function(n){PART[n].visible=list.indexOf(n)>=0;});};
-  M.reset=function(n){toks.forEach(function(o){k.scene.remove(o.m);k.scene.remove(o.tr);});toks=[];fresh();hist=[];film.forEach(function(f){f.pl.visible=f.bd.visible=false;});clearWarn();banner.hidden=true;beatL.hidden=true;keyB.hidden=true;glow(cpu,STEEL,0.15);
+  M.reset=function(n){SQ=[];hideZoom();LANES.scr.hist.length=0;layout("scr");toks.forEach(function(o){k.scene.remove(o.m);k.scene.remove(o.tr);});toks=[];fresh();LANES.run.hist.length=0;layout("run");clearWarn();banner.hidden=true;beatL.hidden=true;keyB.hidden=true;glow(cpu,STEEL,0.15);
     setText(rowReq,"request: none","#f4dca8");tickClock(0);job("");say2("");
     if(n){S.n=n;for(var d=0;d<n;d++){S.ace[d]=1;}S.cur=0;S.turns=true;M.mechOn();}
     B.forEach(function(o,d){o.col.scale.y=o.h0;drawView(o.cv,d,S.game[d],0);o.tex.needsUpdate=true;});present(0);aimEIP(V(JX.input,0.1,CZ));paint();M.show(n?["wad","keys","host"]:["keys"]);M.home();};
@@ -1874,18 +1927,19 @@ function MachineMap(rootId,build){after3d(function(){
 function J(n,t){return '<span class="j" data-job="'+n+'">'+t+'</span>';}
 function Lk(n,t){return '<span class="lk" data-look="'+n+'">'+t+'</span>';}
 MachineMap("ov0",function(M,root,say){
-  var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset(0);}});
+  var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset(0);},onStep:function(){M.step();}});
   root.insertBefore(root.querySelector(".seqc"),say);
   p.load([
     {ms:14000,say:"Plain Doom: one DOOM2.EXE. The "+Lk("cpu","CPU")+" stands raised in the middle and never moves. Its two needles show where it is: <b>EIP</b> points at the instruction it runs, in "+Lk("code","Doom's code")+"; <b>ESP</b> at the top of the game's "+Lk("stack","stack")+". Each frame is four jobs: "+J("input","input")+" reads the "+Lk("keys","keyboard")+", "+J("update","update")+" runs the game and writes the new "+Lk("health","health")+", "+J("draw","draw")+" reads it and writes pixels into the game's "+Lk("buffer","screen buffer")+", "+J("copy","copy to screen")+" reads that buffer and writes the "+Lk("screen","real screen")+". Yellow cards are instructions, fetched from the code into the CPU; small blocks are values read or written. Use ❚❚ and <b>step one job</b> to go slowly.",run:function(){M.reset(0);}},
     {ms:9000,say:"Three layers: <b>memory</b> on the floor, the <b>machine</b> (the CPU and its hardware) above it, <b>time</b> on top. Each frame ends at a "+J("check","frame boundary")+" and the finished frame slides into the "+Lk("time","filmstrip")+"; the one being made sits at the right. The game's own memory is the red area in front, drawn to scale (a block's area grows with the square root of its size): a 4 MB "+Lk("heap","heap")+", a 64 KB "+Lk("stack","stack")+", a 64,000-byte "+Lk("buffer","screen buffer")+".",run:function(){M.home();}},
-    {ms:12000,say:"Now ACE. A <b>loader</b> reads ACE's code from the "+Lk("wad","WAD file")+" into memory, and booting, ACE <b>rewrites 406 places in Doom's code</b> (12 drawn): each now holds a call into "+Lk("ace","ACE's code")+". Watch "+J("update","update")+": EIP reaches a "+Lk("patches","patched place")+" and jumps into ACE.",run:function(){M.show(["keys","wad"]);M.boot(0,true);}},
+    {ms:12000,say:"What is ACE? A mod for DOS Doom 2 that comes as one "+Lk("wad","WAD file")+". Opened with Doom, a trick in how Doom reads WAD files makes it load ACE's code. ACE adds features (a new map format, scripting), and the code that runs every copy lives in ACE too. Watch the loader bring "+Lk("ace","ACE's code")+" from the WAD into depth 0's own memory.",run:function(){M.show(["keys","wad"]);M.load(0);}},
+    {ms:14000,say:"To take control, ACE <b>patches Doom's code</b>: 406 places (12 drawn) now hold a call into ACE. The close-up shows one: before, Doom's own instruction; after, <code>E8</code> and an offset, a call into depth 0's ACE code. Watch "+J("update","update")+": EIP reaches a "+Lk("patches","patched place")+" and jumps into ACE's code.",run:function(){M.patch(0);}},
     {ms:12000,say:"Load a second copy, depth 1. It gets its own memory: its own "+Lk("ace","ACE code")+" (at a different address, "+(RUN&&RUN.depths[1]?hx(RUN.depths[1].image[0]):"")+"), heap, stack and screen buffer. Booting, it <b>patches the same 406 places</b>, with calls into <i>its</i> ACE: different bytes. And now Doom runs inside Doom: "+J("draw","draw")+" also paints a <b>screen-wall</b> in each picture with the next depth's last frame.",run:function(){M.look("bodies");M.boot(1,true);}},
     {ms:16000,say:"Now let them take turns with nothing kept apart. Depth 0 comes back: at the patched place in "+J("update","update")+" it runs <b>depth 1's</b> ACE code. And both games use the same "+Lk("health","health")+" address in Doom data, so each sees the other's value.",run:function(){M.naive(true);M.home();M.turns(true);}},
-    {ms:12000,say:"Here is how they are really kept apart. Each depth gets a "+Lk("slot","saved data")+" slot and a "+Lk("tray","patch bytes")+" tray in its own memory. A third copy, depth 2, boots the same way.",run:function(){M.naive(false);M.turns(false);M.boot(2,false);setTimeout(function(){M.mechOn();},RM?0:1600);M.look("bodies");}},
-    {ms:16000,say:"Turns are set by a clock: host code counts frames in "+Lk("clock","mtx_hs")+" (amber, left). At every "+J("check","frame boundary")+" the CPU checks the request word there. Frames 1 to 3: none, so it carries on. After the 4th: <b>switch</b>.",run:function(){M.show(["wad","host","keys"]);M.turns(true);M.look("left");setTimeout(function(){M.home();},RM?0:5000);}},
+    {ms:12000,say:"Here is how they are really kept apart. Each depth gets a "+Lk("slot","saved data")+" slot and a "+Lk("tray","patch bytes")+" tray in its own memory. A third copy, depth 2, boots the same way.",run:function(){M.naive(false);M.turns(false);M.load(2);M.queue(M.mechOn);M.look("bodies");}},
+    {ms:16000,say:"Turns are set by a clock: host code counts frames in "+Lk("clock","mtx_hs")+" (amber, left). At every "+J("check","frame boundary")+" the CPU checks the request word there. Frames 1 to 3: none, so it carries on. After the 4th: <b>switch</b>.",run:function(){M.show(["wad","host","keys"]);M.turns(true);M.look("left");M.later(M.home,5000);}},
     {ms:16000,say:"A <b>switch</b> is host code (EIP jumps into depth 0's ACE) and runs four beats, in the code's order. "+J("b1","1 · data")+": the outgoing depth's data is saved into its "+Lk("slot","slot")+", the incoming one's loaded; only changed bytes are copied. "+J("b2","2 · patches")+": its own back to its tray, the other's into the code. "+J("b3","3 · pins")+": the shared heap and screen pointers re-pointed at the incoming depth's memory.",run:function(){M.look("sw");}},
-    {ms:14000,say:J("b4","4 · registers")+": the CPU pushes its registers onto the outgoing depth's own "+Lk("stack","stack")+" (the column grows) and writes only the stack pointer, ESP, into "+Lk("host","mtx_hs")+". Then it loads the incoming depth's ESP: the ESP needle jumps to that stack, its registers come back, and EIP is exactly where that depth stopped.",run:function(){M.look("bodies");setTimeout(function(){M.home();},RM?0:6000);}},
+    {ms:14000,say:J("b4","4 · registers")+": the CPU pushes its registers onto the outgoing depth's own "+Lk("stack","stack")+" (the column grows) and writes only the stack pointer, ESP, into "+Lk("host","mtx_hs")+". Then it loads the incoming depth's ESP: the ESP needle jumps to that stack, its registers come back, and EIP is exactly where that depth stopped.",run:function(){M.look("bodies");M.later(M.home,6000);}},
     {ms:16000,say:"The keyboard picks <b>where</b> the CPU goes, not when. <button class=\"press-y\" type=\"button\">Press y</button> (or the y key). The press waits until the running depth's "+J("input","input")+" job reads it; that depth records it in "+Lk("host","mtx_hs")+", and the ▼ moves. The depth you watch gets every other turn, and "+J("copy","copy to screen")+" now reads its buffer.",run:function(){M.viewOn(true);M.home();}},
     {ms:9000,say:"Everything the switch itself needs, the request, the viewer, the saved ESPs, lives in "+Lk("host","mtx_hs")+", fenced off: no snapshot ever copies over it.",run:function(){M.look("host");}},
     {ms:9000,say:"Each chapter opens one of these parts, and this machine comes back at the end of each. One question to hold: of the four beats, which one would you remove first, and what would break?",run:function(){M.home();}}
@@ -1894,7 +1948,7 @@ MachineMap("ov0",function(M,root,say){
 /* --- chapter-end returns: the same machine, the chapter's parts in focus --- */
 function recap(id,items,extra){
   MachineMap(id,function(M,root,say){
-    var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset(3);M.viewOn(true);}});
+    var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset(3);M.viewOn(true);},onStep:function(){M.step();}});
     root.insertBefore(root.querySelector(".seqc"),say);
     var Ls=[{ms:5000,say:"Back to the whole machine: three depths, all four beats running.",run:function(){M.home();}}];
     items.forEach(function(it){Ls.push({ms:10000,say:it[1],run:function(){M.hl(it[0]);}});});
@@ -1911,7 +1965,7 @@ recap("ov5",[["scr","<b>Screen</b>: every "+J("copy","copy to screen")+" reads t
   [{ms:14000,say:"<button class=\"press-y\" type=\"button\">Press y</button>: the running depth's "+J("input","input")+" job sees the key, "+Lk("host","mtx_hs")+" records it, the ▼ moves, and "+J("copy","copy to screen")+" follows.",run:function(M){M.home();}}]);
 /* --- Map 07: take each mechanism away --- */
 MachineMap("ovF",function(M,root,say){
-  var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset(3);M.viewOn(true);}});
+  var p=new Seq(root,{loop:true,say:say,reset:function(){M.reset(3);M.viewOn(true);},onStep:function(){M.step();}});
   root.insertBefore(root.querySelector(".seqc"),say);
   var cut=[["snap","no snapshots","Without <b>snapshots</b>, "+J("b1","beat 1")+" does nothing: the games share one "+Lk("health","health")+" value (Map 03)."],
     ["host","mtx_hs inside a snapshot","With <b>mtx_hs</b> inside a snapshot, the switch reloads its own old copy and loads ESP = 0. Measured: 2,000 illegal reads."],

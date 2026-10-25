@@ -162,3 +162,10 @@ Applied after retest round 2 (R13–R20, plus layers):
 | R26 | Reversible execution: record state per op; step back and step forward; a scrubbable timeline of ops with job and beat marks. Changing article step must cancel any animation still playing. |
 
 Worked: EIP jumping into ACE at update.
+
+Applied after retest round 3 (R21–R26):
+- Step 3 is now two steps. The first says what ACE is (a DOS Doom 2 mod shipped as a WAD; how the loader gets in is not detailed) and shows the loader bringing ACE's code from the WAD into depth 0's memory. The second shows the patching, tile by tile, with a close-up of one patch (before: Doom's own instruction; after: E8 and an offset, calling that depth's ACE).
+- ACE is labelled "ACE code".
+- The time layer has two lanes: "on the screen" (the real screen's picture flies up at each copy) and "who ran" (each finished frame flies out of its depth's buffer).
+- Reversible execution: every animation, including loading and patching, is an op. Each article step takes a checkpoint, and the timeline under the scene lets you click any op to rewind to it (restore, then replay instantly). There are one-op back and forward buttons, and changing step cancels pending animations.
+- Labels size themselves to their text; long labels were being cut off.
