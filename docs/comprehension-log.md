@@ -107,7 +107,7 @@ Rounds 14 and 15 (step 14 and integration): the reader warns that the questionin
 | R2 | 1 | The CPU still reads as a black box: the "registers" card is unexplained, and EIP and ESP are text, placed near the screen. They should be visual pointers: a needle into the exact code spot, a marker in the stack. |
 | R3 | 1 | Job names: "present" is graphics jargon and "think" is ambiguous. Use input · update · draw · copy to screen. |
 | R4 | 1 | Plain Doom reads the keyboard every frame: the keyboard and an input job belong in step 1. |
-| R5 | 1 | The health write looks unconnected to the code: nothing ties the fetched instruction to the write it causes. |
+| R5 | 1 | Execution looks decoupled from memory, for every job: input (keyboard → input command), update (input and health → health), draw (health → pixels in the depth's screen buffer), copy to screen (buffer → real screen, done by the CPU). Each fetch must visibly lead to the read or write it causes, at that moment. |
 | R6 | 1 | Too fast to follow: add pause and step-one-job controls. |
 | R7 | 1 | Sizes are not proportional (the stack looks as big as the heap). Use real sizes from the run, or a stated compressed scale. |
 | R8 | 1 | Prefer specific moving objects (patch tiles, saved byte blocks) over generic surfaces. |
