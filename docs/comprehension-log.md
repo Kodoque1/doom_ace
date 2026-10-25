@@ -183,3 +183,14 @@ Applied after retest round 3 (R21–R26):
 | R33 | Stronger fetch versus data distinction: code on its own raised shelf, labelled instruction and data ports on the CPU, dashed trails for instructions and solid for data, one colour reserved for instruction traffic. |
 
 Worked: patches differ per depth because each calls its own ACE (first time from the scene). Q5 (the patched bytes are Doom's code).
+
+Applied after retest round 3b (R27–R33) and the follow-ups during the build:
+- Code sits on its own raised shelf: Doom code at the front, each depth's ACE code in its own block behind it (the stock loader frees Doom's heap and allocates a fresh block for ACE_CODE, see doom_ace/loader/ldr1.S).
+- The CPU has labelled ports, "instructions in" at the back and "data" at the front. Instruction cards leave dashed trails, data solid ones, and yellow is reserved for instruction traffic.
+- Loading goes through the CPU: depth 0's loader runs from Doom data, and later depths are loaded by depth 0's ACE code. ACE's code comes in as WAD → CPU → its block.
+- A new depth's first turn copies the live Doom data into its saved-data slot, block by block through the CPU: an operation, not a label.
+- Each depth's area is labelled "its own memory", distinct from its saved-data slot.
+- Clicking a paragraph makes it the current step. Clicking a job or beat word advances the scene to that job's next run.
+- Screen buffers are see-through when idle and turn opaque while they are written or read.
+- "Who ran" is three tracks, one per depth, with one block per frame. "On the screen" stays a strip of pictures.
+- Fixed: a step's own camera timers were cancelled as soon as they were set.
