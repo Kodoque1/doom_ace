@@ -45,6 +45,10 @@ It does not contain answers.
 | 34 | 9 | The key's line ends on the ring and reads as "key-handling code"; the host word it really goes through is not shown. |
 | 35 | 9 | Immediate and deferred effects look alike: the ▼ moves after a fixed delay, so it reads as waiting. |
 | 36 | 9 | Nothing links the ▼ to the CPU's next destination; the reader concluded y has no effect on the schedule. |
+| 37 | 10 | The snapshot slots are not identifiable without the caption; nothing moves in or out at this step. |
+| 38 | 10 | The jobs of snapshots and pins are confusable; the reader took pins to give each depth its own data. |
+| 39 | 10 | "Put back" contradicts the scene (the studs stay blue), and whether patches differ per depth is still unsettled (see 16). |
+| 40 | 10 | The pin lines land on the snapshot slots, so pins read as "pointers to snapshots"; they need real per-depth targets (see 11). |
 
 ## Themes for the rework
 
@@ -56,11 +60,16 @@ It does not contain answers.
 - H. The request and the check: 24, 25, 26, 27, 28, 29, 32
 - E also takes 30.
 - I. Interaction and sync: 33, 35
+- J. Three keeping-apart mechanisms, each with its own visible action: 37, 38, 39, 40. Step 10 Q5 confirmed gap 23.
 - H also takes 34, 36. Step 9 Q3 confirmed gap 17.
 - E. Time: 2, 17, 18, 19, 20
 - F. Gear: 3
 
 Worked: step 1 Q5 (screen), step 3 Q4 (taking turns), step 4 Q3 (no saved copy visible), step 5 Q1 (reading the strip), step 6 Q2 (no per-depth state visible). Step 6 Q5 confirmed gaps 9 and 11. Step 7 Q3 was answered from prior knowledge, not the scene: logged as gap 28.
+
+## Proposals from the reader
+
+- P1 (round 10): a tiny procedural game view per depth (corridor plus a health number, no game assets). One on-screen value is linked to a data cell through code on the code plate, and the real screen is composed from the depths' frames as they render. Addresses 1, 14, 17, 21, 22.
 
 ## Test method notes
 
