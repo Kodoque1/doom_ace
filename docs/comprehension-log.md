@@ -53,6 +53,11 @@ It does not contain answers.
 | 42 | 11 | The mtx_hs line is static: no direction, no content. |
 | 43 | 11 | Grey means both "not opened yet" and what mtx_hs looks like; host-owned things need their own consistent colour. |
 | 44 | 11 | "Host", depth 0 and mtx_hs are tangled; the scene does not say what the host is or where the clock runs. |
+| 45 | 12 | The loader never visibly acts, so when it runs is unknowable. |
+| 46 | 12 | Where code comes from (file, then memory, then running) is never shown, for the loader or for ACE (see 6). |
+| 47 | 12 | What picks the screen's depth is invisible; the screen never shows anything (see 17). |
+| 48 | 12 | The input and output layout reads as arbitrary (keyboard on the floor, screen in execution, loader on the left). |
+| 49 | 12 | The flow dots look like the CPU ball ("why multiple balls?"). |
 
 ## Themes for the rework
 
@@ -64,6 +69,7 @@ It does not contain answers.
 - H. The request and the check: 24, 25, 26, 27, 28, 29, 32
 - E also takes 30.
 - I. Interaction and sync: 33, 35
+- L. Layout and glyphs: 48, 49. D also takes 45, 46.
 - K. The host and its state: 41, 42, 43, 44
 - J. Three keeping-apart mechanisms, each with its own visible action: 37, 38, 39, 40. Step 10 Q5 confirmed gap 23.
 - H also takes 34, 36. Step 9 Q3 confirmed gap 17.
@@ -76,6 +82,7 @@ Worked: step 1 Q5 (screen), step 3 Q4 (taking turns), step 4 Q3 (no saved copy v
 
 - P1 (round 10): a tiny procedural game view per depth (corridor plus a health number, no game assets). One on-screen value is linked to a data cell through code on the code plate, and the real screen is composed from the depths' frames as they render. Addresses 1, 14, 17, 21, 22.
 - P2 (round 11): replace the moving ball with a fixed schematic CPU: a visible instruction pointer and stack pointer, with separate fetch and read/write ports whose lines light up as it works. The lit, turning ring shows which depth runs. Addresses 4, 23, 31 and theme A.
+- P3 (round 12): drop the rings. A depth is its body of saved state on the floor, and a switch visibly moves things (patches back to code, pins reconnecting, CPU state put away and restored). The execution layer belongs to the fixed CPU (P2). Depth identity could come from P1's per-depth views. One detail of the proposal does not match the code (not stated, since it answers a question); the design follows the code. Layout research started: docs/layout-research.md.
 
 ## Test method notes
 
