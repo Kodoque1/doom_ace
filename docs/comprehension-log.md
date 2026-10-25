@@ -37,16 +37,25 @@ It does not contain answers.
 | 26 | 7 | "Post" is undefined; the posts are thin, and tall versus short is barely visible. |
 | 27 | 7 | A check that finds nothing looks identical to no check (same as 25, seen from the other side). |
 | 28 | 7 | No reason is shown for switching only at frame ends: no glimpse of a mid-frame switch going wrong (only in Map 07). |
+| 29 | 8 | "The clock" is not an object, only a counter label; it is not placed outside the depths. |
+| 30 | 8 | Ring positions carry no meaning; the top is both "think" and the frame boundary, so where a depth stops reads as arbitrary. |
+| 31 | 8 | The frozen ring seems to remember where to resume, suggesting nothing needs saving. The CPU's state must be seen put away and taken back. |
+| 32 | 8 | Who runs next looks random: the request's destination and the pattern are not shown until the keyboard step. |
 
 ## Themes for the rework
 
 - A. Running touches memory: 1, 7, 10, 14
-- B. A depth has a body: 4, 5, 11
+- B. A depth has a body: 4, 5, 11, 31
 - C. One meaning per colour: 9, 12, 13, 16
 - D. Cause, then consequence: 6, 14, 15, 16, 21, 22
 - G. The switch does something: 23
-- H. The request and the check: 24, 25, 26, 27, 28
+- H. The request and the check: 24, 25, 26, 27, 28, 29, 32
+- E also takes 30.
 - E. Time: 2, 17, 18, 19, 20
 - F. Gear: 3
 
 Worked: step 1 Q5 (screen), step 3 Q4 (taking turns), step 4 Q3 (no saved copy visible), step 5 Q1 (reading the strip), step 6 Q2 (no per-depth state visible). Step 6 Q5 confirmed gaps 9 and 11. Step 7 Q3 was answered from prior knowledge, not the scene: logged as gap 28.
+
+## Test method notes
+
+- Step 8 Q2 and Q5: the reader said the question itself taught them. The retest should use open "what do you see happen when..." questions, not ones that point at the answer.
