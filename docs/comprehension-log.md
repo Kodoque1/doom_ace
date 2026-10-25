@@ -112,4 +112,6 @@ Rounds 14 and 15 (step 14 and integration): the reader warns that the questionin
 | R7 | 1 | Sizes are not proportional (the stack looks as big as the heap). Use real sizes from the run, or a stated compressed scale. |
 | R8 | 1 | Prefer specific moving objects (patch tiles, saved byte blocks) over generic surfaces. |
 | R9 | 1 | Use height: stacked layers, and height for size or stack depth. |
+| R11 | 1 | Sync must go both ways: the scene's Next and Back scroll the text, the word for the current job or beat lights up in the text, and terms in the text highlight their part in the scene. |
+| R12 | – | Use a pixel font throughout the article, to keep the old-school Doom look. |
 | R10 | 1 | Worked: what happens in a frame (Q1), tracing the health from data to screen buffer to screen (Q2), places versus travellers (Q4), what a second game would add (Q5). |
