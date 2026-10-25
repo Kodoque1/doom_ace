@@ -36,6 +36,7 @@ It does not contain answers.
 | 25 | 7 | Nothing shows the CPU checking for a request at a boundary. |
 | 26 | 7 | "Post" is undefined; the posts are thin, and tall versus short is barely visible. |
 | 27 | 7 | A check that finds nothing looks identical to no check (same as 25, seen from the other side). |
+| 28 | 7 | No reason is shown for switching only at frame ends: no glimpse of a mid-frame switch going wrong (only in Map 07). |
 
 ## Themes for the rework
 
@@ -44,8 +45,8 @@ It does not contain answers.
 - C. One meaning per colour: 9, 12, 13, 16
 - D. Cause, then consequence: 6, 14, 15, 16, 21, 22
 - G. The switch does something: 23
-- H. The request and the check: 24, 25, 26, 27
+- H. The request and the check: 24, 25, 26, 27, 28
 - E. Time: 2, 17, 18, 19, 20
 - F. Gear: 3
 
-Worked: step 1 Q5 (screen), step 3 Q4 (taking turns), step 4 Q3 (no saved copy visible), step 5 Q1 (reading the strip), step 6 Q2 (no per-depth state visible). Step 6 Q5 confirmed gaps 9 and 11. Step 7 Q3 (partial rendering), possibly from prior knowledge.
+Worked: step 1 Q5 (screen), step 3 Q4 (taking turns), step 4 Q3 (no saved copy visible), step 5 Q1 (reading the strip), step 6 Q2 (no per-depth state visible). Step 6 Q5 confirmed gaps 9 and 11. Step 7 Q3 was answered from prior knowledge, not the scene: logged as gap 28.
