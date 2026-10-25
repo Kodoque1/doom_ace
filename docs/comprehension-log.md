@@ -115,3 +115,13 @@ Rounds 14 and 15 (step 14 and integration): the reader warns that the questionin
 | R11 | 1 | Sync must go both ways: the scene's Next and Back scroll the text, the word for the current job or beat lights up in the text, and terms in the text highlight their part in the scene. |
 | R12 | – | Use a pixel font throughout the article, to keep the old-school Doom look. |
 | R10 | 1 | Worked: what happens in a frame (Q1), tracing the health from data to screen buffer to screen (Q2), places versus travellers (Q4), what a second game would add (Q5). |
+
+Applied after retest round 1 (R1–R12):
+- Four jobs: input, update, draw, copy to screen. Each fetch leads to its reads and writes, and the copy goes through the CPU.
+- EIP and ESP are needles from the raised CPU.
+- Stack columns grow when registers are pushed.
+- Memory blocks are drawn to scale (area grows with √size).
+- The keyboard and an input job are there from step 1, and a key press waits for the input job.
+- Pause, step-one-job and speed controls.
+- Two-way sync: the scene's Next and Back scroll the text, the current job or beat lights up in the text, and terms in the text flash or focus their part.
+- Pixel fonts throughout: Jersey 10 for headings, Pixelify Sans for body text, VT323 for mono and labels.
