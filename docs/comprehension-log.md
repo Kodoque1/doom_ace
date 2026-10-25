@@ -204,6 +204,6 @@ Applied after retest round 3b (R27–R33) and the follow-ups during the build:
 | R36 | Where depth 1's code comes from is not shown (the reader asked how a later depth gets the WAD, and whether there are several). Answer this by showing it. |
 | R37 | Bug: depth 0's saved-data slot and patch tray showed from step 1 (a visibility flag set to the number 0, which three.js does not treat as hidden). Fixed. Also, the machine's glass plane hides the code shelf: make it much more transparent. |
 | R38 | Show what each depth's load reuses and what it does not (the reader's premise is partly right; details withheld, as they answer Q5). |
-| R39 | Show the ring explicitly: once three depths run, arrows 0 → 1 → 2 → 0 between the screen buffers, lit as each screen-wall is painted. |
+| R39 | Show how the deepest depth connects back to depth 0. Every frame, host code writes each depth's screen-wall source into its parameter block in mtx_hs: the next live depth's buffer, wrapping to depth 0 for the deepest (mtx_boot.c, mtx_ring_next / params[].screen_src). Show it as pointers from mtx_hs, re-aimed when a depth goes live, and have draw read the pointer before the buffer. |
 
 Worked: Q1 (what a new depth adds and does not add) and Q4 (screen-wall traced from the next depth's buffer through the CPU). Q3 was inferred rather than seen.
