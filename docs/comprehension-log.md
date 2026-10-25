@@ -254,3 +254,11 @@ Applied after retest round 5 (R40–R43):
 | R48 | Where the switch code lives was not perceived; "neutral party" was attached to the code instead of to mtx_hs (its data). Separate the switch code (depth 0's ACE) from the switch data (mtx_hs) visibly. |
 
 Worked: Q1 (the frame count triggers it), Q4 for the patches (data omitted, partly the banner's wording).
+
+Applied after retest round 6 (R44–R48):
+- There is no clock: the trigger is a frame counter in mtx_hs. It is drawn as four large cells with a "frame counter · N of 4" readout and a "setting: switch every 4" label, and the text calls it a frame counter and points to Map 06 for why 4. Step 6 opens on it.
+- mtx_hs rows appear only from the step that introduces them (the viewer row from the keyboard step; request and saved ESP from step 6).
+- Saved ESP is shown as a value per depth, from the run.
+- Depth 0's ACE block is labelled "the switch's code" and lights during a switch, and mtx_hs is labelled "the switch's data".
+- The pushed block reads "EIP EBX ESI EDI EBP": "push EIP (where to resume) + EBX ESI EDI EBP", then "pop its registers; ret resumes at its EIP".
+- The banner names what is not switched. The close-up stays folded from step 6 on and sits below the banner.

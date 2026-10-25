@@ -579,6 +579,7 @@ em,i{font-style:normal;color:#f4dca8}
 .m3-zoom .zt{color:#ffd27a;margin-bottom:3px}.m3-zoom .zr{display:grid;grid-template-columns:7.5em 1fr;column-gap:6px;padding:2px 0 2px 6px;border-left:3px solid var(--c,#6f5f50)}
 .m3-zoom .zr b{font-weight:400;color:var(--c,#bfb2a2)}.m3-zoom .zr i{grid-column:2;font-style:normal;color:#8a7d6c;font-size:14px}.m3-zoom .zr.now{background:rgba(241,178,60,.12)}.m3-zoom .zr.now i{color:#fff}
 .m3-zoom{cursor:pointer;font-size:15px}.m3-zoom.shut .zr{display:none}
+.m3-zoom{top:46px!important}
 </style>
 </head>
 <body>
@@ -1648,13 +1649,13 @@ function MachineMap(rootId,build){after3d(function(){
   var CZ=-2.9,CSY=1.6,code=k.plate(10.6,1.4,NEUT,0,CSY,CZ,"code",0.5);
   k.box(15.2,0.05,1.5,0x2a211c,0,CSY-0.06,CZ-1.75,0.05);
   [[-5.1,-0.6],[5.1,-0.6],[-5.1,0.6],[5.1,0.6],[-7.4,-2.4],[7.4,-2.4]].forEach(function(q){k.box(0.12,CSY,0.12,0x4a4540,q[0],0,CZ+q[1],0.05);});
-  L("Doom code",-6.7,CSY+0.35,CZ,"#d8c39a",0.58);L("shared, one copy",-6.7,CSY+0.3,CZ+0.6,"#a89884",0.4);
+  L("Doom code · shared, one copy",-2.6,CSY+0.3,CZ+0.95,"#d8c39a",0.48);
   var JOBS=["input","update","draw","copy"],JX={input:-3.9,update:-1.3,draw:1.3,copy:3.9},JN={input:"input",update:"update",draw:"draw",copy:"copy to screen"};
   JOBS.forEach(function(n){L(JN[n],JX[n],CSY+0.3,CZ-0.35,"#a89884",0.46);});
   var NOTCH=[],NN=12,HOT=0;for(i=0;i<NN;i++){var nx=-4.9+i*(9.8/(NN-1)),nm=new T.Mesh(new T.BoxGeometry(0.34,0.06,0.34),k.mat(0x2a2420,0.05));nm.position.set(nx,CSY+0.05,CZ+0.45);k.scene.add(nm);NOTCH.push(nm);if(Math.abs(nx-JX.update)<Math.abs(NOTCH[HOT].position.x-JX.update))HOT=i;}
   var notchL=L("patched places",6.7,CSY+0.3,CZ+0.45,"#a89884",0.42);notchL.visible=false;
   var DZ=-0.9,data=k.plate(10.6,1.3,NEUT,0,0,DZ,"data",0.5);
-  L("Doom data",-6.7,0.35,DZ,"#d8c39a",0.58);L("shared, one copy",-6.7,0.3,DZ+0.6,"#a89884",0.4);
+  L("Doom data · shared, one copy",-0.2,0.3,DZ+0.85,"#d8c39a",0.48);
   var cIn=k.box(0.7,0.2,0.7,0xd8c39a,-4.6,0,DZ,0.2),cInL=L("input cmd",-4.6,0.7,DZ,"#f4dca8",0.42);
   var cell=k.box(0.7,0.22,0.7,0xd8c39a,-3.3,0,DZ,0.2),cellL=L("health 100",-3.3,0.72,DZ,"#f4dca8",0.48);cellL.userData.pri=6;
   var ldr=k.plate(0.8,0.6,0xd8c39a,-1.7,0.02,DZ,"code",0.85),ldrL=L("loader",-1.7,0.4,DZ,"#f4dca8",0.4);ldr.visible=ldrL.visible=false;
@@ -1678,15 +1679,17 @@ function MachineMap(rootId,build){after3d(function(){
     var fr=new T.Mesh(new T.BoxGeometry(1.8,1.2,0.05),k.mat(DCHEX[d],0.3,0.25));fr.material.depthWrite=false;fr.position.set(x+1.35,0.95,BZ-1.39);G.add(fr);
     o.viewL=L("screen buffer "+kb2(SZ_SCR),x+1.35,1.75,BZ-1.35,DCCSS[d],0.38);
     o.mark=L("▼ you watch this one",x+1.35,2.25,BZ-1.35,"#ffffff",0.46);o.mark.visible=false;
-    o.run=L("◀ running",x+2.6,0.35,BZ+1.95,"#ffffff",0.46);o.run.visible=false;
+    o.swL=d===0?L("◀ the switch's code",x+1.9,CSY+0.35,CZ-1.75,"#f1b23c",0.42):null;if(o.swL)o.swL.visible=false;o.run=L("◀ running",x+2.6,0.35,BZ+1.95,"#ffffff",0.46);o.run.visible=false;
     o.warn=null;k.layer=null;})(d);
   L("block areas grow with √size",BX[0]-1.6,0.1,BZ+2.3,"#8a7d6c",0.36);
-  var LX=-9.3;function lg(){var g=new T.Group();k.scene.add(g);k.layer=g;return g;}
-  var gH=lg(),HZ=1.2,host=k.plate(3.4,3.6,HUDHEX,LX,0,HZ,"host",0.45);
-  for(i=0;i<10;i++){var fx=LX-1.75+(i%5)*0.875,fz=i<5?HZ-1.9:HZ+1.9;k.box(0.06,0.5,0.06,HUDHEX,fx,0,fz,0.3);}
+  var LX=-8.6;function lg(){var g=new T.Group();k.scene.add(g);k.layer=g;return g;}
+  var gH=lg(),HZ=1.2,host=k.plate(3.0,3.6,HUDHEX,LX,0,HZ,"host",0.45);
+  for(i=0;i<10;i++){var fx=LX-1.55+(i%5)*0.775,fz=i<5?HZ-1.9:HZ+1.9;k.box(0.06,0.5,0.06,HUDHEX,fx,0,fz,0.3);}
   L("mtx_hs · host state",LX,0.4,HZ-2.3,"#f1b23c",0.5);L("outside every snapshot",LX,0.3,HZ+2.25,"#c99a4a",0.38);
-  var ticks=[0,1,2,3].map(function(j){var m=new T.Mesh(new T.BoxGeometry(0.3,0.1,0.3),k.mat(0x3d332a,0.05));m.position.set(LX-0.6+j*0.4,0.08,HZ-1.35);gH.add(m);return m;});
-  L("frame count",LX+1.0,0.3,HZ-1.35,"#f4dca8",0.36);
+  /* the frame counter: host data, advanced at every frame boundary; at the setting it posts a request */
+  var ticks=[0,1,2,3].map(function(j){var m=new T.Mesh(new T.BoxGeometry(0.55,0.22,0.5),k.mat(0x3d332a,0.05));m.position.set(LX-1.05+j*0.7,0.11,HZ-1.3);gH.add(m);return m;});
+  var cntL=L("frame counter · 0 of 4",LX,0.75,HZ-1.3,"#f4dca8",0.42);cntL.userData.pri=5;var setL=L("setting: switch every 4",LX,0.3,HZ-1.85,"#c99a4a",0.34);
+  var hostT=L("the switch's data",LX,0.3,HZ-2.75,"#c99a4a",0.38);
   var rowReq=L("request: none",LX,0.35,HZ-0.55,"#f4dca8",0.4),rowView=L("viewer: depth 0",LX,0.35,HZ+0.3,"#f4dca8",0.4),rowEsp=L("saved ESP:",LX,0.35,HZ+1.15,"#f4dca8",0.38),rowWall=L("",LX,0.35,HZ+1.65,"#f4dca8",0.34);rowWall.visible=false;[rowReq,rowView,rowEsp,rowWall].forEach(function(l){l.userData.pri=5;});k.layer=null;
   /* --- machine layer: the CPU and the hardware it talks to --- */
   var glass=new T.Mesh(new T.BoxGeometry(17,0.04,5.4),new T.MeshStandardMaterial({color:0x2a211c,transparent:true,opacity:0.12,depthWrite:false,roughness:1}));glass.position.set(-0.5,MY-0.02,-1.1);k.scene.add(glass);
@@ -1755,7 +1758,7 @@ function MachineMap(rootId,build){after3d(function(){
     bead:function(c,t){return valTag(new T.Mesh(new T.BoxGeometry(0.22,0.22,0.22),k.mat(c,0.6)),t);},
     tile:function(c){return new T.Mesh(new T.BoxGeometry(0.32,0.08,0.32),k.mat(c,0.6));},
     band:function(c){var g=new T.Group();for(var j=0;j<4;j++){var m=new T.Mesh(new T.BoxGeometry(0.22,0.22,0.22),k.mat(c,0.5));m.position.set((j-1.5)*0.27,0,0);g.add(m);}return g;},
-    regs:function(c){return valTag(new T.Mesh(new T.BoxGeometry(0.6,0.16,0.45),k.mat(c,0.5)),"regs");},
+    regs:function(c){return valTag(new T.Mesh(new T.BoxGeometry(0.6,0.16,0.45),k.mat(c,0.5)),"EIP EBX ESI EDI EBP");},
     key:function(){return valTag(new T.Mesh(new T.BoxGeometry(0.45,0.25,0.45),k.mat(0xeadccb,0.5)),"y");},
     fly:function(c,img){var t=new T.CanvasTexture(img);var g=new T.Group();var pl=new T.Mesh(new T.PlaneGeometry(FW*0.92,FW*0.6),new T.MeshBasicMaterial({map:t,side:T.DoubleSide}));g.add(pl);
       var bd=new T.Mesh(new T.BoxGeometry(FW,FW*0.68,0.04),k.mat(c,0.4));bd.position.z=-0.04;g.add(bd);return g;}};
@@ -1775,6 +1778,7 @@ function MachineMap(rootId,build){after3d(function(){
     mech:false,slots:false,slotV:[0,0,0],livePtr:0,slotPtr:[0,0,0],known:[1,0,0],patched:[0,0,0],wadReads:0,order:null,oi:0,crashed:false,keyPending:0,espSaved:[0,0,0],dead:[0,0,0],half:-1,viewOn:false};Q=[];op=null;}
   fresh();
   var BEATS={b1:"1 · data: save the changed bytes, load the other's",b2:"2 · patches: take back, put the other's in",b3:"3 · pins: re-point at the other's memory",b4:"4 · registers onto its own stack; ESP into mtx_hs"};
+  function esp(d){if(!RUN)return "✓";var v=d===0?RUN.root_esp_at_boot:(RUN.depths[d]&&(RUN.depths[d].live_esp||RUN.depths[d].seeded_esp));return v?hx(v):"✓";}
   function aceAddr(d){if(!RUN)return "";var v=d===0?RUN.ace_seg:(RUN.depths[d]&&RUN.depths[d].image&&RUN.depths[d].image[0]);return v?hx(v):"";}
   function setText(l,t,c){k.setLabel(l,t,c);}
   var curTag="";function job(name){curTag=name;root.querySelectorAll("[data-job]").forEach(function(el){el.classList.toggle("now",el.getAttribute("data-job")===name);});}
@@ -1790,14 +1794,15 @@ function MachineMap(rootId,build){after3d(function(){
       o.mark.visible=!!(S.viewOn&&d===S.viewer&&on);
       if(sl)setText(o.slotL,running?"saved: live now":S.slot[d]===null?"saved: empty":"saved: health "+S.slot[d],DCCSS[d]);
       glow(o.tray,S.tray[d]?DCHEX[d]:0x3d332a,S.tray[d]?0.5:0.02);o.tray.material.opacity=S.tray[d]?0.9:0.3;
+      if(o.swL){o.swL.visible=!!S.turns;glow(o.ace,DCHEX[0],S.mode==="switch"?0.9:0.35);}
       o.gameL.visible=!!(on&&S.n>1&&S.known[d]);if(o.gameL.visible)setText(o.gameL,"its game: health "+S.game[d],DCCSS[d]);
       o.regs.visible=!!S.espSaved[d];o.col.position.y=o.col.scale.y/2;o.regs.position.y=o.col.scale.y+0.08;});
     NOTCH.forEach(function(nm){glow(nm,S.patchOwner<0?0x2a2420:DCHEX[S.patchOwner],S.patchOwner<0?0.05:0.6);});
     notchL.visible=S.patchOwner>=0;
     [rEIP,rESP].forEach(function(r){glow(r,S.regsIn&&!S.crashed?DCHEX[S.regOwner]:0x2a2420,S.regsIn?0.5:0.02);});
     nEIP.visible=nESP.visible=S.regsIn&&!S.crashed;if(S.regsIn)rewire(nESP,V(CPX+0.6,MY,CPZ),stackTop(S.regOwner),MY-0.45,DCHEX[S.regOwner]);
-    setText(rowEsp,"saved ESP:"+[0,1,2].slice(0,S.n).map(function(d){return " d"+d+(S.espSaved[d]?" ✓":" –");}).join(""),"#f4dca8");
-    setText(rowView,S.viewOn?"viewer ▼: depth "+S.viewer:"viewer: depth 0","#f4dca8");
+    setText(rowEsp,"saved ESP:"+[0,1,2].slice(0,S.n).map(function(d){return " d"+d+"="+(S.espSaved[d]?esp(d):"–");}).join(""),"#f4dca8");
+    rowView.visible=!!S.viewOn;rowReq.visible=rowEsp.visible=!!S.turns;setText(rowView,"viewer ▼: depth "+S.viewer,"#f4dca8");
     setText(cellL,"health "+S.cell,"#f4dca8");setText(cInL,"input cmd "+S.inp,"#f4dca8");
     pinCab.forEach(function(c,j){var o=B[S.livePtr],t=j===0?o.heap.position:o.buf.position;rewire(c,SOCK[j].position.clone(),V(t.x+(j-1)*0.15,0.05,t.z),0.9+j*0.15,DCHEX[S.livePtr]);c.material.opacity=S.turns?0.35:0;});
     var ring3=S.n>1&&S.ace[1];rowWall.visible=ring3;if(ring3)setText(rowWall,"screen-wall source:"+[0,1,2].slice(0,S.n).map(function(d){return " d"+d+"→d"+ring(d);}).join(" ·"),"#f4dca8");
@@ -1808,7 +1813,7 @@ function MachineMap(rootId,build){after3d(function(){
   function filmPush(kind,d){lanePush("run",kind==="f"?{k:"f",d:d}:{k:"sw"});}
   /* what the screen showed slides up into "on the screen" */
   function screenPush(d){var img=snap(scv);send("fly",DCHEX[d],V(SX,SY0,SCZ),V(slotX("scr"),LANES.scr.y,FZ),TY+2.0,0.6,img,function(){lanePush("scr",{k:"f",d:d,img:img});});}
-  function tickClock(f){ticks.forEach(function(m,j){glow(m,j<f?HUDHEX:0x3d332a,j<f?0.8:0.05);});}
+  function tickClock(f){ticks.forEach(function(m,j){glow(m,j<f?HUDHEX:0x3d332a,j<f?0.8:0.05);});setText(cntL,"frame counter · "+f+" of 4","#f4dca8");}
   function drawTarget(d){return S.n>1?S.livePtr:d;}
   function heat(o){o.hot=1;}
   k.frames.push(function(dt){B.forEach(function(o){if(o.hot>0)o.hot=Math.max(0,o.hot-dt*0.6);o.view.material.opacity=0.35+0.65*Math.min(1,o.hot*1.6);});});
@@ -1859,7 +1864,7 @@ function MachineMap(rootId,build){after3d(function(){
     var last=L2[L2.length-1],e0=last.e;last.e=function(){if(e0)e0();ret(d);S.node++;if(S.node>=JOBS.length){S.node=0;var bo=boundary();Q.push(bo);}};
     return L2;}
   /* at a frame boundary the CPU looks for a request in mtx_hs */
-  function boundary(){var chk=S.turns&&gH.visible;if(chk)Q.push(instr(P(B[0].ace,CSY+0.1),"count the frame; any request?",DCHEX[0]));
+  function boundary(){var chk=S.turns&&gH.visible;if(chk)Q.push(instr(P(B[0].ace,CSY+0.1),"add 1 to the frame counter; 4? then request",DCHEX[0]));
     return O(0.5,function(){job("check");S.frames[S.cur]++;filmPush("f",S.cur);S.f++;tickClock(S.turns?S.f:0);if(!chk)say2("frame boundary");
       if(chk){send("bead",HUDHEX,P(host),PORT.host,"host",0.5,"?");}},
     function(){var last=S.turns&&S.n>1&&S.f>=4;
@@ -1884,13 +1889,13 @@ function MachineMap(rootId,build){after3d(function(){
       L2.push(O(0.4,function(){send("tile",DCHEX[n],PORT.code,hp,"code",0.4);},function(){S.patchOwner=n;S.tray[n]=0;paint();}));}
     if(S.cfg.pin){L2.push(I("b3","re-point the pins at depth "+n));
       L2.push(O(0.5,function(){SOCK.forEach(function(sk){send("bead",DCHEX[n],PORT.data,P(sk),"data",0.5);});},function(){S.livePtr=n;paint();}));}
-    L2.push(I("b4","push the registers"));
+    L2.push(I("b4","push EIP (where to resume) + EBX ESI EDI EBP"));
     L2.push(O(0.6,function(){S.regsIn=false;paint();send("regs",DCHEX[o],V(CPX,MY,CPZ),stackTop(o),"code",0.6);},function(){S.espSaved[o]=1;paint();}));
     L2.push(I("b4","store ESP in mtx_hs"));
     L2.push(O(0.45,function(){if(gH.visible)send("bead",DCHEX[o],PORT.host,P(host),"host",0.45,"ESP");}));
     L2.push(I("b4","load depth "+n+"'s ESP"));
     L2.push(O(0.45,function(){if(!S.cfg.host){crash();return;}if(gH.visible)send("bead",DCHEX[n],P(host),PORT.host,"host",0.45,"ESP");}));
-    L2.push(I("b4","pop its registers"));
+    L2.push(I("b4","pop its registers; ret resumes at its EIP"));
     L2.push(O(0.6,function(){if(S.crashed)return;S.espSaved[n]=0;paint();send("regs",DCHEX[n],stackTop(n),V(CPX,MY,CPZ),"code",0.6);},function(){if(S.crashed)return;S.regsIn=true;S.regOwner=n;endSwitch();}));
     return L2;}
   function crash(){S.crashed=true;S.mode="dead";Q=[];glow(cpu,0xff4a32,0.6);cwarn("ESP = 0: the switch loaded its own stale copy",0,MY+2.2,CPZ);say2("crashed","#ff8a76");beatL.textContent="crashed";paint();}
@@ -1941,14 +1946,14 @@ function MachineMap(rootId,build){after3d(function(){
   /* when the player jumps to a later step it replays the earlier ones instantly: apply their events now, don't queue them */
   function flushRM(){if(!RM)return;while(SQ.length){var o2=SQ.shift();if(o2.s)o2.s();if(o2.e)o2.e();}}
   function simBanner(){var off=["snap","patch","pin"].filter(function(x){return !S.cfg[x];});banner.hidden=!off.length;
-    banner.textContent=off.length===3?"⚠ SIMULATED: only the CPU's own state is switched":"⚠ SIMULATED: not yet kept apart: "+off.map(function(x){return {snap:"data",patch:"patches",pin:"pins"}[x];}).join(", ");}
+    banner.textContent=off.length===3?"⚠ SIMULATED: only the CPU's own state is switched, not data, patches or pins":"⚠ SIMULATED: not yet kept apart: "+off.map(function(x){return {snap:"data",patch:"patches",pin:"pins"}[x];}).join(", ");}
   M.fix=function(x){S.cfg[x]=1;S.zoomShut=1;
     if(x==="snap"){S.slots=true;for(var d=0;d<S.n;d++){if(d!==S.cur&&S.slot[d]===null){S.slot[d]=S.known[d]?S.game[d]:S.cell;S.slotPtr[d]=d;}}["hp0","hp1","hp2"].forEach(wclear);}
     if(x==="patch"){for(var q=0;q<S.n;q++){S.patched[q]=1;S.tray[q]=q===S.patchOwner?0:1;}wclear("misc");}
     if(x==="pin")["px0","px1","px2"].forEach(wclear);simBanner();paint();};
   M.mechOn=function(){S.mech=true;S.slots=true;S.cfg.snap=S.cfg.patch=S.cfg.pin=1;banner.hidden=true;clearWarn();for(var q=0;q<S.n;q++)S.patched[q]=1;S.zoomShut=1;
     for(var d=0;d<S.n;d++){S.slot[d]=d===S.cur?null:S.slot[d]!==null?S.slot[d]:S.game[d];S.slotPtr[d]=d;S.tray[d]=d===S.cur?0:1;S.espSaved[d]=d===S.cur?0:1;}S.patchOwner=S.cur;S.livePtr=S.cur;S.regOwner=S.cur;S.regsIn=true;paint();};
-  M.naive=function(on){S.mech=true;S.cfg.snap=S.cfg.patch=S.cfg.pin=on?0:1;if(on)simBanner();else{banner.hidden=true;clearWarn();}};
+  M.naive=function(on){S.mech=true;S.zoomShut=1;S.cfg.snap=S.cfg.patch=S.cfg.pin=on?0:1;if(on)simBanner();else{banner.hidden=true;clearWarn();}};
   M.turns=function(on){S.turns=on;tickClock(0);};
   M.setLive=function(n){S.n=n;paint();};
   M.viewOn=function(on){S.viewOn=on;keyB.hidden=!on;paint();};
@@ -2017,7 +2022,7 @@ MachineMap("ov0",function(M,root,say){
     {ms:12000,say:"What is ACE? A mod for DOS Doom 2 that comes as one "+Lk("wad","WAD file")+". Opened with Doom, a trick in how Doom reads WAD files makes it load ACE's code. ACE adds features (a new map format, scripting), and the code that runs every copy lives in ACE too. Watch the loader bring "+Lk("ace","ACE's code")+" from the WAD into depth 0's own memory.",run:function(){M.show(["keys","wad"]);M.load(0);}},
     {ms:14000,say:"To take control, ACE <b>patches Doom's code</b>: 406 places (12 drawn) now hold a call into ACE. The close-up shows one: before, Doom's own instruction; after, <code>E8</code> and an offset, a call into depth 0's ACE code. Watch "+J("update","update")+": EIP reaches a "+Lk("patches","patched place")+" and jumps into ACE's code.",run:function(){M.patch(0);}},
     {ms:12000,say:"Load a second copy, depth 1. It gets its own memory: its own "+Lk("ace","ACE code")+" (at a different address, "+(RUN&&RUN.depths[1]?hx(RUN.depths[1].image[0]):"")+"), heap, stack and screen buffer. Booting, it <b>patches the same 406 places</b>, with calls into <i>its</i> ACE: different bytes. And now Doom runs inside Doom: "+J("draw","draw")+" also paints a <b>screen-wall</b> in each picture with the next depth's last frame.",run:function(){M.boot(1,true);}},
-    {ms:20000,say:"Two depths, one CPU: they take turns. A clock, host code, counts frames in "+Lk("clock","mtx_hs")+" (amber, left), and at every "+J("check","frame boundary")+" the CPU asks it for a request. After the 4th frame: a <b>switch</b>. The switch is host code too: EIP goes into depth 0's ACE, and at its simplest it "+J("b4","swaps the CPU's own state")+": push the registers onto the outgoing depth's own "+Lk("stack","stack")+", store ESP in mtx_hs, load the other depth's ESP, pop its registers. That depth carries on exactly where it stopped.",run:function(){M.show(["wad","host","keys"]);M.naive(true);M.turns(true);M.look("left");M.later(M.home,6000);}},
+    {ms:20000,say:"Two depths, one CPU: they take turns. At every "+J("check","frame boundary")+", host code adds one to a "+Lk("clock","frame counter")+" in mtx_hs (amber, left) and checks it. At 4 (a setting; Map 06 measures why) it posts a request, and a <b>switch</b> follows. The switch is host code too: EIP goes into depth 0's ACE, and at its simplest it "+J("b4","swaps the CPU's own state")+": push the registers onto the outgoing depth's own "+Lk("stack","stack")+", store ESP in mtx_hs, load the other depth's ESP, pop its registers. That depth carries on exactly where it stopped.",run:function(){M.show(["wad","host","keys"]);M.naive(true);M.turns(true);M.look("host");M.later(M.home,7000);}},
     {ms:20000,say:"That is all that is kept apart so far, so watch what breaks. Both games use the same "+Lk("health","health")+" in Doom data, so each reads the other's value. At the patched place in "+J("update","update")+", depth 0 runs <b>depth 1's</b> ACE code. And Doom's shared screen pointer still names depth 1's buffer, so depth 0 "+J("draw","draws")+" into it.",run:function(){M.home();}},
     {ms:20000,say:"Fix 1, "+J("b1","data")+". Each depth gets a "+Lk("slot","saved data")+" slot: the switch saves the live Doom data into the outgoing depth's slot and loads the incoming one's. Only changed bytes are copied. The health stops jumping. A third copy, depth 2, boots now: on its first turn its slot is filled with a copy of the live data. Its copy names its parent's screen, so it draws into the parent's buffer.",run:function(){M.fix("snap");M.load(2);M.seed(2);M.look("bodies");M.later(M.home,8000);}},
     {ms:16000,say:"Fix 2, "+J("b2","patches")+". The switch puts the outgoing depth's patch bytes in its "+Lk("tray","tray")+" and the incoming depth's back into the code, so each depth runs its own ACE.",run:function(){M.fix("patch");M.look("code");M.later(M.home,6000);}},
