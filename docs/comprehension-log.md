@@ -32,6 +32,10 @@ It does not contain answers.
 | 21 | 6 | Shared data is stated flatly; the conflict with "each game has its own state" is never staged as the puzzle (sets up Map 03). |
 | 22 | 6 | Nothing links code to the data addresses it uses, so "fixed addresses" has no visible meaning. |
 | 23 | 6 | The hop is a flight path: nothing shows what a switch touches. |
+| 24 | 7 | The switch request has no visible home; it only pops up as a label at frame 4. |
+| 25 | 7 | Nothing shows the CPU checking for a request at a boundary. |
+| 26 | 7 | "Post" is undefined; the posts are thin, and tall versus short is barely visible. |
+| 27 | 7 | A check that finds nothing looks identical to no check (same as 25, seen from the other side). |
 
 ## Themes for the rework
 
@@ -40,7 +44,8 @@ It does not contain answers.
 - C. One meaning per colour: 9, 12, 13, 16
 - D. Cause, then consequence: 6, 14, 15, 16, 21, 22
 - G. The switch does something: 23
+- H. The request and the check: 24, 25, 26, 27
 - E. Time: 2, 17, 18, 19, 20
 - F. Gear: 3
 
-Worked: step 1 Q5 (screen), step 3 Q4 (taking turns), step 4 Q3 (no saved copy visible), step 5 Q1 (reading the strip), step 6 Q2 (no per-depth state visible). Step 6 Q5 confirmed gaps 9 and 11.
+Worked: step 1 Q5 (screen), step 3 Q4 (taking turns), step 4 Q3 (no saved copy visible), step 5 Q1 (reading the strip), step 6 Q2 (no per-depth state visible). Step 6 Q5 confirmed gaps 9 and 11. Step 7 Q3 (partial rendering), possibly from prior knowledge.
