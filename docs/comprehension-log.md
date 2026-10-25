@@ -169,3 +169,17 @@ Applied after retest round 3 (R21–R26):
 - The time layer has two lanes: "on the screen" (the real screen's picture flies up at each copy) and "who ran" (each finished frame flies out of its depth's buffer).
 - Reversible execution: every animation, including loading and patching, is an op. Each article step takes a checkpoint, and the timeline under the scene lets you click any op to rewind to it (restore, then replay instantly). There are one-op back and forward buttons, and changing step cancels pending animations.
 - Labels size themselves to their text; long labels were being cut off.
+
+### Retest round 3b (new steps 3 and 4)
+
+| # | Finding |
+|---|---------|
+| R27 | "Depth 0's snapshot" was used for the whole depth area. Name the area "this depth's own memory", distinct from the saved-data slot. |
+| R28 | Wrong in the scene: the load goes straight from the WAD into memory. The loader is code the CPU runs; the read and the write must go through the CPU (like R1). |
+| R29 | The health write was read as a write into Doom code: the health cell on the data plate sits too close to the code plate. |
+| R30 | Where ACE's code lives (its own block, or inside depth 0's heap) is ambiguous. Check against the engine and label what is true. |
+| R31 | Show reuse of the original process at instantiation: Doom's code and data stay, the new depth's own blocks appear, and its saved-data slot is seeded from the live data ("starts as a copy of its parent"; dos_state.c load_state, first entry). |
+| R32 | Clicking text jumps the scene: a paragraph makes its step current; a job or beat word advances to that job's next occurrence. |
+| R33 | Stronger fetch versus data distinction: code on its own raised shelf, labelled instruction and data ports on the CPU, dashed trails for instructions and solid for data, one colour reserved for instruction traffic. |
+
+Worked: patches differ per depth because each calls its own ACE (first time from the scene). Q5 (the patched bytes are Doom's code).
