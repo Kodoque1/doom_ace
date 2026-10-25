@@ -62,6 +62,11 @@ It does not contain answers.
 | 51 | 13 | Spreading the layers hides the cross-layer lines, and nobody noticed: the relationships vanish exactly when the layers are separated. They should stretch. |
 | 52 | 13 | The rule for each layer is unclear for input and output (see 48). |
 | 53 | 13 | The switch's layer is ambiguous (read as "between execution and time"): it is not clear whether it is code, a moment, or a place. |
+| 54 | 15 | The data snapshot is absent from the reader's account of a turn; it is the mechanism the scene shows least (see 37). |
+| 55 | 15 | What ends a turn (the clock) is absent from the account (see 29). |
+| 56 | 15 | Once versus per depth is unclear: Doom data was listed as "once", and the per-depth heap, stack and state were missing (see 11, 15, 21, 40). |
+| 57 | 15 | The chain from the ▼ to the screen is not shown at all (see 17, 36, 47). |
+| 58 | 15 | The switch process is the biggest remaining gap: theme G is top priority. |
 
 ## Themes for the rework
 
@@ -81,6 +86,8 @@ It does not contain answers.
 - F. Gear: 3
 
 Worked: step 1 Q5 (screen), step 3 Q4 (taking turns), step 4 Q3 (no saved copy visible), step 5 Q1 (reading the strip), step 6 Q2 (no per-depth state visible). Step 6 Q5 confirmed gaps 9 and 11. Step 13 Q3 and Q5 (a), (c) worked; Q5 (b) confirmed 11 and 37. Step 7 Q3 was answered from prior knowledge, not the scene: logged as gap 28.
+
+Rounds 14 and 15 (step 14 and integration): the reader warns that the questioning itself teaches, so Q1 and I2 are not counted as scene successes.
 
 ## Proposals from the reader
 
