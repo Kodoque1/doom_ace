@@ -217,3 +217,14 @@ Applied after retest round 4 (R34–R39), plus a visibility check:
 - Bug fixed: slots and trays showed from step 1 (a visibility flag set to 0).
 - Bug fixed: the "on the screen" lane passed no picture, so the renderer threw.
 - Visibility check in the 3D toolkit, for every 3D scene: labels that overlap on screen give way by priority (moving glyphs, then the CPU's order and live values, then names).
+
+### Retest round 5 (step 6, the simulated run)
+
+| # | Finding |
+|---|---------|
+| R40 | The shared-health damage was guessed, not seen. Each game needs "what it should be" beside "what it read", flagged when they differ. |
+| R41 | Failures are not tied to what the player would see on screen (or not see). |
+| R42 | The switch is a deus ex machina: turns happen in step 6 before turns are explained (steps 8–10). Reorder: turns at their simplest first (clock, check, a switch that swaps only the CPU's state), then the simulated failure, then beats 1–3 as the fixes, each repairing a failure just watched. |
+| R43 | The switch is described by labels, not shown as work. It is host code: EIP moves into it (depth 0's ACE), and each beat is an instruction card that enters the CPU before its data moves. Drop the beat banner. |
+
+Worked: Q4 (the simulation banner), Q3 (with the reader's nuance: EIP works, what it points to is wrong).
