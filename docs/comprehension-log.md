@@ -125,3 +125,18 @@ Applied after retest round 1 (R1–R12):
 - Pause, step-one-job and speed controls.
 - Two-way sync: the scene's Next and Back scroll the text, the current job or beat lights up in the text, and terms in the text flash or focus their part.
 - Pixel fonts throughout: Jersey 10 for headings, Pixelify Sans for body text, VT323 for mono and labels.
+
+### Retest round 2 (step 2)
+
+| # | Finding |
+|---|---------|
+| R13 | The time strip depends on a text label. Make it a filmstrip: a finished frame slides in as a thumbnail framed in its depth's colour, and a fresh blank frame comes up to be worked on. |
+| R14 | Nothing shows the nesting ("Doom inside Doom"): the three game views are unrelated. |
+| R15 | Block sizes are readable, but not their roles (the heap was guessed from CS training). Show each block used for its role, e.g. draw reading textures from the heap, the stack growing and shrinking. |
+| R16 | Only EIP came across as "where the CPU is"; the ESP needle, the lit body, the readout and the text highlight did not. |
+| R17 | The two legs of the copy (buffer to CPU, CPU to screen) are too weak to register. |
+| R18 | Show arrows only while something moves, except real pointers: EIP, ESP, and fainter pins. |
+| R19 | Use angular, right-angled paths (circuit trace or automap style), one route per kind of link. |
+| R20 | Show the instruction ordering the operation: a plain-words instruction card enters the CPU, becomes its current order, then the read or write leaves. No fetch-decode cycle, no invented x86. |
+
+Worked: sync with the text, stepping through the four jobs.
