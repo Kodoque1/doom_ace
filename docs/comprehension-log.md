@@ -149,3 +149,16 @@ Applied after retest round 2 (R13–R20, plus layers):
 - Instruction cards in plain words enter the CPU and become its order before each read or write.
 - Right-angled routes on separate lanes, with short trails; lines appear only while something moves, except the EIP, ESP and (faint) pin pointers.
 - The frame count lives in mtx_hs.
+
+### Retest round 3 (step 3)
+
+| # | Finding |
+|---|---------|
+| R21 | What ACE is, and why even depth 0 (the original DOOM2.EXE) runs it, is never explained. It is a missing piece of the story and must come before any patch. |
+| R22 | Where the patches come from is not visible: neither ACE's code arriving from the WAD nor the tiles leaving ACE was seen. The load and the patching run too fast and back to back. |
+| R23 | A patch's content is invisible (gap 16 again). Needs a close-up of one patch, bytes before and after. |
+| R24 | ACE's code, inside the depth's own memory, reads as data ("it executed code in the data part"). Code needs one look wherever it lives. |
+| R25 | Time layer in two lanes: "on screen" (the real screen's picture slides up at each copy) and "who ran" (each depth's finished frame slides out of its buffer). |
+| R26 | Reversible execution: record state per op; step back and step forward; a scrubbable timeline of ops with job and beat marks. Changing article step must cancel any animation still playing. |
+
+Worked: EIP jumping into ACE at update.
