@@ -1382,8 +1382,11 @@ function Seq(root,o){
     root.appendChild(st);root.appendChild(col);
     bar.classList.add("sc-bar");st.appendChild(bar);if(o.say)o.say.hidden=true;sl.hidden=true;pq.hidden=true;
     var stps=[].slice.call(col.querySelectorAll(".stp"));self.col=col;
-    if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;
-      stps.forEach(function(x){x.classList.toggle("on",x===e.target);});runTo(+e.target.getAttribute("data-upto"));});},{rootMargin:"-42% 0px -48% 0px"});
+    /* the root is this document, not the top window: inside a cross-origin frame (the artifact viewer) the top-window
+       root ignores rootMargin, every visible step would count as "current", and the steps would run on their own */
+    if("IntersectionObserver" in window){var cb=function(es){if(Date.now()<self.quiet)return;es.forEach(function(e){if(!e.isIntersecting)return;
+      stps.forEach(function(x){x.classList.toggle("on",x===e.target);});runTo(+e.target.getAttribute("data-upto"));});},io;
+      try{io=new IntersectionObserver(cb,{root:document,rootMargin:"-42% 0px -48% 0px"});}catch(err){io=new IntersectionObserver(cb,{rootMargin:"-42% 0px -48% 0px"});}
       stps.forEach(function(x){io.observe(x);});}
     setTimeout(function(){window.dispatchEvent(new Event("resize"));},50);
   }
@@ -1393,7 +1396,8 @@ function Seq(root,o){
   bPlay.addEventListener("click",function(){if(playing){want=false;stop();}else{want=true;if(wait)reveal(-1);play();}});
   /* scene → text: the scene's own Next and Back bring the matching sentence into view */
   function syncCol(){if(!self.col)return;var el=null;[].slice.call(self.col.querySelectorAll(".stp")).forEach(function(x){if(+x.getAttribute("data-upto")<=i)el=x;});
-    if(!el)el=self.col.querySelector(".stp");if(!el)return;var r=el.getBoundingClientRect();window.scrollBy(0,r.top+r.height/2-innerHeight/2);}
+    if(!el)el=self.col.querySelector(".stp");if(!el)return;self.quiet=Date.now()+700;[].slice.call(self.col.querySelectorAll(".stp")).forEach(function(x){x.classList.toggle("on",x===el);});
+    var r=el.getBoundingClientRect();window.scrollBy(0,r.top+r.height/2-innerHeight/2);}
   function nextF(){want=false;stop();one();syncCol();}
   bar.querySelector('[data-q=next]').addEventListener("click",nextF);
   function backF(){want=false;var n=wait?i-1:i-1;
