@@ -49,6 +49,10 @@ It does not contain answers.
 | 38 | 10 | The jobs of snapshots and pins are confusable; the reader took pins to give each depth its own data. |
 | 39 | 10 | "Put back" contradicts the scene (the studs stay blue), and whether patches differ per depth is still unsettled (see 16). |
 | 40 | 10 | The pin lines land on the snapshot slots, so pins read as "pointers to snapshots"; they need real per-depth targets (see 11). |
+| 41 | 11 | Why host state must sit outside the snapshots is not shown at this step (only in Map 07). |
+| 42 | 11 | The mtx_hs line is static: no direction, no content. |
+| 43 | 11 | Grey means both "not opened yet" and what mtx_hs looks like; host-owned things need their own consistent colour. |
+| 44 | 11 | "Host", depth 0 and mtx_hs are tangled; the scene does not say what the host is or where the clock runs. |
 
 ## Themes for the rework
 
@@ -60,6 +64,7 @@ It does not contain answers.
 - H. The request and the check: 24, 25, 26, 27, 28, 29, 32
 - E also takes 30.
 - I. Interaction and sync: 33, 35
+- K. The host and its state: 41, 42, 43, 44
 - J. Three keeping-apart mechanisms, each with its own visible action: 37, 38, 39, 40. Step 10 Q5 confirmed gap 23.
 - H also takes 34, 36. Step 9 Q3 confirmed gap 17.
 - E. Time: 2, 17, 18, 19, 20
@@ -70,6 +75,7 @@ Worked: step 1 Q5 (screen), step 3 Q4 (taking turns), step 4 Q3 (no saved copy v
 ## Proposals from the reader
 
 - P1 (round 10): a tiny procedural game view per depth (corridor plus a health number, no game assets). One on-screen value is linked to a data cell through code on the code plate, and the real screen is composed from the depths' frames as they render. Addresses 1, 14, 17, 21, 22.
+- P2 (round 11): replace the moving ball with a fixed schematic CPU: a visible instruction pointer and stack pointer, with separate fetch and read/write ports whose lines light up as it works. The lit, turning ring shows which depth runs. Addresses 4, 23, 31 and theme A.
 
 ## Test method notes
 
