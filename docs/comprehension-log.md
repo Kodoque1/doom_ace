@@ -41,6 +41,10 @@ It does not contain answers.
 | 30 | 8 | Ring positions carry no meaning; the top is both "think" and the frame boundary, so where a depth stops reads as arbitrary. |
 | 31 | 8 | The frozen ring seems to remember where to resume, suggesting nothing needs saving. The CPU's state must be seen put away and taken back. |
 | 32 | 8 | Who runs next looks random: the request's destination and the pattern are not shown until the keyboard step. |
+| 33 | 9 | The scene is not synced with the text: the press-y button is unannounced, and the scene also presses on a timer. The reader's press should drive the animation the text describes. |
+| 34 | 9 | The key's line ends on the ring and reads as "key-handling code"; the host word it really goes through is not shown. |
+| 35 | 9 | Immediate and deferred effects look alike: the ▼ moves after a fixed delay, so it reads as waiting. |
+| 36 | 9 | Nothing links the ▼ to the CPU's next destination; the reader concluded y has no effect on the schedule. |
 
 ## Themes for the rework
 
@@ -51,6 +55,8 @@ It does not contain answers.
 - G. The switch does something: 23
 - H. The request and the check: 24, 25, 26, 27, 28, 29, 32
 - E also takes 30.
+- I. Interaction and sync: 33, 35
+- H also takes 34, 36. Step 9 Q3 confirmed gap 17.
 - E. Time: 2, 17, 18, 19, 20
 - F. Gear: 3
 
