@@ -207,3 +207,13 @@ Applied after retest round 3b (R27–R33) and the follow-ups during the build:
 | R39 | Show how the deepest depth connects back to depth 0. Every frame, host code writes each depth's screen-wall source into its parameter block in mtx_hs: the next live depth's buffer, wrapping to depth 0 for the deepest (mtx_boot.c, mtx_ring_next / params[].screen_src). Show it as pointers from mtx_hs, re-aimed when a depth goes live, and have draw read the pointer before the buffer. |
 
 Worked: Q1 (what a new depth adds and does not add) and Q4 (screen-wall traced from the next depth's buffer through the CPU). Q3 was inferred rather than seen.
+
+Applied after retest round 4 (R34–R39), plus a visibility check:
+- Close-up panel on the scene: one patched place, with each depth's bytes (E8 + offset → its ACE address, from the run) and which depth's bytes are in the code now versus in its tray. It folds to one line once all the mechanisms are on, and can be clicked open.
+- The camera follows a load. The WAD shows its ACE_CODE lump and how many times it has been read.
+- Depth 0's load and later loads say how they differ: the stock loader frees and jumps once, while later depths are loaded by depth 0's ACE from the same open WAD through a reentrant loader with no free and no close.
+- Each depth's screen-wall source is a pointer row in mtx_hs, with faint pointers to the buffers it names; the deepest points back to depth 0. Draw reads that pointer before reading the frame.
+- The machine glass is fainter, so the code shelf shows through.
+- Bug fixed: slots and trays showed from step 1 (a visibility flag set to 0).
+- Bug fixed: the "on the screen" lane passed no picture, so the renderer threw.
+- Visibility check in the 3D toolkit, for every 3D scene: labels that overlap on screen give way by priority (moving glyphs, then the CPU's order and live values, then names).
