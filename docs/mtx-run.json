@@ -107,191 +107,284 @@
  "schedule": [
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 40,
+   "tics": 2
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 42,
+   "tics": 4
   },
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 46,
+   "tics": 3
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 49,
+   "tics": 3
   },
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 52,
+   "tics": 2
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 54,
+   "tics": 2
   },
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 56,
+   "tics": 2
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 58,
+   "tics": 2
   },
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 60,
+   "tics": 2
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 62,
+   "tics": 2
   },
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 64,
+   "tics": 3
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 67,
+   "tics": 0
   },
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 67,
+   "tics": 3
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 70,
+   "tics": 3
   },
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 73,
+   "tics": 2
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 75,
+   "tics": 4
   },
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 79,
+   "tics": 2
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 81,
+   "tics": 4
   },
   {
    "depth": 0,
-   "frames": 4
+   "frames": 4,
+   "t": 85,
+   "tics": 2
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 87,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 87,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 87,
+   "tics": 13
   },
   {
    "depth": 0,
-   "frames": 1
+   "frames": 1,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 100,
+   "tics": 63
   },
   {
    "depth": 0,
-   "frames": 1
+   "frames": 1,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 2,
-   "frames": 4
+   "frames": 4,
+   "t": 163,
+   "tics": 0
   },
   {
    "depth": 1,
-   "frames": 4
+   "frames": 4,
+   "t": 163
   }
  ],
  "copyless": [

@@ -24,6 +24,9 @@ def main(path):
     def dep(n):
         return d.setdefault(str(n), {})
 
+    # I_GetTime (35 Hz tics) at the root's frame lines: the start of each slice,
+    # so the gap to the next slice's start is how long that slice took.
+    last_t = None
     for raw in open(path, errors="replace"):
         line = raw.strip()
         if not line.startswith("[MTX]"):
@@ -127,19 +130,20 @@ def main(path):
                 if "stack" in v and v["stack"][0] <= esp < v["stack"][1]:
                     v.setdefault("live_esp", esp)
                     if out["schedule"] and out["schedule"][-1].get("pending"):
-                        out["schedule"][-1] = {"depth": int(n), "frames": 4}
+                        out["schedule"][-1] = {"depth": int(n), "frames": 4, "t": out["schedule"][-1]["t"]}
             continue
         m = re.match(r"instance resumed, frame (\d+)", t)
         if m:
-            out["schedule"].append({"pending": True})
+            out["schedule"].append({"pending": True, "t": last_t})
             continue
-        m = re.match(r"frame (\d+) child=", t)
+        m = re.match(r"frame (\d+) child=\d+ t=(\d+)", t)
         if m:
+            last_t = int(m.group(2))
             s = out["schedule"]
             if s and s[-1].get("depth") == 0:
                 s[-1]["frames"] += 1
             else:
-                s.append({"depth": 0, "frames": 1})
+                s.append({"depth": 0, "frames": 1, "t": last_t})
             continue
         m = re.match(r"copyless: last save copied (\d+) B, last load (\d+) B, of a (\d+) B snapshot", t)
         if m:
@@ -147,6 +151,10 @@ def main(path):
             out["copyless"].append({"save": sv, "load": ld, "of": tot})
             continue
     out["schedule"] = [s for s in out["schedule"] if "depth" in s]
+    sch = out["schedule"]
+    for i, s in enumerate(sch):
+        if i + 1 < len(sch) and s.get("t") is not None and sch[i + 1].get("t") is not None:
+            s["tics"] = sch[i + 1]["t"] - s["t"]
     json.dump(out, sys.stdout, indent=1)
     sys.stdout.write("\n")
 
