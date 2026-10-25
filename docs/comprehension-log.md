@@ -98,3 +98,18 @@ Rounds 14 and 15 (step 14 and integration): the reader warns that the questionin
 ## Test method notes
 
 - Step 8 Q2 and Q5: the reader said the question itself taught them. The retest should use open "what do you see happen when..." questions, not ones that point at the answer.
+
+## Retest of the rebuilt Map 00 (v2)
+
+| # | Step | Finding |
+|---|------|---------|
+| R1 | 1 | Wrong in the scene: the present bead goes straight from the screen buffer to the screen. The CPU does that copy (read the buffer, write the screen). |
+| R2 | 1 | The CPU still reads as a black box: the "registers" card is unexplained, and EIP and ESP are text, placed near the screen. They should be visual pointers: a needle into the exact code spot, a marker in the stack. |
+| R3 | 1 | Job names: "present" is graphics jargon and "think" is ambiguous. Use input · update · draw · copy to screen. |
+| R4 | 1 | Plain Doom reads the keyboard every frame: the keyboard and an input job belong in step 1. |
+| R5 | 1 | The health write looks unconnected to the code: nothing ties the fetched instruction to the write it causes. |
+| R6 | 1 | Too fast to follow: add pause and step-one-job controls. |
+| R7 | 1 | Sizes are not proportional (the stack looks as big as the heap). Use real sizes from the run, or a stated compressed scale. |
+| R8 | 1 | Prefer specific moving objects (patch tiles, saved byte blocks) over generic surfaces. |
+| R9 | 1 | Use height: stacked layers, and height for size or stack depth. |
+| R10 | 1 | Worked: what happens in a frame (Q1), tracing the health from data to screen buffer to screen (Q2), places versus travellers (Q4), what a second game would add (Q5). |
