@@ -140,3 +140,12 @@ Applied after retest round 1 (R1–R12):
 | R20 | Show the instruction ordering the operation: a plain-words instruction card enters the CPU, becomes its current order, then the read or write leaves. No fetch-decode cycle, no invented x86. |
 
 Worked: sync with the text, stepping through the four jobs.
+
+Applied after retest round 2 (R13–R20, plus layers):
+- Three stacked layers: memory on the floor, the machine (CPU, keyboard, screen, WAD disk) on a glass plane above, time on top.
+- The time strip is a filmstrip of finished frames, with the frame being made at the right.
+- Screen-walls: each depth's draw paints the next live depth's last frame onto a wall (the engine's ring), so the pictures nest.
+- Draw reads textures from the heap, and the stack column grows on each job and shrinks after it.
+- Instruction cards in plain words enter the CPU and become its order before each read or write.
+- Right-angled routes on separate lanes, with short trails; lines appear only while something moves, except the EIP, ESP and (faint) pin pointers.
+- The frame count lives in mtx_hs.
