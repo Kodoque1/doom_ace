@@ -242,3 +242,15 @@ Applied after retest round 5 (R40–R43):
 - Failures name what the player sees ("the player sees it jump", "the player sees the wrong game").
 - Draw writes wherever Doom's shared screen pointer names: a booting depth points it at itself, snapshots carry it, and pins force it. That makes the pin failure real: a seeded child draws into its parent's buffer.
 - Warnings are keyed, so several can show at once.
+
+### Retest round 6 (new step 6: turns at their simplest)
+
+| # | Finding |
+|---|---------|
+| R44 | Why 4 frames is unexplained. It is a tuning choice with a measured trade-off (Map 06): say so, and make the clock look adjustable. |
+| R45 | The mtx_hs "viewer" row shows before it is introduced and was read as "which depth to save". Show each mtx_hs row only from the step that introduces it. |
+| R46 | Where the switch's instructions come from (depth 0's ACE) was not noticed. Mark that block as "the switch" and light it during a switch. |
+| R47 | Where EIP and ESP go is unclear (read as "somewhere in the snapshot"). Spell out the pushed block (return address = where to resume, plus EBX, ESI, EDI, EBP), and show the stored ESP as a value in its own mtx_hs row. |
+| R48 | Where the switch code lives was not perceived; "neutral party" was attached to the code instead of to mtx_hs (its data). Separate the switch code (depth 0's ACE) from the switch data (mtx_hs) visibly. |
+
+Worked: Q1 (the frame count triggers it), Q4 for the patches (data omitted, partly the banner's wording).
