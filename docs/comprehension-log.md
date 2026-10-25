@@ -58,6 +58,7 @@ It does not contain answers.
 | 47 | 12 | What picks the screen's depth is invisible; the screen never shows anything (see 17). |
 | 48 | 12 | The input and output layout reads as arbitrary (keyboard on the floor, screen in execution, loader on the left). |
 | 49 | 12 | The flow dots look like the CPU ball ("why multiple balls?"). |
+| 50 | 12 | Every flow is drawn as a train of several dots, so one key press reads as several requests; the scripted auto-press adds more. One event must be one glyph. |
 
 ## Themes for the rework
 
@@ -69,7 +70,7 @@ It does not contain answers.
 - H. The request and the check: 24, 25, 26, 27, 28, 29, 32
 - E also takes 30.
 - I. Interaction and sync: 33, 35
-- L. Layout and glyphs: 48, 49. D also takes 45, 46.
+- L. Layout and glyphs: 48, 49, 50. D also takes 45, 46.
 - K. The host and its state: 41, 42, 43, 44
 - J. Three keeping-apart mechanisms, each with its own visible action: 37, 38, 39, 40. Step 10 Q5 confirmed gap 23.
 - H also takes 34, 36. Step 9 Q3 confirmed gap 17.
