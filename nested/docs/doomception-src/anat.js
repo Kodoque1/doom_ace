@@ -12,18 +12,22 @@ function H(t,cls,p,html){var e=document.createElement(t);if(cls)e.className=cls;
 /* --- the board both SVG figures draw on: pictures of the parts, few words --- */
 var CX=[10,220,430],CW=194,CY=232,PTRS=["screen_buffer","screens[0]","mainzone"],PTO=["screen","screen","heap"],SOCK=[[470,66],[470,100],[470,134]];
 /* each part's rectangle inside a card: code left, data right, the snapshot drawer below */
-var BLK={ace:[10,40,82,56],stack:[102,40,82,56],heap:[10,110,82,56],screen:[102,110,82,56],snap:[10,180,174,54]};
+var BLK={ace:[10,40,76,56],stack:[108,40,76,56],heap:[10,110,76,56],screen:[108,110,76,56],snap:[10,180,174,54]};   /* a 22-unit gap in the middle carries the pointers */
 function bc(i,b){var q=BLK[b];return {x:CX[i]+q[0],y:CY+q[1],w:q[2],h:q[3]};}
 /* routes run in the gaps: the left bus (x 4), the band above the cards, each card's gutters */
 function viaLeft(x0,y0,i,blk,off){var b=bc(i,blk),gx=CX[i]-(off||4),y=b.y+b.h/2;return [[x0,y0],[x0,214],[gx,214],[gx,y],[b.x,y]];}
-/* patches leave the code on the left and run along the bottom, under every other arrow */
-function fromCodeTo(i,blk,dy){var b=bc(i,blk),gx=CX[i]-4,y=b.y+b.h/2+(dy||0);if(!i)return [[10,64],[4,64],[4,y],[b.x,y]];return [[10,64],[4,64],[4,490],[gx,490],[gx,y],[b.x,y]];}
+/* patches leave the code on the left, run under everything, and come up between the depths:
+   one straight entry, through the depth's left side into its ACE */
+function fromCodeTo(i,blk,dy){var b=bc(i,blk),gx=CX[i]-8,y=b.y+b.h/2+(dy||0);if(!i)return [[10,64],[4,64],[4,y],[b.x,y]];return [[10,64],[4,64],[4,490],[gx,490],[gx,y],[b.x,y]];}
 function viaRight(x0,y0,i,blk,off){var b=bc(i,blk),gx=CX[i]+CW+(off||4),y=b.y+b.h/2;return [[x0,y0],[x0,210],[gx,210],[gx,y],[b.x+b.w,y]];}
-/* the three pointer routes nest and never cross: the upper a socket, the outer its bus and
-   the lower its turn; mainzone, lowest, runs down the card's middle gap into the heap */
-function ptrRoute(k,p){var sx=SOCK[k][0]+8,sy=SOCK[k][1],bx=632-k*5,hy=206-k*5;
-  if(k===2){var h=bc(p,"heap"),mx=CX[p]+97,y=h.y+h.h/2;return [[sx,sy],[bx,sy],[bx,hy],[mx,hy],[mx,y],[h.x+h.w,y]];}
-  var sc=bc(p,"screen"),vx=CX[p]+CW+6-k*4,yy=sc.y+sc.h/2+(k===0?8:-8);return [[sx,sy],[bx,sy],[bx,hy],[vx,hy],[vx,yy],[sc.x+sc.w,yy]];}
+/* the three pointers: each leaves its socket down its own lane, out through the bottom of the
+   data, and into the depth straight down through its top, along the gap in its middle. The
+   routes nest, so none crosses another: the upper the socket, the outer its lane, the lower
+   its turn, and the further right it enters */
+var LANE=[604,584,564],BAND=[206,201,196],ENTRY=[104,99,94];
+function ptrRoute(k,p){var sx=SOCK[k][0]+14,sy=SOCK[k][1],lx=LANE[k],hy=BAND[k],ex=CX[p]+ENTRY[k];
+  if(k===2){var h=bc(p,"heap"),y=h.y+h.h/2;return [[sx,sy],[lx,sy],[lx,hy],[ex,hy],[ex,y],[h.x+h.w,y]];}
+  var sc=bc(p,"screen"),yy=sc.y+sc.h/2+(k===0?-8:8);return [[sx,sy],[lx,sy],[lx,hy],[ex,hy],[ex,yy],[sc.x,yy]];}
 
 /* pictograms */
 function icListing(g,x,y,w,h,col,seed){var n=Math.floor(h/7);for(var i=0;i<n;i++){var ind=((i*7+seed)%5===0)?10:2,len=(w-ind-6)*(0.35+0.6*(((i*37+seed*11)%17)/17));
