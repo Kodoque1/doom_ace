@@ -1064,6 +1064,7 @@ char *new_string(const char *s, int n)
 /* ---------- code generation ---------- */
 static const char *vlabel(Var *v) { return v->label ? v->label : v->name; }
 static int ret_label, brk[64], cnt[64], nloop;
+static int discard;   /* the expression being generated is a statement: its value is unused */
 
 static void load_const(int reg, int v)
 {
@@ -1236,6 +1237,8 @@ static void gen_cond_jump(Node *c, int target_if_false)
 
 static void gen_expr(Node *n)
 {
+	int unused = discard;
+	discard = 0;
 	err_line = n->line;
 	switch (n->kind) {
 	case N_NUM: load_const(0, n->val); return;
@@ -1274,6 +1277,11 @@ static void gen_expr(Node *n)
 			gen_expr(n->r);
 			load_label(1, vlabel(n->l->var));
 			store(n->l->ty, 0, 1);
+		} else if (simple(n->r)) {
+			gen_addr(n->l);
+			gen_simple(n->r, 1);
+			store(n->l->ty, 1, 0);
+			if (!unused) emit("\tmov r0, r1");
 		} else {
 			gen_addr(n->l);
 			emit("\tpush r0");
@@ -1281,11 +1289,26 @@ static void gen_expr(Node *n)
 			emit("\tpop r1");
 			store(n->l->ty, 0, 1);
 		}
-		if (n->l->ty->kind == TY_CHAR) { emit("\tldi r1, 255"); emit("\tand r0, r0, r1"); }
+		if (n->l->ty->kind == TY_CHAR && !unused) { emit("\tldi r1, 255"); emit("\tand r0, r0, r1"); }
 		return;
 	case N_OPASSIGN: {
 		Type *lt = value_type(n->l->ty);
 		int elem = (lt->kind == TY_PTR && (n->op == '+' || n->op == '-')) ? lt->base->size : 1;
+		if (is_local_scalar(n->l) && simple(n->r)) {
+			const char *ld = n->l->ty->kind == TY_CHAR ? "ldb" : "ldw", *st = n->l->ty->kind == TY_CHAR ? "stb" : "stw";
+			emit("\t%s r0, [fp%+d]", ld, n->l->var->offset);
+			long k = n->r->kind == N_NUM ? (long)n->r->val * elem * (n->op == '-' ? -1 : 1) : 1L << 20;
+			if ((n->op == '+' || n->op == '-') && k >= -32768 && k <= 32767) {
+				emit("\taddi r0, r0, %ld", k);
+			} else {
+				gen_simple(n->r, 1);
+				scale(1, elem);
+				binop(n->op);
+			}
+			emit("\t%s r0, [fp%+d]", st, n->l->var->offset);
+			if (n->l->ty->kind == TY_CHAR && !unused) { emit("\tldi r1, 255"); emit("\tand r0, r0, r1"); }
+			return;
+		}
 		gen_addr(n->l);
 		emit("\tpush r0");
 		gen_expr(n->r);
@@ -1313,7 +1336,7 @@ static void gen_expr(Node *n)
 			emit("\taddi r1, r0, %d", n->val);
 			store(n->l->ty, 1, 2);
 		}
-		if (n->kind == N_PREINC) {
+		if (n->kind == N_PREINC && !unused) {
 			emit("\tmov r0, r1");
 			if (n->l->ty->kind == TY_CHAR) { emit("\tldi r1, 255"); emit("\tand r0, r0, r1"); }
 		}
@@ -1357,7 +1380,7 @@ static void gen_stmt(Node *n)
 	for (; n; n = n->next) {
 		err_line = n->line;
 		switch (n->kind) {
-		case N_EXPR: gen_expr(n->l); break;
+		case N_EXPR: discard = 1; gen_expr(n->l); discard = 0; break;
 		case N_BLOCK: gen_stmt(n->body); break;
 		case N_ASM: {
 			const char *p = n->name;
@@ -1655,10 +1678,20 @@ static void init_value(Type *ty)
 	if (ty->kind == TY_ARRAY) {
 		int start = init_off;
 		if (ty->base->kind == TY_CHAR && tk()->kind == TK_STR) {
-			Tok *t = tk();
-			pos++;
-			if (!ty->len) { ty->len = t->len + 1; ty->size = ty->len; }
-			for (int i = 0; i < ty->len; i++) data("\t.byte %d\n", i < t->len ? (unsigned char)t->s[i] : 0);
+			char buf[8192];
+			int n = 0;
+			while (tk()->kind == TK_STR) {     /* adjacent strings concatenate */
+				if (n + tk()->len >= (int)sizeof buf) die("string too long");
+				memcpy(buf + n, tk()->s, (size_t)tk()->len);
+				n += tk()->len;
+				pos++;
+			}
+			if (!ty->len) { ty->len = n + 1; ty->size = ty->len; }
+			for (int i = 0; i < ty->len; i += 16) {
+				data("\t.byte ");
+				for (int k = i; k < i + 16 && k < ty->len; k++) data("%s%d", k > i ? ", " : "", k < n ? (unsigned char)buf[k] : 0);
+				data("\n");
+			}
 			init_off += ty->len;
 			return;
 		}

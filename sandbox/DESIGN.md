@@ -1,4 +1,7 @@
-# Doomception sandbox: design (draft)
+# Doomception sandbox: design
+
+**Status:** the local kit is built and its checker passes its self-test; how to
+play is in [`README.md`](README.md). The browser page (section 8) is next.
 
 A puzzle kit for experienced developers: run several copies of a tiny Doom-like game
 inside one program, on a tiny computer with no operating system support, by writing
@@ -43,9 +46,11 @@ scheduler has nowhere to hide its own state but the shared 64 KiB.
 
 - A raycaster drawing 64×40, with a health counter, a level timer and a frame loop:
   input, update, draw, present.
-- **Fixed addresses:** code at `0x1000`, globals at `0x6000`. Heap, stack and
-  framebuffer come from `alloc` at start-up, and their addresses are stored in
-  globals, so they are shared pointers.
+- **Fixed addresses:** code at `0x1000`, the globals right after it. Framebuffer,
+  heap and level script come from `alloc` when a copy starts, and their addresses
+  are stored in globals, so they are shared pointers.
+- **It plays itself:** the player walks on its own (straight on, turning at walls,
+  from a seeded random number), so every run is the same run.
 - **Map scripts, a feature:** a level file may carry a script section. The game loads
   it at a fixed address and calls it once at level start, with full access to memory.
   Scripts may patch the game's code: a documented hook table at known addresses,
@@ -90,7 +95,7 @@ that differ, are reported.
 | M2 | Separate data | each copy's globals trace matches its solo run |
 | M3 | Separate patches | M2 still holds while the copies' scripts patch the hook table differently |
 | M4 | Separate pointers | each copy's framebuffer and heap trace matches |
-| M5 | Survive | a hostile level script writes everywhere it is allowed to, and M1–M4 still hold, so your scheduler's own state is safe |
+| M5 | Survive | a hostile level script writes everywhere a script may (every hook, chaining `frame_end`; its globals; its free stack), and M1–M4 still hold |
 | M6 | The ring | three copies; each one's wall shows the next copy's latest frame, and the last shows the first |
 
 **Scores after a pass:** cycles per switch, bytes copied per switch, and memory used,
@@ -100,10 +105,12 @@ optimisation is open-ended.
 ## 7. Kit layout
 
 ```
-tools/   vm.c  cc.c  as.c  check.c   (one C compiler builds them)
-game/    tinydoom.c  levels/
-you/     sched.c  kit.h              (sched.c: yours, from a starter)
-make run  ·  make check  ·  make check M=3
+tools/     vm.c  run.c  as.c  cc.c  check.c   (one C compiler builds them)
+game/      tinydoom.c  game.h  script.h  levels/level1.c ... level8.c
+kit/       kit.h  kit.c                       (the plumbing)
+you/       sched.c                            (yours, from a starter)
+spoilers/  sched.c  broken/                   (the reference, and the self-test's)
+make check  ·  make check M=3  ·  make watch  ·  make play L=5  ·  make selftest
 ```
 
 ## 8. The browser page: the same kit, with step controls
@@ -146,8 +153,8 @@ first article's 3D machine (`nested/docs/doomception-src`, and the old page's
 
 ## Out of scope for v1
 
-Preemption and timer interrupts, memory protection, a browser version (later: the same
-`vm.c` compiled to WebAssembly and embedded in the Doomception page), sound.
+Preemption and timer interrupts, memory protection, the browser version (section 8:
+the same `vm.c` compiled to WebAssembly, next), sound.
 
 ## Decisions
 
@@ -171,3 +178,12 @@ Preemption and timer interrupts, memory protection, a browser version (later: th
   - `switch_to()`, the registers and the stack pointer;
   - `save(copy)` and `load(copy)`, the data and the patches;
   - `on_frame_end()`, when to switch and to whom.
+- **Learned while building it:**
+  - A level script may chain `frame_end` (call whatever was there before). So the
+    scheduler cannot simply pin `frame_end` to itself on every load: that cuts the
+    chain. It seeds each new copy's `frame_end` with itself, and restores each
+    copy's own patches, chain included.
+  - A pin that must hold from a copy's first frame (the ring's `wall_tex`) only
+    works if the game's start-up leaves it alone, so `copy_main` does not reset it.
+  - The hostile level changes a patch at the end of its frame, after it has
+    drawn: a scheduler that saves patches once, or only at level start, misses it.
