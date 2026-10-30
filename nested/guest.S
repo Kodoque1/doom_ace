@@ -1,0 +1,123 @@
+/*
+ * matryoshka/guest.S
+ *
+ * The payload a nested depth loads from the WAD and executes.
+ *
+ * Why it exists: ldr1N can read a code image into depth-owned memory and enter
+ * it, but "it was entered" is not evidence on its own. This guest is small,
+ * position-independent, and reports three things from inside the loaded image:
+ *
+ *   - a magic dword ('MTXG'), so the host can see that code fetched from a WAD
+ *     lump, placed at an arbitrary depth-owned address and jumped to, really ran;
+ *   - its own entry address, computed by the guest ITSELF (call/pop), so the host
+ *     can see that the image executed at an address it was not linked for;
+ *   - the zone the engine handed it, so the host can see that a nested depth
+ *     really can obtain a heap of its own (see mtx_zone.c).
+ *
+ * Between the reports it yields, which is the interesting part: control leaves
+ * the loaded image, the parent runs a frame, and the image resumes exactly where
+ * it stopped. A nested instance is a coroutine, not a one-shot call.
+ *
+ * Entered as an ordinary cdecl function - `void mtx_guest(void *svc)` - because
+ * the matryoshka depth entry is dispatched through C (mtx_run_entry), which is
+ * also why the bases travel in a descriptor rather than in ESI/EDI (see ldr0N.S).
+ *
+ * Service table, owned by the host, arrives in ECX (the ldr0N hand-off is a jump,
+ * not a call, so there is no argument frame on the stack):
+ *   [ 0] uint32_t *report     where the guest leaves its evidence
+ *   [ 4] void    (*yield)()   parent runs a frame; RETURNS here afterwards
+ *   [ 8] void    (*finish)()  end this depth (never returns)
+ *   [12] void *  (*zone)()    this depth's own zone, or 0 - the engine's nested
+ *                             Z_Init path, so the guest obtains a heap the same
+ *                             way a real nested instance would
+ *   [16] void *  (*screen)()  fill this depth's OWN screen region and return it.
+ *                             At a depth, `screen_buffer` is that depth's own
+ *                             buffer, so the drawing lands there and not in the
+ *                             root's - which is what makes the screens separate.
+ *   [20] void *  (*doomscreen)()  write a marker through DOOM's own screen pointer
+ *                             (`screens[0]`) and return where it landed, or 0 if
+ *                             the engine refused because it did not point at this
+ *                             depth's own buffer. ACE's `screen_buffer` is only a
+ *                             copy taken at init; the renderer uses Doom's
+ *                             variable, so that is the one that must follow.
+ *
+ * It yields TWICE, so the depth stays alive across two frame boundaries rather
+ * than completing at the first one: a nested instance that exists for exactly one
+ * frame cannot demonstrate anything about being switched away from and back.
+ *
+ * Position independence is not a luxury: the same image is loaded at a different
+ * address for every depth, so it must contain no absolute addresses. Note it also
+ * cannot keep anything in registers across the yield - a context switch is a real
+ * switch, so it parks the service pointer on its own stack and reloads from there.
+ * For the same reason every slot is reloaded from that stack after a C call: a C
+ * function is free to clobber eax/ecx/edx, and the zone call above IS a C call.
+ *
+ * Image header (see ldr1n.h): [0] .bss size, [4] version, then the payload. The
+ * entry is therefore payload + 8, the same arithmetic engine/asm.S does.
+ */
+
+	.section .text
+	.globl mtx_guest
+	.type  mtx_guest, @function
+
+	/* Same image header the engine's own code lump carries, so both load alike. */
+	.4byte	0			/* this guest needs no .bss */
+	.4byte	0x4D545847		/* 'MTXG' - what the loader expects here */
+
+mtx_guest:
+	push	%ecx			/* park the service pointer on our own
+					   stack: the yield below clobbers every
+					   caller-saved register */
+
+	mov	%ecx, %eax
+	mov	(%eax), %edx		/* edx = report slot */
+	movl	$0x4D545847, (%edx)	/* report[0]: the loaded image ran */
+
+	/* Get this depth's zone through the engine's nested Z_Init path. */
+	mov	(%esp), %eax
+	call	*12(%eax)
+	mov	(%esp), %edx		/* svc back from our own stack */
+	mov	(%edx), %edx		/* report - reloaded, the call clobbered it */
+	mov	%eax, 12(%edx)		/* report[3]: this depth's own zone */
+
+	/* Draw on this depth's own screen, through the engine's own screen pointer. */
+	mov	(%esp), %eax
+	call	*16(%eax)
+	mov	(%esp), %edx
+	mov	(%edx), %edx
+	mov	%eax, 8(%edx)		/* report[2]: this depth's own screen */
+
+	/* Now through DOOM's own pointer (`screens[0]`), not ACE's copy of it: that
+	   is the variable the renderer writes through, so it is the one that has to
+	   follow the depth. Refused by the engine if it does not point at our buffer. */
+	mov	(%esp), %eax
+	call	*20(%eax)
+	mov	(%esp), %edx
+	mov	(%edx), %edx
+	mov	%eax, 16(%edx)		/* report[4]: where that write landed */
+
+	/* Overwrite one of the 405 patch sites ACE installed in Doom's memory. The host
+	   checks afterwards that the ROOT never sees it: that is what hook isolation
+	   has to do before a real engine image can run at a depth. */
+	mov	(%esp), %eax
+	call	*24(%eax)
+
+	/* Yield: the parent runs a frame, we come back here. Twice, so this depth is
+	   alive across two boundaries instead of completing at the first one. */
+	mov	(%esp), %eax
+	call	*4(%eax)
+	mov	(%esp), %eax
+	call	*4(%eax)
+
+	mov	(%esp), %eax		/* svc back from our own stack */
+	mov	(%eax), %edx
+	call	9f
+9:	pop	%ecx
+	subl	$(9b - mtx_guest), %ecx	/* self-computed entry address */
+	mov	%ecx, 4(%edx)		/* report[1]: where this image is running */
+
+	mov	(%esp), %eax
+	jmp	*8(%eax)		/* finish: depth ends, control goes home */
+	.size	mtx_guest, .-mtx_guest
+
+	.section .note.GNU-stack,"",@progbits
