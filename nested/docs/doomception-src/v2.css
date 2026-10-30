@@ -17,3 +17,24 @@ h1{font-size:clamp(64px,13vw,150px)!important}
 .video{margin:22px 0 0}.video video{width:100%;max-width:760px;display:block;border:2px solid #3d2c23;background:#000}
 .milestones{columns:2;column-gap:28px}.milestones li{margin:0 0 6px}.soon{font-family:var(--f-hud);font-size:17px;color:#0b0807;background:var(--hud);padding:0 6px;margin-right:4px}
 @media (max-width:620px){.milestones{columns:1}}
+/* anatomy: flat figures */
+h3{font-family:var(--f-display);font-size:34px;margin:34px 0 4px;color:var(--fg)}
+.anat{margin:18px auto 8px}
+.a-svg{width:100%;height:auto;display:block;max-width:900px;margin:0 auto}
+.a-svg text{font-family:var(--f-hud);fill:var(--fg)}
+.a-t{font-size:21px}.a-s{font-size:16px}.a-hud{fill:var(--hud)!important}.a-dim{fill:var(--dim)!important}.a-code{fill:#d8c39a!important}
+.a-box{fill:var(--panel);stroke:#5a4334;stroke-width:1.5}.a-host{fill:#231a10;stroke:var(--hud)}
+.a-tint{opacity:.13}.a-tick{stroke:#0b0807;stroke-width:1}
+.a-slot{fill:#100b09;stroke-width:1.5}
+.a-card{fill:#140e0b;stroke-width:1.5}.a-card.a-run{fill:#1e1612;stroke-width:3}
+.a-drawer{fill:#100b09;stroke-width:1.2;stroke-opacity:.5}.a-drawer.a-full{fill:#2a1f19;stroke-opacity:1;stroke-width:2.2}.a-lab{fill:#a9957f!important;font-size:14px!important}
+.a-arrow{fill:none;stroke-width:2}
+.a-ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;margin:10px 0 0;font-family:var(--f-hud);font-size:18px;color:var(--dim)}
+.a-ctl button{font-size:18px!important;padding:3px 10px 2px!important}
+.a-ctl button[aria-pressed=true]{border-color:currentColor;background:#3a2a20}
+.a-stages{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;list-style:none;margin:0 0 10px;padding:0;font-family:var(--f-hud);font-size:18px}
+.a-stages li{padding:1px 10px;border:1px solid var(--line);color:var(--dim)}.a-stages li.on{color:#0b0807;background:var(--hud);border-color:var(--hud)}
+.a-say{max-width:680px;margin:10px auto 0;min-height:3.1em;font-size:18px;text-align:center}
+#fig-ring{width:100%;max-width:760px;height:auto;display:block;margin:0 auto}
+.incode{color:var(--dim);font-size:16px}
+@media (max-width:620px){.anat .a-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.anat .a-svg,#fig-ring{min-width:600px}.a-scroll::after{content:'scroll →';display:block;font-family:var(--f-hud);color:var(--faint);font-size:15px;text-align:right}}

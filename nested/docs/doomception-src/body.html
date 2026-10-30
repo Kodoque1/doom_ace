@@ -34,9 +34,29 @@
 
 <div class="wrap"><div class="wide console" id="model"><div class="m3-stage"><canvas aria-label="The model, running: three depths taking turns on one CPU"></canvas></div></div></div>
 
-<section class="ch col"><p class="sec-tag">Step by step</p><h2>One piece at a time</h2></section>
+<section class="ch col" id="anatomy"><p class="sec-tag">Up close</p><h2>Anatomy</h2>
+<p>Three small pictures of the real mechanism: what a depth is, what a switch does, and how the pictures loop.</p>
+<h3>A depth</h3>
+<p>A depth is its own memory, plus a saved copy of everything it shares with the other depths.</p></section>
+<div class="wrap"><div class="wide anat" id="fig-depth"></div></div>
+<section class="col"><ul class="model">
+<li><b>Pointers.</b> Three globals in the shared data, <code>mainzone</code>, ACE's <code>screen_buffer</code> and Doom's <code>screens[0]</code>, point at the running depth's heap and screen.</li>
+<li><b>Patches.</b> ACE patched <span id="nPatch">406</span> places in Doom's memory, most of them in its code. They call the running depth's ACE code; the other depths' patch bytes wait in their snapshots.</li>
+<li><b>Host state.</b> Which depth runs, and every suspended depth's stack pointer, sit in one block that no snapshot covers.</li>
+</ul><p class="incode">In the code: <code>nested/dos_wire.c</code> (<code>mtx_dos_wire_register</code>).</p></section>
 
-<div class="wrap"><div class="wide console" id="walk"><div class="m3-stage"><canvas aria-label="The model, built up one piece at a time"></canvas></div><div class="seq-say" aria-live="polite"></div></div></div>
+<section class="col"><h3>A switch</h3>
+<p>Every 4 frames the host saves one depth, loads the next, re-points the pointers and swaps the stacks.</p></section>
+<div class="wrap"><div class="wide anat" id="fig-switch"></div></div>
+<section class="col"><p class="incode">In the code: <code>nested/mtx_core.c</code> (<code>mtx_switch</code>), <code>nested/dos_state.c</code> (<code>mtx_dos_save_state</code>, <code>mtx_dos_load_state</code>), <code>nested/mtx_sched.c</code> (<code>mtx_frame_tick</code>).</p></section>
+
+<section class="col"><h3>The pictures</h3>
+<p>Each depth draws into its own screen buffer. One wall texture reads the next depth's buffer. The monitor shows one buffer.</p></section>
+<div class="wrap"><div class="wide anat"><div class="a-scroll"><canvas id="fig-ring" width="640" height="400" aria-label="Three screen buffers in a ring, and the monitor"></canvas></div></div></div>
+<section class="col"><ul class="model">
+<li>Every frame the host tells each depth whose buffer its wall shows (<code>screen_src</code>). The deepest depth wraps to depth 0.</li>
+<li>A suspended depth doesn't draw, so its wall picture is that depth's latest frame.</li>
+</ul><p class="incode">In the code: <code>engine/mtx_boot.c</code> (<code>mtx_ring_next</code>, <code>mtx_world_screen</code>, <code>mtx_engine_video</code>).</p></section>
 
 <section class="ch col"><p class="sec-tag">Go deeper</p><h2>Where it is in the code</h2>
 <p>The page simplifies; the code doesn't. Everything is in <a href="https://github.com/Kodoque1/doom_ace">one repository</a>, a fork of kgsws' <a href="https://github.com/kgsws/doom_ace">doom_ace</a>: the engine at the root, the switch in <code>nested/</code>.</p>
