@@ -21,10 +21,26 @@ function fmt(n){return Number(n).toLocaleString("en-US");}
   $("measured").innerHTML=li.map(function(x){return "<li>"+x+"</li>";}).join("");
 })();
 
-/* --- the looping picture --- */
-(function(){var out=$("hero");if(!out)return;var g=out.getContext("2d"),V=[0,1,2].map(function(){var c=document.createElement("canvas");c.width=320;c.height=208;return c;}),t=0,f=[0,0,0];
-  function tick(){var d=t%3;f[d]++;drawView(V[d],d,100-(f[d]*3)%88,f[d],false,false,V[ringNext(d,3)]);t++;g.imageSmoothingEnabled=false;g.drawImage(V[0],0,0,out.width,out.height);}
-  for(var i=0;i<9;i++)tick();if(!RM)setInterval(tick,160);})();
+/* --- the looping picture, and the teleport: y moves you into the depth on the wall --- */
+(function(){var out=$("hero");if(!out)return;var g=out.getContext("2d"),W=out.width,H=out.height,
+    V=[0,1,2].map(function(){var c=document.createElement("canvas");c.width=320;c.height=208;return c;}),t=0,f=[0,0,0],v=0,fx=null;
+  /* the wall's rectangle inside a depth's picture, as drawView places it */
+  function wall(d){var c=V[d],w=c.width,h=c.height,hb=Math.round(h*0.78),sway=Math.sin(f[d]*0.35)*10;return {x:Math.round(w*0.64+sway*0.4),y:Math.round(hb*0.16),w:Math.round(w*0.3),h:Math.round(hb*0.5)};}
+  function tag(){g.font="bold 22px VT323, monospace";g.fillStyle="rgba(11,8,7,.75)";g.fillRect(10,10,200,30);g.fillStyle=DCCSS[v];g.fillText("you are in depth "+v,18,32);}
+  function show(){g.imageSmoothingEnabled=false;
+    if(fx&&fx.k==="zoom"){var p=Math.min(1,(performance.now()-fx.t0)/700),e=p*p*(3-2*p),r=wall(v),c=V[v];
+      g.drawImage(c,r.x*e,r.y*e,c.width+(r.w-c.width)*e,c.height+(r.h-c.height)*e,0,0,W,H);
+      if(p>=1){v=(v+1)%3;fx={k:"sweep",t0:performance.now()};}return;}
+    g.drawImage(V[v],0,0,W,H);
+    if(fx&&fx.k==="sweep"){var q=Math.min(1,(performance.now()-fx.t0)/550),y=q*H;g.fillStyle=DCCSS[v];g.globalAlpha=0.85;g.fillRect(0,y-6,W,12);g.globalAlpha=0.35;g.fillRect(0,0,W,y);g.globalAlpha=1;if(q>=1)fx=null;}
+    tag();}
+  function tick(){var d=t%3;f[d]++;drawView(V[d],d,100-(f[d]*3)%88,f[d],false,false,V[ringNext(d,3)]);t++;}
+  for(var i=0;i<9;i++)tick();show();
+  function go(){if(fx)return;if(RM){v=(v+1)%3;show();return;}fx={k:"zoom",t0:performance.now()};}
+  if(!RM){setInterval(tick,160);(function loop(){show();requestAnimationFrame(loop);})();}
+  var b=$("teleport");if(b)b.addEventListener("click",go);out.addEventListener("click",go);
+  document.addEventListener("keydown",function(e){if((e.key!=="y"&&e.key!=="Y")||/INPUT|TEXTAREA/.test((e.target||{}).tagName||""))return;var r=out.getBoundingClientRect();if(r.bottom>0&&r.top<innerHeight)go();});
+})();
 
 /* --- the scene --- */
 function Model(rootId,build){after3d(function(){
