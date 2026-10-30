@@ -50,7 +50,7 @@ var LEGEND=(function(){var C="#d8c39a",A="#f1b23c";function sv(b){return '<svg v
     code:r(2,3,24,2)+r(6,8,18,2)+r(6,13,22,2)+r(2,17,14,2),
     plug:r(12,5,12,10,A)+r(5,7,7,2,A)+r(5,11,7,2,A),
     data:[0,1,2,3,4,5].map(function(i){return r(3+(i%3)*9,2+Math.floor(i/3)*9,7,7,C,0.5+0.1*i);}).join(""),
-    ptr:'<circle cx="5" cy="10" r="4" fill="'+A+'"/>'+r(9,9,15,2)+'<path d="M30 10 L23 6 L23 14Z" fill="'+C+'"/>',
+    ptr:'<circle cx="5" cy="10" r="4" fill="#e0553c"/>'+r(9,9,15,2)+'<path d="M30 10 L23 6 L23 14Z" fill="'+C+'"/>',
     stack:[0,1,2,3].map(function(i){return r(5+i*2,16-i*4,22-i*4,3,C,0.4+0.15*i);}).join(""),
     heap:r(2,2,10,7)+r(13,2,6,7,C,0.4)+r(20,2,10,7)+r(2,11,16,7,C,0.6)+r(19,11,11,7),
     pic:'<rect x="2" y="2" width="28" height="16" fill="#0b0807" stroke="'+C+'"/><rect x="8" y="5" width="16" height="9" fill="none" stroke="'+C+'" opacity=".6"/>'+r(20,4,8,6,"#2a1d16"),
@@ -60,9 +60,10 @@ var LEGEND=(function(){var C="#d8c39a",A="#f1b23c";function sv(b){return '<svg v
     pins:r(6,4,3,12,"#e0553c")+r(11,4,3,12,"#e0553c")+r(18,4,3,12,"#7fd23e")+r(23,4,3,12,"#7fd23e"),
     chip:r(8,4,16,12,"#2a2a2e")+r(12,7,8,6,"#e0553c")+[0,1,2].map(function(i){return r(10+i*5,1,2,3,A)+r(10+i*5,16,2,3,A);}).join(""),
     mov:'<rect x="3" y="5" width="26" height="10" fill="#eadccb"/><text x="16" y="13.5" font-size="8" text-anchor="middle" fill="#0b0807" font-family="monospace">MOV</text>',
+    hot:r(3,2,7,7,C,0.4)+r(12,2,7,7,"#e0553c")+r(21,2,7,7,C,0.4)+r(3,11,7,7,C,0.4)+r(12,11,7,7,C,0.4)+r(21,11,7,7,"#e0553c"),
     sheet:r(4,10,20,2)+r(6,7,20,2)+r(8,4,20,2,"#e0553c"),
     regs:[0,1,2,3].map(function(i){return r(6,3+i*4,20,3,"#e0553c");}).join("")};
-  var rows=[["code","code: Doom's, or a depth's ACE"],["plug","a place ACE patched in Doom's code"],["data","Doom's data: one live copy"],["ptr","a pointer: where it points"],
+  var rows=[["code","code: Doom's, or a depth's ACE"],["plug","a place ACE patched in Doom's code"],["data","Doom's data: one live copy, the same in every depth"],["hot","the few bytes that differ: the running depth's"],["ptr","a pinned pointer: where it points"],
     ["stack","a stack"],["heap","a heap"],["pic","a screen buffer"],["drawer","a snapshot: saved data and patches"],["safe","the host's state, in no snapshot"],
     ["esp","a saved stack pointer (ESP)"],["pins","pin values: each depth's heap and screen"],["chip","the CPU"],
     null,["mov","an instruction, fetched"],["sheet","data, read or copied"],["regs","4 registers, saved"],["pic","a frame, drawn or copied"]];
@@ -92,6 +93,10 @@ function Model(rootId,build){after3d(function(){
   var dataTint=new T.InstancedMesh(new T.BoxGeometry(0.2,0.05,0.2),k.mat(NEU,0.2,0.0),75),dm=new T.Matrix4();
   for(var di=0;di<75;di++){var dc=di%15,dr=Math.floor(di/15);dm.makeScale(1,1+((dc*13+dr*7)%5)*0.5,1);dm.setPosition(0.6+dc*0.26,0.07,-3.05+dr*0.26);dataTint.setMatrixAt(di,dm);}
   k.scene.add(dataTint);
+  /* the few bytes that differ between depths: the only part of Doom's data in the running depth's colour */
+  var dataHot=new T.InstancedMesh(new T.BoxGeometry(0.2,0.05,0.2),k.mat(DCHEX[0],0.5),8);
+  [[1,0],[4,1],[7,3],[10,2],[12,4],[2,4],[13,1],[6,2]].forEach(function(q,i){dm.makeScale(1,2.2,1);dm.setPosition(0.6+q[0]*0.26,0.08,-3.05+q[1]*0.26);dataHot.setMatrixAt(i,dm);});
+  k.scene.add(dataHot);
   /* each depth's private memory */
   var RX=[-4.6,0,4.6],RZ=2.0,R=[];
   for(var d=0;d<3;d++)(function(d){var x=RX[d],o={},G=new T.Group();k.scene.add(G);k.layer=G;o.G=G;
@@ -148,10 +153,10 @@ function Model(rootId,build){after3d(function(){
 
   /* moving things: right-angled routes, one glyph per event */
   function route(a,b,yc){var p=[a,V(a.x,yc,a.z),V(b.x,yc,a.z),V(b.x,yc,b.z),b],c=new T.CurvePath();for(var j=0;j<4;j++)if(p[j].distanceTo(p[j+1])>1e-3)c.add(new T.LineCurve3(p[j],p[j+1]));if(!c.curves.length)c.add(new T.LineCurve3(a,V(b.x,b.y+0.01,b.z)));return c;}
-  var toks=[],EV=[],clock=0,paused=false,speed=1,stepUnits=-1,H=[];
+  var toks=[],EV=[],clock=0,paused=false,speed=0.25,stepUnits=-1,H=[];
   function after(ms,fn){if(RM){fn();return;}EV.push({t:clock+ms/1000,fn:fn});}
   /* controls: back one step, pause, one step, speed (each frame and each switch step is one step) */
-  var ctl=document.createElement("div");ctl.className="m3-ctl";ctl.innerHTML='<button type="button" data-c="back" aria-label="One step back">◀</button><button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" data-c="step" aria-label="One step forward">▶|</button><button type="button" data-c="slower" aria-label="Slower">◀◀ slower</button><span class="m3-speed" aria-live="polite">1×</span><button type="button" data-c="faster" aria-label="Faster">faster ▶▶</button><button type="button" data-c="legend">legend</button>';stage.appendChild(ctl);legShow();
+  var ctl=document.createElement("div");ctl.className="m3-ctl";ctl.innerHTML='<button type="button" data-c="back" aria-label="One step back">◀</button><button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" data-c="step" aria-label="One step forward">▶|</button><button type="button" data-c="slower" aria-label="Slower">◀◀ slower</button><span class="m3-speed" aria-live="polite">¼×</span><button type="button" data-c="faster" aria-label="Faster">faster ▶▶</button><button type="button" data-c="legend">legend</button>';stage.appendChild(ctl);legShow();
   ["pointerdown","pointermove"].forEach(function(ev){ctl.addEventListener(ev,function(e){e.stopPropagation();});});
   var SPEEDS=[0.25,0.5,1,2];function spTxt(v){return (v===0.25?"¼":v===0.5?"½":v)+"×";}
   function ctlLabel(){ctl.querySelector('[data-c=pause]').textContent=paused?"▶":"❚❚";ctl.querySelector('.m3-speed').textContent=spTxt(speed);
@@ -188,7 +193,8 @@ function Model(rootId,build){after3d(function(){
     R.forEach(function(o,d){var on=d<S.n;o.G.visible=on;o.saved.visible=o.savedL.visible=!!(on&&S.swap&&S.turns&&s.saved);o.aceL.visible=!!s.ace;o.ace.visible=d===0?S.patchOwner>=0||S.n>1:true;
       o.stackL.visible=!!s.stack;o.heapL.visible=!!s.heap;o.picL.visible=!!s.pic;o.base.material.opacity=d===S.cur?0.32:0.12;});
     tiles.forEach(function(m){glow(m,S.patchOwner<0?0x3d332a:DCHEX[S.patchOwner],S.patchOwner<0?0.05:0.6);});
-    glow(dataTint,DCHEX[S.dataOwner],0.25);dataTint.material.opacity=S.n>1?0.35:0;
+    glow(dataTint,0x8f8577,0.15);dataTint.material.opacity=0.55;glow(dataHot,DCHEX[S.dataOwner],0.6);
+    sock.forEach(function(m){glow(m,DCHEX[S.ptrOwner],0.5);});
     glow(chip,DCHEX[S.cur],0.6);ptr.visible=!!s.ptr;if(s.ptr)rewirePtr(S.ptrOwner);
     swRows.forEach(function(m,d){var on=S.turns&&d<S.n&&d!==S.cur;glow(m,on?0x5a4334:0x2a211b,0.1);m.userData.needle.visible=on;});
     sw.visible=lab.sw.visible;pinRow.visible=sw.visible;lab.pins.visible=sw.visible&&!!s.sw;swRows.forEach(function(m){m.visible=sw.visible;});}

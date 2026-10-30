@@ -24,6 +24,7 @@ function viaRight(x0,y0,i,blk,off){var b=bc(i,blk),gx=CX[i]+CW+(off||4),y=b.y+b.
    data, and into the depth straight down through its top, along the gap in its middle. The
    routes nest, so none crosses another: the upper the socket, the outer its lane, the lower
    its turn, and the further right it enters */
+var HOT=[15,65,82,136,154,198,227,247];   /* grid cells standing for the bytes that differ */
 var LANE=[604,584,564],BAND=[206,201,196],ENTRY=[104,99,94];
 function ptrRoute(k,p){var sx=SOCK[k][0]+14,sy=SOCK[k][1],lx=LANE[k],hy=BAND[k],ex=CX[p]+ENTRY[k];
   if(k===2){var h=bc(p,"heap"),y=h.y+h.h/2;return [[sx,sy],[lx,sy],[lx,hy],[ex,hy],[ex,y],[h.x+h.w,y]];}
@@ -93,7 +94,9 @@ function line(g,pts,col,head){var d="M"+pts.map(function(p){return p[0]+" "+p[1]
 /* st: cur (holds the CPU), data, patch, ptr (who owns each), espIn (which depth's ESP is in the CPU) */
 function paint(o,st){
   o.ticks.forEach(function(t){t.querySelectorAll("rect").forEach(function(r){r.setAttribute("fill",DCCSS[st.patch]);});});
-  o.grid.querySelectorAll("rect").forEach(function(r){r.setAttribute("fill",DCCSS[st.data]);});o.cpu.setAttribute("fill",DCCSS[st.cur]);
+  /* most of Doom's data is the same in every depth: only the bytes that differ, and the pins, are the running depth's */
+  o.grid.querySelectorAll("rect").forEach(function(r,i){var hot=HOT.indexOf(i)>=0;r.setAttribute("fill",hot?DCCSS[st.data]:"#8f8577");if(hot)r.setAttribute("opacity",1);});
+  o.slot.forEach(function(c){c.setAttribute("fill",DCCSS[st.ptr]);});o.cpu.setAttribute("fill",DCCSS[st.cur]);
   o.esp.forEach(function(s,d){while(s.n.firstChild)s.n.removeChild(s.n.firstChild);var inCpu=d===st.espIn;s.r.setAttribute("stroke",inCpu?"#3d2c23":DCCSS[d]);
     s.r.setAttribute("stroke-dasharray",inCpu?"3 3":"");if(!inCpu)icNeedle(s.n,s.x+22,134,DCCSS[d],30);});
   o.card.forEach(function(c,d){var run=d===st.cur;c.box.setAttribute("stroke",run?DCCSS[d]:"#3d2c23");c.box.setAttribute("class","a-card"+(run?" a-run":""));
@@ -122,8 +125,8 @@ function newSvg(host,label){var w=H("div","a-scroll",host),s=E("svg",{viewBox:"0
   var chipEl=names.map(function(n){return H("li","",chips,n);});
   var svg=newSvg(host,"A switch, stage by stage"),bd=Board(svg),say=H("p","a-say",host),ctl=H("div","a-ctl",host);
   say.setAttribute("aria-live","polite");
-  ctl.innerHTML='<button type="button" data-c="back" aria-label="One stage back">◀</button><button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" data-c="step" aria-label="One stage forward">▶|</button><button type="button" data-c="slower" aria-label="Slower">◀◀ slower</button><span class="m3-speed" aria-live="polite">1×</span><button type="button" data-c="faster" aria-label="Faster">faster ▶▶</button>';
-  var o0=0,s=0,t=0,dur=[2.6,3.4,3.4,3.0,3.8,2.2],paused=false,stepping=false,speed=1,SP=[0.25,0.5,1,2],toks=[];
+  ctl.innerHTML='<button type="button" data-c="back" aria-label="One stage back">◀</button><button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" data-c="step" aria-label="One stage forward">▶|</button><button type="button" data-c="slower" aria-label="Slower">◀◀ slower</button><span class="m3-speed" aria-live="polite">¼×</span><button type="button" data-c="faster" aria-label="Faster">faster ▶▶</button>';
+  var o0=0,s=0,t=0,dur=[2.6,3.4,3.4,3.0,3.8,2.2],paused=false,stepping=false,speed=0.25,SP=[0.25,0.5,1,2],toks=[];
   function n0(){return (o0+1)%3;}
   /* the picture at the start of each stage (and at its end, which is the next one's start) */
   function stateAt(o,st){var n=(o+1)%3;return st<=1?{cur:o,data:o,patch:o,ptr:o,espIn:o}:st===2?{cur:o,data:o,patch:o,ptr:o,espIn:o}:

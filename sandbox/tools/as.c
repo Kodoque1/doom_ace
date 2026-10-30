@@ -1,10 +1,11 @@
 /* as.c - the D32 assembler.
  *
- *   as [-o out.o] [-s out.sym] file.s ...
+ *   as [-o out.o] [-s out.sym] [-l out.map] file.s ...
  *
  * Output is relocatable (see vm_load): every reference to a label is an offset from
  * the start of the image, fixed up by the loader. The symbol file lists every label
- * as "name offset" in hex, which is how the kit finds the game's addresses.
+ * as "name offset" in hex, which is how the kit finds the game's addresses. The map
+ * (-l) gives, for each instruction, "offset file:line" of the line it came from.
  *
  * Syntax, one statement per line, ';' starts a comment:
  *   label:
@@ -35,6 +36,7 @@ static int nrel;
 static const char *curfile;
 static int curline;
 static char entry_name[64];
+static FILE *mapf;
 
 static void die(const char *fmt, ...)
 {
@@ -152,6 +154,7 @@ static void addrel(int type)
 
 static void insn(int op, int a, int b, int imm, int reloc)
 {
+	if (pass == 2 && mapf) fprintf(mapf, "%04x %s:%d\n", pc, curfile, curline);
 	if (reloc) addrel(1);
 	emit32(d32_enc(op, a, b, imm));
 }
@@ -299,9 +302,13 @@ int main(int argc, char **argv)
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-o") && i + 1 < argc) out = argv[++i];
 		else if (!strcmp(argv[i], "-s") && i + 1 < argc) symout = argv[++i];
+		else if (!strcmp(argv[i], "-l") && i + 1 < argc) {
+			mapf = fopen(argv[++i], "w");
+			if (!mapf) { perror(argv[i]); return 2; }
+		}
 		else if (nfiles < 64) files[nfiles++] = argv[i];
 	}
-	if (!nfiles) { fprintf(stderr, "usage: as [-o out.o] [-s out.sym] file.s ...\n"); return 2; }
+	if (!nfiles) { fprintf(stderr, "usage: as [-o out.o] [-s out.sym] [-l out.map] file.s ...\n"); return 2; }
 	run_pass(1, files, nfiles);
 	if (err) return 1;
 	run_pass(2, files, nfiles);
@@ -313,6 +320,7 @@ int main(int argc, char **argv)
 		if (i < 0 || !sym[i].defined) { fprintf(stderr, "as: entry '%s' undefined\n", entry_name); return 1; }
 		entry = sym[i].value;
 	}
+	if (mapf) fclose(mapf);
 	FILE *f = fopen(out, "wb");
 	if (!f) { perror(out); return 1; }
 	uint8_t h[12] = { 'D', '3', '2', 'O', (uint8_t)pc, (uint8_t)(pc >> 8), (uint8_t)nrel, (uint8_t)(nrel >> 8),

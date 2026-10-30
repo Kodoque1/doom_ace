@@ -15,6 +15,9 @@
  *   __hook(name, args)    call name_default(args) from a call site labelled hook_name,
  *                         so the site can be found and patched
  *
+ * Each statement is preceded by a comment "; @file:line", so a listing can map code
+ * back to the C.
+ *
  * Code: r0 is the accumulator, temporaries go on the stack, r6 is the frame pointer.
  * Arguments are pushed right to left and the caller pops them; parameter i is at
  * [fp + 8 + 4i]; the result comes back in r0. Globals are emitted after the code,
@@ -444,6 +447,7 @@ typedef struct Node {
 	int nargs;
 	struct Node *next;      /* in a block */
 	int line;
+	const char *file;
 } Node;
 
 /* binary operator codes beyond single characters */
@@ -468,7 +472,7 @@ static char *ident_tok(void)
 	return toks.v[pos++].s;
 }
 
-static Node *mk(int kind) { Node *n = zalloc(sizeof *n); n->kind = kind; n->line = tk()->line; return n; }
+static Node *mk(int kind) { Node *n = zalloc(sizeof *n); n->kind = kind; n->line = tk()->line; n->file = tk()->file; return n; }
 static Node *num(int v) { Node *n = mk(N_NUM); n->val = v; n->ty = ty_int; return n; }
 
 /* decay arrays and functions to pointers */
@@ -631,7 +635,7 @@ static int npnames;
 
 static Type *declarator(Type *ty, char **name)
 {
-	while (accept("*")) { while (accept("const") || accept("volatile")) ; ty = ptr_to(ty); }
+	while (accept("*")) { while (accept("const") || accept("volatile")) {} ty = ptr_to(ty); }
 	if (at("(") && !(toks.v[pos + 1].kind == TK_PUNCT && !strcmp(toks.v[pos + 1].s, ")")) &&
 	    !(toks.v[pos + 1].kind == TK_IDENT && is_typename_at(pos + 1))) {
 		/* nested declarator: int (*f)(int) */
@@ -1379,6 +1383,8 @@ static void gen_stmt(Node *n)
 {
 	for (; n; n = n->next) {
 		err_line = n->line;
+		/* where each statement comes from: the simulator maps pc back to the C */
+		if (n->kind != N_BLOCK && n->file) emit("; @%s:%d", n->file, n->line);
 		switch (n->kind) {
 		case N_EXPR: discard = 1; gen_expr(n->l); discard = 0; break;
 		case N_BLOCK: gen_stmt(n->body); break;

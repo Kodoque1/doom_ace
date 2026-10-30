@@ -40,6 +40,7 @@
 <p>A depth is its own memory, plus a saved copy of everything it shares with the other depths.</p></section>
 <div class="wrap"><div class="wide anat" id="fig-depth"></div></div>
 <section class="col"><ul class="model">
+<li><b>Data.</b> Doom's data is one live copy. Most of it is the same in every depth; the few bytes that differ (coloured) are the running depth's.</li>
 <li><b>Pointers.</b> Three globals in the shared data, <code>mainzone</code>, ACE's <code>screen_buffer</code> and Doom's <code>screens[0]</code>, point at the running depth's heap and screen.</li>
 <li><b>Patches.</b> ACE patched <span id="nPatch">406</span> places in Doom's memory, most of them in its code. They call the running depth's ACE code; the other depths' patch bytes wait in their snapshots.</li>
 <li><b>Host state.</b> Which depth runs, and every suspended depth's stack pointer, sit in one block that no snapshot covers.</li>
@@ -80,7 +81,9 @@
 <ol class="cool milestones">
 <li>Take turns.</li><li>Keep their data apart.</li><li>Keep their patches apart.</li><li>Keep their pointers apart.</li><li>Survive a hostile level.</li><li>Close the ring.</li>
 </ol>
-<p>A checker proves each step, then scores you on cycles and bytes. <span class="soon">Ready</span> to run locally: clone the repository, then <code>cd sandbox &amp;&amp; make check</code>. The rules are in <a href="https://github.com/Kodoque1/doom_ace/tree/claude/great-hypatia-7l3xi1/sandbox"><code>sandbox/README.md</code></a>. A browser version comes next.</p>
+<p>A checker proves each step, then scores you on cycles and bytes.</p>
+<p><a class="tp play" href="challenge/index.html"><b>▶</b> Play it in your browser</a></p>
+<p class="note">Edit your scheduler, check it, and watch the machine run it, one instruction at a time if you like. Everything on that page is the kit's own C compiled to WebAssembly, so its verdicts are the same as <code>make check</code> in <a href="https://github.com/Kodoque1/doom_ace/tree/claude/great-hypatia-7l3xi1/sandbox"><code>sandbox/</code></a>, which also runs locally.</p>
 </section>
 
 </main>
