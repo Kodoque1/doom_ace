@@ -56,7 +56,7 @@ makes the nesting visible inside the nested view as well as around it.
 
 | tree | branch | remote |
 |---|---|---|
-| `doom_ace/` | `inset-wip` | github.com/Kodoque1/doom_ace (PRIVATE) — HEAD `649dfa6`, pushed |
+| `doom_ace/` | `inset-wip` | github.com/Kodoque1/doom_ace (public) |
 | `doom_ace/nested/` | (same repository) | merged in from github.com/Kodoque1/nested, history kept |
 
 The host now lives in this repository under `nested/`, and `engine/makefile` has
