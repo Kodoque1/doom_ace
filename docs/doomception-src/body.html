@@ -1,0 +1,53 @@
+<header class="hero wrap">
+  <div class="wide">
+    <p class="eyebrow">Doom inside Doom inside Doom inside the first Doom</p>
+    <h1>Doomception</h1>
+    <p class="dek">Three copies of Doom running inside one DOOM2.EXE under DOS, with no operating system to help, each one showing the next on a wall.</p>
+    <figure class="hero-pic"><canvas id="hero" width="640" height="416" aria-label="Depth 0's picture: one wall shows depth 1's picture, whose wall shows depth 2's, whose wall shows depth 0 again"></canvas>
+      <figcaption>A re-enactment of the picture: each depth's wall shows the next depth's latest frame, and the last wraps back to the first.</figcaption></figure>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section class="ch col"><p class="sec-tag">Why it's cool</p><h2>Four things worth the trip</h2>
+<ol class="cool">
+<li><b>Three games in one program, with no operating system.</b> DOS has no processes, no threads, no memory protection. Everything an operating system would do for you is done by hand, inside the game.</li>
+<li><b>The nesting is literally visible.</b> Each game's walls show the next game's live picture, and the deepest one shows the first, so the picture loops.</li>
+<li><b>Pausing a running game and resuming another takes a handful of instructions.</b> Save a few registers, swap one stack pointer, and a different game carries on where it stopped.</li>
+<li><b>A program written to be alone is made to share.</b> All three games use the same code and the same data addresses. They are kept apart by swapping only what differs: <span id="nCopied">about 1,300</span> bytes per switch out of <span id="nSnap">577 KB</span>, plus <span id="nPatch">406</span> code patches and a few pointers.</li>
+</ol></section>
+
+<section class="ch col"><p class="sec-tag">The model</p><h2>How it works, in one paragraph</h2>
+<p class="model">DOOM2.EXE is loaded once: its code and data sit at fixed addresses, and every copy of the game uses those same addresses. Each copy, a <b>depth</b>, also gets private memory of its own: a heap, a stack, a screen buffer and its own copy of ACE's code. The CPU runs one depth at a time. Every 4 frames, a <b>switch</b> runs: host code whose own state lives outside every depth. It saves the running depth's copy of Doom's writable data and of the code patches its ACE made, loads the next depth's, points Doom's shared heap and screen pointers at that depth's private memory, and swaps the CPU's stack pointer, so the next depth resumes exactly where it stopped. Each depth draws the next depth's latest frame onto a wall, and the deepest draws the first.</p>
+<p class="note">ACE is a mod for DOS Doom 2 that comes as a WAD file. It adds its own engine code to the game, and the code that runs the copies is part of it.</p>
+</section>
+
+<div class="wrap"><div class="wide console" id="model"><div class="m3-stage"><canvas aria-label="The model, running: three depths taking turns on one CPU"></canvas></div></div></div>
+
+<section class="ch col"><p class="sec-tag">Step by step</p><h2>The same picture, one piece at a time</h2></section>
+
+<div class="wrap"><div class="wide console" id="walk"><div class="m3-stage"><canvas aria-label="The model, built up one piece at a time"></canvas></div><div class="seq-say" aria-live="polite"></div></div></div>
+
+<section class="ch col"><p class="sec-tag">Go deeper</p><h2>Where it is in the code</h2>
+<p>Everything above is a simplification. The code is the real thing: here is where each part of the model lives, and what to read first. <a href="https://github.com/Kodoque1/nested">nested</a> holds the host (the switch and its helpers); <a href="https://github.com/Kodoque1/doom_ace">doom_ace</a> holds the engine with the host wired in.</p>
+<div class="tblwrap"><table class="codemap">
+<thead><tr><th>In the model</th><th>In the code</th><th>Read first</th></tr></thead>
+<tbody>
+<tr><td>Handing over the CPU: registers onto the depth's own stack, swap the stack pointer</td><td><code>nested/mtx_switch.S</code> (<code>mtx_switch_ctx</code>), <code>nested/mtx_core.c</code> (<code>mtx_switch_to</code>)</td><td>README, “The mechanism”</td></tr>
+<tr><td>When it switches: at a frame boundary, every 4 frames</td><td><code>nested/mtx_sched.c</code> (<code>mtx_frame_tick</code>), <code>doom_ace/engine/mtx_boot.c</code> (<code>MTX_DEMO_INTERVAL</code>, <code>mtx_sched_next</code>)</td><td>README, “The yield point”</td></tr>
+<tr><td>Saving and loading Doom's writable data, the code patches and the pointers</td><td><code>nested/dos_state.c</code> (<code>mtx_dos_save_state</code>, <code>mtx_dos_load_state</code>), <code>nested/mtx_hooks.c</code></td><td>README, “What is per-depth” and “405 patches”</td></tr>
+<tr><td>The switch's own state, outside every depth</td><td><code>nested/mtx_host.h</code> (<code>mtx_hs</code>)</td><td>README, “Live switching, and the illegal-read fix”</td></tr>
+<tr><td>A depth's private memory</td><td><code>nested/mtx_zone.c</code>, <code>nested/mtx_raw.c</code>, stack slots in <code>nested/mtx_core.c</code> (<code>mtx_seed</code>)</td><td>README, “A depth's own zone”</td></tr>
+<tr><td>Starting a depth: loading its copy of ACE</td><td><code>nested/ldr0N.S</code>, <code>nested/ldr1n.c</code>, <code>doom_ace/engine/mtx_ldr.c</code></td><td>README, “The loaders”</td></tr>
+<tr><td>The walls and the loop</td><td><code>doom_ace/engine/mtx_boot.c</code> (<code>mtx_ring_next</code>, <code>mtx_screen_paint</code>), <code>nested/mtx_params.h</code> (<code>screen_src</code>)</td><td>the comments above those functions</td></tr>
+</tbody></table></div>
+<h3>Measured in a real run</h3>
+<ul class="measured" id="measured"></ul>
+</section>
+
+</main>
+
+<footer class="wrap mini"><div class="col">
+<p>The pictures and the 3D scenes are simplified re-enactments written for this page, not recordings: the games are drawn as a corridor and a health number, and the switch is slowed down so it can be followed. The numbers under “Measured” come from the project's own log of a real run (<code>MTX.LOG</code>) and its README. No game data is used.</p>
+</div></footer>
