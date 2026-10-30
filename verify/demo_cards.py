@@ -12,7 +12,7 @@ clip, O = sys.argv[1], sys.argv[2]
 os.makedirs(O, exist_ok=True)
 W, H = 1280, 1080
 
-d.card([('DOOMATRYOSHKA', 9, 'red', 300), ('A RING OF DOOM II INSTANCES', 4, 'gold', 470),
+d.card([('DOOMCEPTION', 9, 'red', 300), ('A RING OF DOOM II INSTANCES', 4, 'gold', 470),
         ("EACH ONE'S WALL IS A LIVE SCREEN", 3, 'white', 590), ('SHOWING THE NEXT ONE', 3, 'white', 640),
         ('AND THE LAST SHOWS THE FIRST', 3, 'white', 690)], os.path.join(O, 'title.png'))
 
