@@ -172,7 +172,9 @@ function scrollTo_(line){ta.scrollTop=Math.max(0,(line-8)*20);gut.scrollTop=ta.s
 ta.addEventListener("scroll",function(){gut.scrollTop=ta.scrollTop;});
 ta.addEventListener("input",function(){if(cur===0){store.set("dc-sched",ta.value);errLine=0;}gutter();});
 ta.addEventListener("keydown",function(e){if(e.key==="Tab"&&!ta.readOnly){e.preventDefault();var s=ta.selectionStart;ta.setRangeText("\t",s,ta.selectionEnd,"end");store.set("dc-sched",ta.value);}});
-$("bStarter").onclick=function(){if(!confirm("Replace your sched.c with the starter?"))return;store.set("dc-sched",STARTER);show(0);};
+$("bStarter").onclick=function(){if(!confirm("Replace your sched.c with the starter?"))return;
+  if(cur===0)ta.value=STARTER;   /* show() saves the editor first: give it the starter to save */
+  store.set("dc-sched",STARTER);show(0);};
 $("bSave").onclick=function(){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text(0)],{type:"text/plain"}));a.download="sched.c";a.click();};
 SCEN.forEach(function(s,i){var o=document.createElement("option");o.value=i;o.textContent=s.n;$("scen").appendChild(o);});
 

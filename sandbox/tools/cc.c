@@ -1068,6 +1068,7 @@ char *new_string(const char *s, int n)
 /* ---------- code generation ---------- */
 static const char *vlabel(Var *v) { return v->label ? v->label : v->name; }
 static int ret_label, brk[64], cnt[64], nloop;
+static Type *ret_type;   /* the function being generated returns this */
 static int discard;   /* the expression being generated is a statement: its value is unused */
 
 static void load_const(int reg, int v)
@@ -1436,7 +1437,11 @@ static void gen_stmt(Node *n)
 			break;
 		}
 		case N_RETURN:
-			if (n->l) gen_expr(n->l);
+			if (n->l) {
+				gen_expr(n->l);
+				/* a char function returns a char: what an assignment to one would keep */
+				if (ret_type && ret_type->kind == TY_CHAR && n->l->ty->kind != TY_CHAR) { emit("\tldi r1, 255"); emit("\tand r0, r0, r1"); }
+			}
 			emit("\tjmp .L%d", ret_label);
 			break;
 		case N_BREAK:
@@ -1773,6 +1778,7 @@ static void function(char *name, Type *ty)
 	Node *body = block();
 	scope_depth = 0;
 	ret_label = nlabel++;
+	ret_type = ty->base;
 	emit("%s:", name);
 	emit("\tpush fp");
 	emit("\tmov fp, sp");

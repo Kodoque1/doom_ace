@@ -29,6 +29,7 @@ int add(int a, int b) { return a + b; }
 int twice(int (*f)(int, int), int v) { return f(v, v); }
 int fact(int n) { return n <= 1 ? 1 : n * fact(n - 1); }
 int count(void) { static int k; return ++k; }
+char byte(int n) { return n; }
 int sum(int *p, int n) { int s = 0; for (int i = 0; i < n; i++) s += p[i]; return s; }
 
 int main()
@@ -81,6 +82,7 @@ int main()
 	char *s = name;
 	CHECK(*s++ == 'd' && *s == 'o');
 	CHECK((char)300 == 44);
+	CHECK(byte(300) == 44 && byte(-1) == 255);
 	puts_("t1 done\n");
 	return fails;
 }
