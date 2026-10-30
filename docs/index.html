@@ -597,6 +597,8 @@ h1{font-size:clamp(64px,13vw,150px)!important}
 .tp{font-family:var(--f-hud);font-size:19px;padding:3px 12px;margin-right:6px;background:rgba(241,178,60,.15);border:1px solid var(--hud);color:#fff}.tp b{color:var(--hud)}
 .credit{color:var(--dim);font-size:16px;margin:10px 0 0}.credit a{color:var(--hud)}
 .video{margin:22px 0 0}.video video{width:100%;max-width:760px;display:block;border:2px solid #3d2c23;background:#000}
+.milestones{columns:2;column-gap:28px}.milestones li{margin:0 0 6px}.soon{font-family:var(--f-hud);font-size:17px;color:#0b0807;background:var(--hud);padding:0 6px;margin-right:4px}
+@media (max-width:620px){.milestones{columns:1}}
 </style>
 </head>
 <body>
@@ -656,6 +658,14 @@ h1{font-size:clamp(64px,13vw,150px)!important}
 </tbody></table></div>
 <h3>Measured</h3>
 <ul class="measured" id="measured"></ul>
+</section>
+
+<section class="ch col" id="challenge"><p class="sec-tag">Your turn</p><h2>The challenge</h2>
+<p>Write the switch yourself. A tiny computer, a TinyDoom and a C compiler, all in one kit: make three copies share one machine.</p>
+<ol class="cool milestones">
+<li>Take turns.</li><li>Keep their data apart.</li><li>Keep their patches apart.</li><li>Keep their pointers apart.</li><li>Survive a hostile level.</li><li>Close the ring.</li>
+</ol>
+<p>A checker proves each step, then scores you on cycles and bytes. <span class="soon">In design</span>: read the plan in <a href="https://github.com/Kodoque1/doom_ace/tree/claude/great-hypatia-7l3xi1/sandbox"><code>sandbox/DESIGN.md</code></a>. It will run locally first, then here in the browser.</p>
 </section>
 
 </main>

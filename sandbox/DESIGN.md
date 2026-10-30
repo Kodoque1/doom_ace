@@ -101,7 +101,7 @@ optimisation is open-ended.
 ```
 tools/   vm.c  cc.c  as.c  check.c   (one C compiler builds them)
 game/    tinydoom.c  levels/
-you/     sched.c                     (yours)
+you/     sched.c  kit.h              (sched.c: yours, from a starter)
 make run  ·  make check  ·  make check M=3
 ```
 
@@ -122,10 +122,25 @@ make run  ·  make check  ·  make check M=3
 Preemption and timer interrupts, memory protection, a browser version (later: the same
 `vm.c` compiled to WebAssembly and embedded in the Doomception page), sound.
 
-## Open questions
+## Decisions
 
-- Should a copy's script code be per-copy (as ACE is) or shared? Per-copy is more
-  faithful and makes M3 richer.
-- 64 KiB or more? 64 KiB keeps snapshots small and the puzzle tight, but limits
-  the number of copies.
-- How much the kit gives away: a starter `sched.c` that passes M1, or a blank file.
+- **Map scripts are per copy**, as ACE is per depth. Each copy loads its own script
+  code at its own address, and each script patches the shared hook table with calls
+  into itself. That conflict is M3.
+- **64 KiB, on purpose.** The constraint is part of the puzzle: three copies, their
+  stacks, heaps and framebuffers, saved copies of the shared data, and the scheduler
+  all have to fit.
+- **A starter `sched.c`: concept, not grunt work.** The kit provides the plumbing in
+  `kit.h`:
+  - `copy_start(level)`, which allocates a stack, heap and framebuffer and calls
+    `level_start` on the new stack;
+  - `hook_get` and `hook_set` for the hook table;
+  - `block_copy` and `block_equal`;
+  - `GLOBALS_START` and `GLOBALS_END`;
+  - the list of shared pointers.
+
+  The starter compiles and runs one copy. What is left are four functions with the
+  concepts in them, each a TODO with a one-line hint:
+  - `switch_to()`, the registers and the stack pointer;
+  - `save(copy)` and `load(copy)`, the data and the patches;
+  - `on_frame_end()`, when to switch and to whom.
