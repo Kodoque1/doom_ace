@@ -38,3 +38,11 @@ h3{font-family:var(--f-display);font-size:34px;margin:34px 0 4px;color:var(--fg)
 #fig-ring{width:100%;max-width:760px;height:auto;display:block;margin:0 auto}
 .incode{color:var(--dim);font-size:16px}
 @media (max-width:620px){.anat .a-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.anat .a-svg,#fig-ring{min-width:600px}.a-scroll::after{content:'scroll →';display:block;font-family:var(--f-hud);color:var(--faint);font-size:15px;text-align:right}}
+.m3-legend{position:absolute;left:10px;top:10px;z-index:3;background:rgba(11,8,7,.9);border:1px solid var(--line);padding:6px 10px 8px;font-family:var(--f-hud);font-size:16px;line-height:1.15;color:var(--fg);max-height:calc(100% - 64px);overflow:auto;max-width:min(310px,calc(100% - 20px))}
+.m3-legend[hidden]{display:none}
+.m3-legend b{display:block;color:var(--hud);font-weight:400;margin:0 0 4px}.m3-legend .lg-h{margin:8px 0 4px}
+.m3-legend .lg{display:grid;grid-template-columns:36px 1fr;align-items:center;margin:0 0 3px}
+.m3-legend .lg-x{float:right;font-size:15px!important;padding:1px 7px!important;margin:0 0 0 8px}
+.m3-ctl button[aria-pressed=true]{border-color:var(--hud)}
+.m3-speed{font-family:var(--f-hud);font-size:18px;color:var(--hud);min-width:2.2em;text-align:center;align-self:center;background:rgba(11,8,7,.7);padding:2px 4px}
+.m3-ctl button:disabled,.a-ctl button:disabled{opacity:.4;cursor:default}

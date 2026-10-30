@@ -10,17 +10,20 @@ function E(t,a,p,txt){var e=document.createElementNS(NS,t);for(var k in a)e.setA
 function H(t,cls,p,html){var e=document.createElement(t);if(cls)e.className=cls;if(html!==undefined)e.innerHTML=html;if(p)p.appendChild(e);return e;}
 
 /* --- the board both SVG figures draw on: pictures of the parts, few words --- */
-var CX=[10,220,430],CW=194,CY=232,PTRS=["mainzone","screen_buffer","screens[0]"],PTO=["heap","screen","screen"],SOCK=[[470,66],[470,100],[470,134]];
+var CX=[10,220,430],CW=194,CY=232,PTRS=["screen_buffer","screens[0]","mainzone"],PTO=["screen","screen","heap"],SOCK=[[470,66],[470,100],[470,134]];
 /* each part's rectangle inside a card: code left, data right, the snapshot drawer below */
 var BLK={ace:[10,40,82,56],stack:[102,40,82,56],heap:[10,110,82,56],screen:[102,110,82,56],snap:[10,180,174,54]};
 function bc(i,b){var q=BLK[b];return {x:CX[i]+q[0],y:CY+q[1],w:q[2],h:q[3]};}
 /* routes run in the gaps: the left bus (x 4), the band above the cards, each card's gutters */
 function viaLeft(x0,y0,i,blk,off){var b=bc(i,blk),gx=CX[i]-(off||4),y=b.y+b.h/2;return [[x0,y0],[x0,214],[gx,214],[gx,y],[b.x,y]];}
-function fromCodeTo(i,blk,dy){var b=bc(i,blk),gx=CX[i]-4,y=b.y+b.h/2+(dy||0);return [[10,64],[4,64],[4,218],[gx,218],[gx,y],[b.x,y]];}
+/* patches leave the code on the left and run along the bottom, under every other arrow */
+function fromCodeTo(i,blk,dy){var b=bc(i,blk),gx=CX[i]-4,y=b.y+b.h/2+(dy||0);if(!i)return [[10,64],[4,64],[4,y],[b.x,y]];return [[10,64],[4,64],[4,490],[gx,490],[gx,y],[b.x,y]];}
 function viaRight(x0,y0,i,blk,off){var b=bc(i,blk),gx=CX[i]+CW+(off||4),y=b.y+b.h/2;return [[x0,y0],[x0,210],[gx,210],[gx,y],[b.x+b.w,y]];}
-function ptrRoute(k,p){var sx=SOCK[k][0]+8,sy=SOCK[k][1],bx=622+k*5,hy=196+k*5;
-  if(k===0){var h=bc(p,"heap"),gx=CX[p]-8,y=h.y+h.h/2;return [[sx,sy],[bx,sy],[bx,hy],[gx,hy],[gx,y],[h.x,y]];}
-  var sc=bc(p,"screen"),vx=CX[p]+CW+k*3-2,yy=sc.y+sc.h/2+(k===1?-8:8);return [[sx,sy],[bx,sy],[bx,hy],[vx,hy],[vx,yy],[sc.x+sc.w,yy]];}
+/* the three pointer routes nest and never cross: the upper a socket, the outer its bus and
+   the lower its turn; mainzone, lowest, runs down the card's middle gap into the heap */
+function ptrRoute(k,p){var sx=SOCK[k][0]+8,sy=SOCK[k][1],bx=632-k*5,hy=206-k*5;
+  if(k===2){var h=bc(p,"heap"),mx=CX[p]+97,y=h.y+h.h/2;return [[sx,sy],[bx,sy],[bx,hy],[mx,hy],[mx,y],[h.x+h.w,y]];}
+  var sc=bc(p,"screen"),vx=CX[p]+CW+6-k*4,yy=sc.y+sc.h/2+(k===0?8:-8);return [[sx,sy],[bx,sy],[bx,hy],[vx,hy],[vx,yy],[sc.x+sc.w,yy]];}
 
 /* pictograms */
 function icListing(g,x,y,w,h,col,seed){var n=Math.floor(h/7);for(var i=0;i<n;i++){var ind=((i*7+seed)%5===0)?10:2,len=(w-ind-6)*(0.35+0.6*(((i*37+seed*11)%17)/17));
@@ -98,7 +101,7 @@ function paint(o,st){
   PTRS.forEach(function(n,k){line(o.arrows,ptrRoute(k,st.ptr),DCCSS[st.ptr]);});
   line(o.arrows,fromCodeTo(st.patch,"ace"),DCCSS[st.patch]);
 }
-function newSvg(host,label){var w=H("div","a-scroll",host),s=E("svg",{viewBox:"0 0 640 482",role:"img","aria-label":label,class:"a-svg"});w.appendChild(s);return s;}
+function newSvg(host,label){var w=H("div","a-scroll",host),s=E("svg",{viewBox:"0 0 640 498",role:"img","aria-label":label,class:"a-svg"});w.appendChild(s);return s;}
 
 /* --- figure 1: a depth --- */
 (function(){var host=$("fig-depth");if(!host)return;
@@ -115,8 +118,8 @@ function newSvg(host,label){var w=H("div","a-scroll",host),s=E("svg",{viewBox:"0
   var chipEl=names.map(function(n){return H("li","",chips,n);});
   var svg=newSvg(host,"A switch, stage by stage"),bd=Board(svg),say=H("p","a-say",host),ctl=H("div","a-ctl",host);
   say.setAttribute("aria-live","polite");
-  ctl.innerHTML='<button type="button" data-c="back" aria-label="One stage back">◀</button><button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" data-c="step" aria-label="One stage forward">▶|</button><button type="button" data-c="speed">speed 1×</button>';
-  var o0=0,s=0,t=0,dur=[2.6,3.4,3.4,3.0,3.8,2.2],paused=false,stepping=false,speed=1,SP=[0.5,1,2],toks=[];
+  ctl.innerHTML='<button type="button" data-c="back" aria-label="One stage back">◀</button><button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" data-c="step" aria-label="One stage forward">▶|</button><button type="button" data-c="slower" aria-label="Slower">◀◀ slower</button><span class="m3-speed" aria-live="polite">1×</span><button type="button" data-c="faster" aria-label="Faster">faster ▶▶</button>';
+  var o0=0,s=0,t=0,dur=[2.6,3.4,3.4,3.0,3.8,2.2],paused=false,stepping=false,speed=1,SP=[0.25,0.5,1,2],toks=[];
   function n0(){return (o0+1)%3;}
   /* the picture at the start of each stage (and at its end, which is the next one's start) */
   function stateAt(o,st){var n=(o+1)%3;return st<=1?{cur:o,data:o,patch:o,ptr:o,espIn:o}:st===2?{cur:o,data:o,patch:o,ptr:o,espIn:o}:
@@ -147,10 +150,10 @@ function newSvg(host,label){var w=H("div","a-scroll",host),s=E("svg",{viewBox:"0
   function finish(){paint(bd,s<5?stateAt(o0,s+1):stateAt(n0(),0));clear();}
   function next(){finish();s++;if(s>5){s=0;o0=n0();}start();}
   function back(){paused=true;stepping=false;label();s--;if(s<0){s=5;o0=(o0+2)%3;}start();}
-  function label(){ctl.querySelector('[data-c=pause]').textContent=paused?"▶":"❚❚";ctl.querySelector('[data-c=speed]').textContent="speed "+(speed===0.5?"½":speed)+"×";}
+  function label(){ctl.querySelector('[data-c=pause]').textContent=paused?"▶":"❚❚";ctl.querySelector('.m3-speed').textContent=(speed===0.25?"¼":speed===0.5?"½":speed)+"×";ctl.querySelector('[data-c=slower]').disabled=speed===SP[0];ctl.querySelector('[data-c=faster]').disabled=speed===SP[SP.length-1];}
   ctl.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;var c=b.getAttribute("data-c");
     if(c==="pause"){paused=!paused;stepping=false;}if(c==="step"){paused=false;stepping=true;}
-    if(c==="speed")speed=SP[(SP.indexOf(speed)+1)%SP.length];if(c==="back")back();label();});
+    if(c==="slower")speed=SP[Math.max(0,SP.indexOf(speed)-1)];if(c==="faster")speed=SP[Math.min(SP.length-1,SP.indexOf(speed)+1)];if(c==="back")back();label();});
   var last=0,seen=false;
   if("IntersectionObserver" in window)new IntersectionObserver(function(es){seen=es[0].isIntersecting;},{root:document}).observe(host);else seen=true;
   function frame(now){var dt=Math.min(0.1,(now-(last||now))/1000);last=now;
@@ -180,7 +183,7 @@ function newSvg(host,label){var w=H("div","a-scroll",host),s=E("svg",{viewBox:"0
       else{g.fillStyle="#6f5f50";g.fillRect(ix,iy,5,18);g.fillRect(ix+10,iy,5,18);}}
     /* each wall shows the next depth's buffer; the last one wraps to the first */
     arrow([[BX[1]-2,BY+40],[BX[0]+BW+2,BY+40]],DCCSS[1]);arrow([[BX[2]-2,BY+40],[BX[1]+BW+2,BY+40]],DCCSS[2]);
-    arrow([[BX[0]+40,BY+BH+2],[BX[0]+40,BY+BH+26],[wallX(2)+30,BY+BH+26],[wallX(2)+30,BY+BH+4]],DCCSS[0]);
+    arrow([[BX[0]+BW/2,BY-2],[BX[0]+BW/2,12],[wallX(2)+26,12],[wallX(2)+26,BY-4]],DCCSS[0]);
 
     /* the monitor */
     var vx=BX[view]+BW/2;arrow([[vx,BY+BH+2],[vx,MY-22],[MX+BW/2,MY-22],[MX+BW/2,MY-4]],DCCSS[view]);
@@ -193,7 +196,7 @@ function newSvg(host,label){var w=H("div","a-scroll",host),s=E("svg",{viewBox:"0
     g.beginPath();g.moveTo(kx+86,ky+22);g.lineTo(kx+78,ky+17);g.lineTo(kx+78,ky+27);g.fillStyle="#f1b23c";g.fill();
     g.font="19px VT323, monospace";g.fillText("next",kx+94,ky+28);
     /* a wall: where the arrows land */
-    g.font="16px VT323, monospace";g.fillStyle="#d8c39a";g.fillText("wall ↓",wallX(0)+8,BY-12);}
+    for(var w=0;w<3;w++){var lx=wallX(w)+2,ly=BY+BH*0.43+26;g.fillStyle="rgba(11,8,7,.85)";g.fillRect(lx-2,ly-13,40,17);g.font="15px VT323, monospace";g.fillStyle="#d8c39a";g.fillText("wall",lx+4,ly);}}
   function tick(){f[run]++;drawView(V[run],run,100-(f[run]*3)%88,f[run],false,false,V[(run+1)%3]);if(++inSlice>=4){inSlice=0;run=(run+1)%3;}show();}
   for(var i=0;i<6;i++)tick();
   var ctl=H("div","a-ctl",host);ctl.innerHTML='<button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" class="tp" data-c="y"><b>y</b> · move to the next depth</button>';
