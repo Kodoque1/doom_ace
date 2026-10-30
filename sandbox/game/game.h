@@ -1,9 +1,11 @@
-/* game.h - TinyDoom's interface: everything a level script (and the kit) may use.
+/* game.h - TinyDoom's interface, which is everything a level script or the kit is
+ * allowed to use.
  *
- * TinyDoom is one copy of a tiny raycaster. Its code and its globals sit at fixed
- * addresses; the rest of a copy's memory (its framebuffer, its heap, its level
- * script) comes from the operating system's allocator, and the globals below hold
- * the addresses. Those are the shared pointers.
+ * TinyDoom is a tiny raycaster, and one copy of it is a whole program. Its code and
+ * its globals sit at fixed addresses, exactly as Doom's do, while the rest of a
+ * copy's memory (framebuffer, heap, level script) comes from the operating system's
+ * allocator. The globals below hold those blocks' addresses, which makes them the
+ * pointers every copy shares the location of but needs its own value in.
  */
 #ifndef GAME_H
 #define GAME_H
@@ -54,8 +56,9 @@ int isin(int a);            /* angles: 256 to a turn; result: -255..255 */
 int icos(int a);
 
 /* --- the hook table ---
- * Each hook is a call instruction in the game's code, at a labelled address. The
- * game calls the default; a level script may point it at its own function. */
+ * Each hook is a call instruction in the game's code at a labelled address. As built,
+ * it calls the default function below; a level script changes the instruction to call
+ * one of its own instead, which is the same thing ACE does to Doom, done on purpose. */
 extern char hook_think[];       /* int think(int i): move thing i, once a tic       */
 extern char hook_damage[];      /* int damage(int d): how much a hit really costs   */
 extern char hook_wall_color[];  /* int wall_color(int cell, int side): a colour     */

@@ -1,4 +1,4 @@
-/* Level 1: a plain level. Two imps, no hooks. */
+/* Level 1: a plain level, with two imps and no hooks patched. */
 #include "../script.h"
 
 char level_map[] =

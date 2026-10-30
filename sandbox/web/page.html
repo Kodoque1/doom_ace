@@ -30,12 +30,14 @@ h2{font-family:var(--f-d);font-weight:400;font-size:38px;margin:30px 0 8px}
 .dek{max-width:760px;margin:0 0 6px}
 .note{color:var(--dim);font-size:15px;max-width:820px}
 code,.mono{font-family:var(--f-hud);font-size:1.12em}
-button,select{font-family:var(--f-hud);font-size:19px;color:var(--fg);background:#2f231c;border:1px solid #5a4334;border-bottom-width:3px;border-radius:3px;padding:3px 11px 2px;cursor:pointer;line-height:1.1}
+button,select{max-width:100%;font-family:var(--f-hud);font-size:19px;color:var(--fg);background:#2f231c;border:1px solid #5a4334;border-bottom-width:3px;border-radius:3px;padding:3px 11px 2px;cursor:pointer;line-height:1.1}
 button:disabled{opacity:.45;cursor:default}
 button.go{background:#4a2a12;border-color:var(--hud);color:#fff}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lbl{font-family:var(--f-hud);font-size:19px;color:var(--dim)}
+.pick{display:inline-flex;gap:8px;align-items:center;max-width:100%}.pick select{min-width:0;max-width:100%}
 .cols{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:22px}
-@media (max-width:900px){.cols{grid-template-columns:1fr}}
+@media (max-width:900px){.cols{grid-template-columns:minmax(0,1fr)}}
 .panel{background:var(--panel);border:1px solid var(--line);padding:10px 12px}
 .tabs{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 -1px}
 .tabs button{font-size:17px;border-bottom-width:1px;border-radius:3px 3px 0 0;background:#1a1310}
@@ -59,7 +61,7 @@ pre.out:empty{display:none}
 .bar .stat{font-family:var(--f-hud);font-size:18px;color:var(--dim);margin-left:auto}
 #tl{width:100%;height:46px;display:block;background:#0b0807;border:1px solid var(--line);cursor:pointer}
 .mach{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:12px}
-@media (max-width:900px){.mach{grid-template-columns:1fr}}
+@media (max-width:900px){.mach{grid-template-columns:minmax(0,1fr)}}
 .screens{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .scr{background:#0b0807;border:1px solid var(--line);padding:6px}
 .scr canvas{width:100%;image-rendering:pixelated;display:block;background:#000}
@@ -95,7 +97,7 @@ footer{color:var(--faint);font-size:15px;padding:40px 0 60px}
 <div class="row" style="margin-top:10px">
 <button class="go" id="bCheck">Check the milestones</button>
 <button id="bRun">Run it in the machine</button>
-<select id="scen" aria-label="Which copies to run"></select>
+<span class="pick"><label class="lbl" for="scen">with</label><select id="scen" aria-label="What the machine runs"></select></span>
 <button id="bStarter" title="Put the starter back">Starter</button>
 <button id="bSave" title="Download sched.c">Download</button>
 </div>
@@ -109,6 +111,7 @@ footer{color:var(--faint);font-size:15px;padding:40px 0 60px}
 </div>
 
 <h2>The machine</h2>
+<p class="dek">“Run it in the machine” boots whatever the menu next to it says: one of the runs the checker makes for the milestones, with copies of two or three levels under your scheduler, or a single level alone with no scheduler at all, which is the reference the checker compares copies against. You can stop anywhere, step one instruction at a time in either direction, or jump to the next frame or the next switch, and since the screens are read straight out of the machine's memory, pausing in the middle of a frame shows it half drawn.</p>
 <div class="bar">
 <button id="mBack" aria-label="One instruction back">◀</button>
 <button id="mPlay" aria-label="Run">▶</button>
@@ -133,7 +136,7 @@ footer{color:var(--faint);font-size:15px;padding:40px 0 60px}
 <pre class="out" id="con" aria-label="The machine's console"></pre>
 </div>
 </div>
-<footer>The machine, the compiler, TinyDoom and the checker are in <a href="https://github.com/Kodoque1/doom_ace/tree/HEAD/sandbox">sandbox/</a>. Doomception builds on kgsws' <a href="https://github.com/kgsws/doom_ace">ACE Engine</a>.</footer>
+<footer>The machine, the compiler, TinyDoom and the checker are in <a href="https://github.com/Kodoque1/doom_ace/tree/HEAD/sandbox">sandbox/</a>, and Doomception itself is built on kgsws' <a href="https://github.com/kgsws/doom_ace">ACE Engine</a>.</footer>
 </div>
 <div id="tip"></div>
 <script src="kit.js"></script>
@@ -144,10 +147,16 @@ var $=function(id){return document.getElementById(id);};
 var COL=["#f1b23c","#e0553c","#7fd23e","#6c9cf0"],COPYNAME=["boot copy (level 0)","copy 1","copy 2","copy 3"];
 var PAL=[[0,0,0],[40,28,20],[90,60,40],[140,100,70],[224,85,60],[127,210,62],[108,156,240],[241,178,60],[234,220,203],[255,255,255],[60,40,30],[30,60,20],[25,35,70],[120,30,20],[200,200,200],[255,210,122]];
 var OPS=["halt","ldi","lui","mov","add","sub","mul","div","mod","and","or","xor","shl","shr","seq","sne","slt","sle","addi","ldw","ldb","stw","stb","jmp","bz","bnz","call","callr","ret","push","pop","sys","jmpr"];
-var SCEN=[{n:"Levels 1 and 2 (M1 M2 M4)",a:[0,2,0,1,2]},{n:"Levels 3 and 4: patches (M3 M4)",a:[0,2,0,3,4]},{n:"Levels 1 and 5: hostile (M5)",a:[0,2,0,1,5]},{n:"Levels 6, 7, 8: the ring (M6)",a:[0,3,1,6,7,8]}];
-for(var l=1;l<=8;l++)SCEN.push({n:"Level "+l+" alone",a:[l]});
-var MS=[["Take turns","Two copies both draw 100 frames."],["Separate data","Their globals match their solo runs."],["Separate patches","With levels that patch hooks, the hooks match too."],
-  ["Separate pointers","Their heaps and screens match."],["Survive","A hostile level, and M1 to M4 still hold."],["The ring","Three copies: each screen-wall shows the next copy's screen."]];
+/* the runs the checker makes, and each level alone with no scheduler: the references */
+var SCEN=[{n:"copies of levels 1 and 2 (the M1, M2, M4 run)",a:[0,2,0,1,2]},{n:"copies of levels 3 and 4, which patch hooks (M3, M4)",a:[0,2,0,3,4]},
+  {n:"copies of level 1 and hostile level 5 (M5)",a:[0,2,0,1,5]},{n:"copies of levels 6, 7, 8 in a ring (M6)",a:[0,3,1,6,7,8]}];
+for(var l=1;l<=8;l++)SCEN.push({n:"level "+l+" alone, no scheduler (a reference)",a:[l]});
+var MS=[["Take turns","Two copies each draw 100 frames, which means the switch works and every copy gets the machine back."],
+  ["Separate data","Each copy's globals match its solo run at every frame, so no copy ever sees another's data."],
+  ["Separate patches","With two levels that patch the same hooks in different ways, each copy's hooks match its solo run too."],
+  ["Separate pointers","Each copy's heap and screen match its solo run, so its pointers lead to its own memory."],
+  ["Survive","M1 to M4 still hold next to a hostile level that rewrites every hook, its globals and its free stack every frame."],
+  ["The ring","With three copies, each one's screen-wall shows the next copy's screen, and the last one's shows the first."]];
 var store={get:function(k){try{return localStorage.getItem(k);}catch(e){return null;}},set:function(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
 
 /* ---------- loading ---------- */
@@ -156,7 +165,7 @@ function bytesOf(b64){var s=atob(b64),u=new Uint8Array(s.length);for(var i=0;i<s
 Promise.all([fetch("disk.json").then(function(r){return r.json();})].concat(["cc","as","check","sim"].map(function(n){
     return fetch(n+".wasm").then(function(r){return r.arrayBuffer();}).then(function(b){MOD[n+"Bytes"]=b;return WebAssembly.compile(b);}).then(function(m){MOD[n]=m;});})))
   .then(function(r){var pack=r[0];disk=new Kit.Disk();Object.keys(pack).forEach(function(k){disk.put(k,pack[k].t!==undefined?pack[k].t:bytesOf(pack[k].b));});
-    STARTER=disk.text("you/sched.c");initEditor();initMilestones();ready=true;$("cstat").textContent="Ready: check the starter, or start writing.";})
+    STARTER=disk.text("you/sched.c");initEditor();initMilestones();ready=true;$("cstat").textContent="Ready. The starter compiles, but it reaches no milestone until you fill it in.";})
   .catch(function(e){$("cstat").textContent="Could not load the kit: "+e;});
 
 /* ---------- the editor ---------- */
@@ -200,8 +209,8 @@ function runCheck(){var files={};["build/disk/game.o","build/game.sym","build/di
 function runCheckHere(files){var d=new Kit.Disk();Object.keys(files).forEach(function(k){d.put(k,files[k]);});return Kit.run(MOD.check,d,["check","-d","build/disk","-s","build/game.sym"]);}
 var lastCheck=null;
 $("bCheck").onclick=function(){if(!ready)return;$("bCheck").disabled=true;$("cstat").textContent="Building…";
-  build().then(function(ok){if(!ok){$("cstat").textContent="It does not build: see the message under the editor.";return;}
-    $("cstat").textContent="Checking: every level alone, then your scheduler, frame by frame…";
+  build().then(function(ok){if(!ok){$("cstat").textContent="It does not build; the compiler's message is under the editor.";return;}
+    $("cstat").textContent="Checking: every level alone first, then your scheduler, frame by frame…";
     return runCheck().then(function(r){parseCheck(r.out+(r.code>1?r.err:""));});}).finally(function(){$("bCheck").disabled=false;});};
 function initMilestones(){var ol=$("ms");ol.innerHTML="";MS.forEach(function(m,i){var li=document.createElement("li");li.className="unk";li.id="m"+(i+1);
   li.innerHTML='<span class="k">M'+(i+1)+'</span><span class="t"><b>'+m[0]+'.</b> '+m[1]+'<span class="why"></span></span><span class="v">·</span>';ol.appendChild(li);});}

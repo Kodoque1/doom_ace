@@ -1,6 +1,7 @@
 /* kit.js - runs the kit's own C programs, compiled to WebAssembly by web/build.sh, on
- * an in-memory disk. The same cc, as and check as `make check`, so the page gives the
- * same verdicts. Works in a browser, a worker and Node. */
+ * an in-memory disk. They are the same cc, as and check that `make check` uses, which
+ * is why the page's verdicts match the local kit's. It works in a browser, in a
+ * worker and in Node. */
 var Kit = (function () {
   var enc = new TextEncoder(), dec = new TextDecoder();
 

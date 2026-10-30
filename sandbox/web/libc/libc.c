@@ -1,5 +1,7 @@
-/* libc.c - the browser build's C library: memory, strings, formatted I/O, and files
- * kept by JavaScript. Enough for cc, as, check and the machine; nothing more. */
+/* libc.c - the C library for the browser build: memory, strings, formatted I/O, and
+ * files that JavaScript keeps. It implements exactly what cc, as, check and the machine
+ * call and nothing else, which is small enough that there was no reason to depend on a
+ * full WebAssembly C library. */
 #include <stdarg.h>
 #include <stdint.h>
 #include "stdio.h"

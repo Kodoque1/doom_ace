@@ -1,12 +1,14 @@
 # The Doomception sandbox
 
-Several copies of a tiny Doom, one 64 KiB machine, no operating system to help.
-Write the scheduler that makes them share it.
+Several copies of a tiny Doom-like game have to share one 64 KiB machine that has no
+operating system, and the exercise is to write the scheduler that makes it work.
 
-It is [Doomception](https://kodoque1.github.io/doom_ace/) at a size you can hold in
-your head: the same problems (data, patches, pointers, a hostile level, the ring)
-on a made-up computer where everything, from the instruction set to the C
-compiler, fits in this folder.
+This is [Doomception](https://kodoque1.github.io/doom_ace/) cut down to a size you can
+hold in your head. The problems are the same ones, shared data, code patches,
+pointers, a level that misbehaves, and the ring of screens, but they happen on a
+made-up computer whose instruction set, C compiler, game and checker all fit in this
+folder and build with nothing but a C compiler. The same kit also runs [in the
+browser](https://kodoque1.github.io/doom_ace/challenge/).
 
 ## Start
 
@@ -19,26 +21,29 @@ make watch        # two copies taking turns, as text
 make play L=5     # level 5 alone; its last frame is build/level5.ppm
 ```
 
-Your file is [`you/sched.c`](you/sched.c): four functions, each a `TODO` with a
-hint. Everything else is given, and the checker builds it fresh, so change only
-your file.
+Your file is [`you/sched.c`](you/sched.c), which has four functions to write, each a
+`TODO` with a hint. Everything else is provided, and the checker rebuilds it from
+scratch on every run, so changes anywhere but your file have no effect.
 
 ## What you are working with
 
-- **The machine** ([`MACHINE.md`](MACHINE.md)): 64 KiB of memory, eight registers,
-  33 instructions, no protection, no interrupts. Every instruction costs cycles.
-- **The game** ([`game/game.h`](game/game.h)): TinyDoom's code and globals sit at
-  fixed addresses. Each copy has its own framebuffer, heap and level script; the
-  globals point at them. Level scripts patch the game's code through a hook table.
-- **The kit** ([`kit/kit.h`](kit/kit.h)): starting a copy, the hook table, where the
-  globals are, copying memory. Your scheduler is level 0's script, so it runs only
-  when the game calls one of its hooks.
+- **The machine** ([`MACHINE.md`](MACHINE.md)) has 64 KiB of memory, eight registers
+  and 33 instructions, with no memory protection and no interrupts, so any code can
+  write anywhere and nothing takes control away from a running program. Every
+  instruction costs a fixed number of cycles, which is what the scores count.
+- **The game** ([`game/game.h`](game/game.h)) keeps its code and globals at fixed
+  addresses, while each copy's framebuffer, heap and level script are allocated for
+  it, with globals pointing at them. Level scripts change the game's behaviour by
+  patching call instructions in its code, through a hook table.
+- **The kit** ([`kit/kit.h`](kit/kit.h)) starts copies, knows where the globals and
+  the hooks are, and copies memory. Your scheduler is level 0's script, so after boot
+  it only ever runs when the game calls one of its hooks.
 
 ## Milestones
 
-The checker first runs every level alone, then runs copies under your scheduler.
-Each copy's globals, hooks, heap and framebuffer must match its solo run at every
-frame.
+The checker first runs every level alone, then runs copies of them under your
+scheduler, and each copy's globals, hooks, heap and framebuffer have to match its
+solo run at every frame.
 
 | # | Milestone | The copies | Passes when |
 |---|---|---|---|
@@ -49,14 +54,16 @@ frame.
 | M5 | Survive | level 1 and level 5, which is hostile | M1–M4 hold |
 | M6 | The ring | levels 6, 7 and 8 | each copy's screen-wall shows the next copy's screen |
 
-Then three scores: cycles your scheduler runs per switch, bytes it writes per
-switch, and memory it uses. The reference solution copies everything on every
-switch: 2,239 cycles and 1,017 bytes. You can do better.
+A scheduler that passes is then scored on the cycles it runs per switch, the bytes
+it writes per switch, and the memory it uses. The reference solution copies every
+global and every hook on every switch, which costs 2,228 cycles and 1,005 bytes, and
+there is a lot of room below that.
 
 ## Spoilers
 
-[`spoilers/`](spoilers/) holds a reference solution, and broken ones the checker's
-self-test uses (`make selftest`). Look after you solve it.
+[`spoilers/`](spoilers/) holds the reference solution, along with the deliberately
+broken ones that the checker's self-test (`make selftest`) uses to prove each
+milestone catches what it should. It is worth solving the puzzle before reading them.
 
 ## How it maps to Doomception
 

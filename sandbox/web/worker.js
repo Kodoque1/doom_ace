@@ -1,4 +1,5 @@
-/* worker.js - runs the checker off the page's main thread, so the page stays live. */
+/* worker.js - runs the checker off the page's main thread, because a full check takes
+ * a few seconds and the page should stay responsive meanwhile. */
 importScripts("kit.js");
 var mod = null;
 onmessage = function (e) {

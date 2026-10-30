@@ -1,4 +1,4 @@
-/* kit.c - the plumbing behind kit.h. */
+/* kit.c - the implementation of kit.h. */
 #include "kit.h"
 
 struct Copy copies[MAX_COPIES + 1];
@@ -122,8 +122,9 @@ struct Copy *copy_start(int level)
 	c->screen = kit_alloc(FB_SIZE);
 	c->heap = kit_alloc(HEAP_SIZE);
 	c->started = 0;
-	/* a suspended frame of switch_to(): sp -> [fp], and that fp's frame returns into
-	   copy_entry(c) */
+	/* Build what a copy suspended in switch_to() would leave on its stack: sp points
+	   at a saved fp, and the frame that fp names returns into copy_entry(c). Resuming
+	   this exactly like an old copy is what starts the new one. */
 	int *top = (int *)(c->stack + STACK_SIZE);
 	top[-1] = (int)c;              /* copy_entry's argument      */
 	top[-2] = 0;                   /* copy_entry's return: never */

@@ -1,8 +1,9 @@
-/* Level 5: hostile. Its script writes everywhere a level script may write, every
- * tic: every hook (it chains the frame_end hook to whatever was there, and changes
- * its wall colours there, at the end of a frame), the automap and the random seed in
- * the game's globals, and the free stack below its own stack pointer.
- * Deterministic, so its solo run is still a reference. */
+/* Level 5: hostile. Every tic its script writes everywhere a level script is allowed
+ * to: every hook, the automap and the random seed in the game's globals, and the free
+ * stack below its own stack pointer. It chains the frame_end hook to whatever was
+ * there before, and changes its wall colours from inside that chain, after the frame
+ * is drawn, so a scheduler that saves patches only once misses the change. All of it
+ * is deterministic, so the level's solo run is still a valid reference. */
 #include "../script.h"
 
 char level_map[] =

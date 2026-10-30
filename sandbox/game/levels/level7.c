@@ -1,5 +1,5 @@
-/* Level 7: the second ring level. The east wall is all screen-wall: in the ring it
- * shows the next copy's frame. */
+/* Level 7: the second ring level. Its whole east wall is screen-wall, which in the ring
+ * shows the next copy's latest frame. */
 #include "../script.h"
 
 char level_map[] =
