@@ -105,7 +105,33 @@ you/     sched.c  kit.h              (sched.c: yours, from a starter)
 make run  ·  make check  ·  make check M=3
 ```
 
-## 8. How it maps to the real project
+## 8. The browser page: the same kit, with step controls
+
+`docs/challenge/` on the article's site runs the same C code compiled to WebAssembly,
+so it gives the same verdicts as `make check`. It keeps the step-control system of the
+first article's 3D machine (`nested/docs/doomception-src`, and the old page's
+`ov.js`), applied to the real machine instead of a re-enactment.
+
+- **Controls:**
+  - `◀` one instruction back;
+  - `❚❚` pause and run;
+  - `▶|` one instruction forward;
+  - **one frame**: run until the current copy's next frame boundary;
+  - **speed**: ½×, 1×, 2× and as fast as possible.
+- **Timeline:** a strip of events, coloured by copy (frames, switches, hook calls, the
+  first divergence the checker found). Click an event to rewind to it.
+- **Rewind:**
+  - The machine is deterministic, so rewinding is exact: restore the nearest
+    checkpoint, a full 64 KiB plus registers taken every few thousand cycles, then
+    replay to the chosen instruction.
+  - The old page's per-step checkpoint and instant replay, made exact.
+- **Views:**
+  - each copy's framebuffer;
+  - the memory map, coloured by owner, the last write flashing;
+  - the registers, `pc` with the source line from `sched.c`;
+  - the checker's milestones.
+
+## 9. How it maps to the real project
 
 | Sandbox | Real project |
 |---|---|
