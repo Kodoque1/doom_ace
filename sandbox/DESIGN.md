@@ -12,15 +12,16 @@ judgement.
 
 ## 1. The machine: D32
 
-- **Registers:** `r0`–`r7` (32-bit), `sp`, `pc`, and one flags register. No privileged
-  mode, no memory protection, no interrupts. Switching is cooperative, as in the real
-  project.
+- **Registers:** `r0`–`r7` (32-bit; `r7` is `sp`, `r6` is `fp`) and `pc`. No flags,
+  no privileged mode, no memory protection, no interrupts. Switching is cooperative,
+  as in the real project.
 - **Memory:** 64 KiB, flat and byte-addressed. Everything shares it: code, data,
   stacks, the scheduler, every copy of the game.
-- **Instructions:** fixed 32-bit encoding, about 25 of them.
-  - load and store (byte and word, `[reg+imm]`), `ldi`, `mov`;
-  - `add sub mul div mod and or xor shl shr`, `cmp`, conditional branches, `jmp`;
-  - `call ret push pop`, `sys n` (OS call), `halt`.
+- **Instructions:** fixed 32-bit encoding, 33 of them.
+  - load and store (byte and word, `[reg+imm]`), `ldi`, `lui`, `mov`;
+  - `add sub mul div mod and or xor shl shr addi`;
+  - `seq sne slt sle` (compare into a register), `bz bnz jmp jmpr`;
+  - `call callr ret push pop`, `sys n` (OS call), `halt`.
 
   The spec fits on one page, in `MACHINE.md`.
 - **Cycle counting:** every instruction costs a fixed number of cycles. That is what
