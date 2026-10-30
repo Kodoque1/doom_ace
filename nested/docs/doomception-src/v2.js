@@ -88,7 +88,14 @@ function Model(rootId,build){after3d(function(){
 
   /* moving things: right-angled routes, one glyph per event */
   function route(a,b,yc){var p=[a,V(a.x,yc,a.z),V(b.x,yc,a.z),V(b.x,yc,b.z),b],c=new T.CurvePath();for(var j=0;j<4;j++)if(p[j].distanceTo(p[j+1])>1e-3)c.add(new T.LineCurve3(p[j],p[j+1]));if(!c.curves.length)c.add(new T.LineCurve3(a,V(b.x,b.y+0.01,b.z)));return c;}
-  var toks=[];
+  var toks=[],EV=[],clock=0,paused=false,speed=1,stepUnits=-1,H=[];
+  function after(ms,fn){if(RM){fn();return;}EV.push({t:clock+ms/1000,fn:fn});}
+  /* controls: back one step, pause, one step, speed (each frame and each switch step is one step) */
+  var ctl=document.createElement("div");ctl.className="m3-ctl";ctl.innerHTML='<button type="button" data-c="back" aria-label="One step back">◀</button><button type="button" data-c="pause" aria-label="Pause">❚❚</button><button type="button" data-c="step" aria-label="One step forward">▶|</button><button type="button" data-c="speed">speed 1×</button>';stage.appendChild(ctl);
+  ["pointerdown","pointermove"].forEach(function(ev){ctl.addEventListener(ev,function(e){e.stopPropagation();});});
+  var SPEEDS=[0.5,1,2];function ctlLabel(){ctl.querySelector('[data-c=pause]').textContent=paused?"▶":"❚❚";ctl.querySelector('[data-c=speed]').textContent="speed "+(speed===0.5?"½":speed)+"×";}
+  ctl.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;e.stopPropagation();var c=b.getAttribute("data-c");
+    if(c==="pause"){paused=!paused;stepUnits=-1;}if(c==="step"){stepUnits=1;paused=false;}if(c==="speed")speed=SPEEDS[(SPEEDS.indexOf(speed)+1)%SPEEDS.length];if(c==="back")back();ctlLabel();});
   function send(c,a,b,yc,dur,size,txt){if(RM)return;var s=size||0.22,m=new T.Mesh(new T.BoxGeometry(s,s,s),k.mat(c,0.6));if(txt){var l=k.label(txt,0,0,0,"#ffffff",0.38);l.userData.pri=8;k.scene.remove(l);m.add(l);l.position.set(0,0.35,0);}
     var path=route(a,b,yc===undefined?1.6:yc);m.position.copy(a);k.scene.add(m);toks.push({m:m,p:path,t:0,d:dur||0.6});}
   function P(o,y){return V(o.position.x,y===undefined?0.25:y,o.position.z);}
@@ -115,27 +122,33 @@ function Model(rootId,build){after3d(function(){
   /* one frame of the running depth: fetch code, read and write data, draw its picture */
   function frame(){var d=S.cur;S.frames[d]++;
     send(0xffffff,P(code),V(-0.5,CY,-0.4),2.2,0.45,0.18);
-    setTimeout(function(){send(0xd8c39a,P(data),V(0.5,CY,-0.4),2.4,0.4,0.2);},RM?0:300);
-    setTimeout(function(){var tg=S.n>1?S.ptrOwner:d;send(DCHEX[d],V(0,CY,-0.4),P(R[tg].pic,0.9),2.6,0.45,0.2);},RM?0:620);
+    after(300,function(){send(0xd8c39a,P(data),V(0.5,CY,-0.4),2.4,0.4,0.2);});
+    after(620,function(){var tg=S.n>1?S.ptrOwner:d;send(DCHEX[d],V(0,CY,-0.4),P(R[tg].pic,0.9),2.6,0.45,0.2);});
     if(S.sim){S.hp[d]=S.hp[S.dataOwner];}S.hp[d]=S.hp[d]-3<12?100:S.hp[d]-3;S.own[d]=S.hp[d];S.dataOwner=d;
-    var wl=S.loop&&S.n>1;if(wl){var nx=ringNext(d,S.n);setTimeout(function(){send(DCHEX[nx],P(R[nx].pic,1.25),V(0.6,CY,-0.4),2.6,0.3,0.24,"d"+nx+"'s frame");},RM?0:400);setTimeout(function(){send(DCHEX[nx],V(0.6,CY,-0.4),P(R[S.ptrOwner].pic,1.25),2.6,0.3,0.24);},RM?0:700);}
-    setTimeout(function(){draw(d);flash(S.n>1?S.ptrOwner:d);},RM?0:1000);warn();vis();
+    var wl=S.loop&&S.n>1;if(wl){var nx=ringNext(d,S.n);after(400,function(){send(DCHEX[nx],P(R[nx].pic,1.25),V(0.6,CY,-0.4),2.6,0.3,0.24,"d"+nx+"'s frame");});after(700,function(){send(DCHEX[nx],V(0.6,CY,-0.4),P(R[S.ptrOwner].pic,1.25),2.6,0.3,0.24);});}
+    after(1000,function(){draw(d);flash(S.n>1?S.ptrOwner:d);});warn();vis();
     say("depth "+d+" runs · frame "+(S.f+1)+(S.turns&&S.n>1?" of 4":""));}
   /* the switch: save and load the data and the patches, re-point the pointers, hand over the CPU */
   var BEATS=[
-    function(o,n){say("switch: depth "+o+"'s copy of Doom's data → its own memory, depth "+n+"'s back");send(DCHEX[o],P(data),P(R[o].saved),1.4,0.6,0.32);setTimeout(function(){send(DCHEX[n],P(R[n].saved),P(data),1.4,0.6,0.32);},RM?0:500);},
-    function(o,n){say("switch: depth "+o+"'s code patches out, depth "+n+"'s in");send(DCHEX[o],P(tiles[2]),P(R[o].saved),1.8,0.55,0.18);setTimeout(function(){send(DCHEX[n],P(R[n].saved),P(tiles[2]),1.8,0.55,0.18);},RM?0:450);},
+    function(o,n){say("switch: depth "+o+"'s copy of Doom's data → its own memory, depth "+n+"'s back");send(DCHEX[o],P(data),P(R[o].saved),1.4,0.6,0.32);after(500,function(){send(DCHEX[n],P(R[n].saved),P(data),1.4,0.6,0.32);});},
+    function(o,n){say("switch: depth "+o+"'s code patches out, depth "+n+"'s in");send(DCHEX[o],P(tiles[2]),P(R[o].saved),1.8,0.55,0.18);after(450,function(){send(DCHEX[n],P(R[n].saved),P(tiles[2]),1.8,0.55,0.18);});},
     function(o,n){say("switch: Doom's heap and screen pointers → depth "+n+"'s memory");},
     function(o,n){say("switch: depth "+o+"'s registers → its own stack, its stack pointer → the switch's state; depth "+n+"'s come back");
-      send(DCHEX[o],V(0,CY,-0.4),P(R[o].stack,0.4),2.9,0.55,0.26);setTimeout(function(){send(DCHEX[o],V(-1,CY,-0.4),P(sw),3.2,0.5,0.18);},RM?0:350);
-      setTimeout(function(){send(DCHEX[n],P(sw),V(-1,CY,-0.4),3.2,0.5,0.18);send(DCHEX[n],P(R[n].stack,0.4),V(0,CY,-0.4),2.9,0.55,0.26);},RM?0:800);}];
+      send(DCHEX[o],V(0,CY,-0.4),P(R[o].stack,0.4),2.9,0.55,0.26);after(350,function(){send(DCHEX[o],V(-1,CY,-0.4),P(sw),3.2,0.5,0.18);});
+      after(800,function(){send(DCHEX[n],P(sw),V(-1,CY,-0.4),3.2,0.5,0.18);send(DCHEX[n],P(R[n].stack,0.4),V(0,CY,-0.4),2.9,0.55,0.26);});}];
   function beatEnd(b,o,n){if(b===0){S.dataOwner=n;S.hp[n]=S.own[n];}if(b===1)S.patchOwner=n;if(b===2)S.ptrOwner=n;if(b===3){S.cur=n;}vis();}
-  var FR=0.95,BT=1.05;
-  k.frames.push(function(dt){
+  var FR=1.4,BT=1.5;
+  function snapState(){H.push({S:JSON.stringify(S),st:status.textContent,cv:R.map(function(o){return o.cv.getContext("2d").getImageData(0,0,o.cv.width,o.cv.height);})});if(H.length>40)H.shift();}
+  /* before a step starts: pause here if stepping, otherwise remember the state so Back can return to it */
+  function gate(){if(stepUnits===0){paused=true;stepUnits=-1;ctlLabel();return true;}if(stepUnits>0)stepUnits--;snapState();return false;}
+  function back(){var h=H.pop();if(!h)return;paused=true;stepUnits=-1;toks.forEach(function(o){k.scene.remove(o.m);});toks=[];EV=[];
+    S=JSON.parse(h.S);R.forEach(function(o,d){o.cv.getContext("2d").putImageData(h.cv[d],0,0);o.tex.needsUpdate=true;});vis();warn();say("◀ back: "+h.st);}
+  k.frames.push(function(dt){if(paused)return;dt*=speed;clock+=dt;
+    EV=EV.filter(function(e){if(e.t<=clock){e.fn();return false;}return true;});
     toks=toks.filter(function(o){o.t+=dt/o.d;var p=Math.min(1,o.t),e=p<0.5?2*p*p:1-2*(1-p)*(1-p);o.m.position.copy(o.p.getPointAt(e));if(p>=1){k.scene.remove(o.m);return false;}return true;});
     S.t+=dt;
-    if(S.phase==="run"){if(S.t>=FR){S.t=0;frame();S.f++;if(S.turns&&S.n>1&&S.f>=4){S.f=0;S.next=(S.cur+1)%S.n;S.phase="switch";S.beat=S.swap?0:3;BEATS[S.beat](S.cur,S.next);}}}
-    else if(S.t>=BT){S.t=0;var o=S.cur,n=S.next;beatEnd(S.beat,o,n);
+    if(S.phase==="run"){if(S.t>=FR){if(gate())return;S.t=0;frame();S.f++;if(S.turns&&S.n>1&&S.f>=4){S.f=0;S.next=(S.cur+1)%S.n;S.phase="switch";S.beat=S.swap?0:3;BEATS[S.beat](S.cur,S.next);}}}
+    else if(S.t>=BT){if(gate())return;S.t=0;var o=S.cur,n=S.next;beatEnd(S.beat,o,n);
       if(S.beat>=3||!S.swap&&S.beat>=3){S.phase="run";}else{S.beat++;if(!S.swap)S.beat=3;BEATS[S.beat](o,n);}}});
   /* what each step changes */
   function drawAll(){for(var q=0;q<S.n;q++){var o=R[q];drawView(o.cv,q,S.hp[q],S.frames[q],false,false,S.loop&&S.n>1?R[ringNext(q,S.n)].cv:null);o.tex.needsUpdate=true;}}
@@ -144,7 +157,7 @@ function Model(rootId,build){after3d(function(){
     if(o.show)S.show=o.show;drawAll();vis();warn();};
   M.look=function(x,y,z,r){k.focus(x,y,z,r);};
   M.home=function(){k.focus(-1.2,0.8,0.3,14.5);};
-  M.reset=function(){toks.forEach(function(o){k.scene.remove(o.m);});toks=[];fresh();R.forEach(function(o,d){o.col.scale.y=0.3;drawView(o.cv,d,S.hp[d],0);o.tex.needsUpdate=true;});vis();warn();say("");M.home();};
+  M.reset=function(){toks.forEach(function(o){k.scene.remove(o.m);});toks=[];EV=[];H=[];fresh();R.forEach(function(o,d){o.col.scale.y=0.3;drawView(o.cv,d,S.hp[d],0);o.tex.needsUpdate=true;});vis();warn();say("");M.home();};
   M.reset();
   build(M,root);
 });}
