@@ -57,11 +57,11 @@ makes the nesting visible inside the nested view as well as around it.
 | tree | branch | remote |
 |---|---|---|
 | `doom_ace/` | `inset-wip` | github.com/Kodoque1/doom_ace (PRIVATE) — HEAD `649dfa6`, pushed |
-| `nested/` | `master` | github.com/Kodoque1/nested (PRIVATE) — HEAD `c68cfbe`, pushed |
+| `doom_ace/nested/` | (same repository) | merged in from github.com/Kodoque1/nested, history kept |
 
-`doom_ace/engine/makefile` has `MTX_DIR ?= ../../nested`, so **clone both side by
-side** (`X/doom_ace`, `X/nested`) or build with
-`make -C doom_ace/engine MTX_DIR=/path/to/nested`.
+The host now lives in this repository under `nested/`, and `engine/makefile` has
+`MTX_DIR ?= ../nested`, so one clone builds everything. An out-of-tree host still
+works with `make -C doom_ace/engine MTX_DIR=/path/to/nested`.
 
 ```
 make -C doom_ace/engine
@@ -71,7 +71,7 @@ python3 verify/mkwadlevels.py    # regenerates level*.wad
 
 The harness scripts that produced these numbers are committed under
 `verify/` (the 39 probes plus `NEXT.md`, 954 lines). They assume the working tree
-is `$HOME/Documents/recursive_doom` with `doom_ace/` and `nested/` side by side;
+is `$HOME/Documents/recursive_doom/doom_ace` (the host is `doom_ace/nested/`);
 `record.sh` hardcodes that in `ROOT`.
 
 **Build trap (cost hours once):** `make -C engine` alone leaves `loader/loader.wad`
