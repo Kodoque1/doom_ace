@@ -83,8 +83,8 @@ footer{color:var(--faint);font-size:15px;padding:40px 0 60px}
 <header>
 <p class="eyebrow">Doomception · your turn</p>
 <h1>The challenge</h1>
-<p class="dek">Several copies of a tiny Doom share one 64&nbsp;KiB machine, with no operating system to help. Write the scheduler that keeps them from trampling each other.</p>
-<p class="note">Everything below is the kit's own C, compiled to WebAssembly: the same compiler, assembler, machine and checker as <code>make check</code>, so the verdicts are the same. Background: <a href="../">the Doomception article</a>. Rules and the local kit: <a href="https://github.com/Kodoque1/doom_ace/tree/HEAD/sandbox">sandbox/README.md</a>.</p>
+<p class="dek">Several copies of a tiny Doom-like game have to share one 64&nbsp;KiB machine with no operating system, and your scheduler is what keeps them from trampling each other.</p>
+<p class="note">The compiler, assembler, machine and checker on this page are the kit's own C compiled to WebAssembly, so a verdict here is the same as <code>make check</code> on your own machine. <a href="../">The Doomception article</a> explains the real system this is modelled on, and <a href="https://github.com/Kodoque1/doom_ace/tree/HEAD/sandbox">sandbox/README.md</a> has the rules and the local kit.</p>
 </header>
 
 <div class="cols">
@@ -104,7 +104,7 @@ footer{color:var(--faint);font-size:15px;padding:40px 0 60px}
 <section>
 <h2>Milestones</h2>
 <div class="panel"><div class="status" id="cstat">Not checked yet.</div><ol class="ms" id="ms"></ol><div class="score" id="score"></div></div>
-<p class="note">The checker runs each level alone, then runs copies under your scheduler, and compares each copy's globals, hooks, heap and screen with its solo run, frame by frame. Four functions are yours: <code>switch_to</code>, <code>save</code>, <code>load</code>, <code>on_frame_end</code>.</p>
+<p class="note">The checker first runs each level alone, then runs copies of them under your scheduler and compares every copy's globals, hooks, heap and screen with its solo run, frame by frame. The four functions in <code>sched.c</code> are yours, <code>switch_to</code>, <code>save</code>, <code>load</code> and <code>on_frame_end</code>, and the rest of the kit is plumbing.</p>
 </section>
 </div>
 

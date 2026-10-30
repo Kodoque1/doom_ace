@@ -132,12 +132,12 @@ function newSvg(host,label){var w=H("div","a-scroll",host),s=E("svg",{viewBox:"0
   function stateAt(o,st){var n=(o+1)%3;return st<=1?{cur:o,data:o,patch:o,ptr:o,espIn:o}:st===2?{cur:o,data:o,patch:o,ptr:o,espIn:o}:
     st===3?{cur:o,data:n,patch:n,ptr:o,espIn:o}:st===4?{cur:o,data:n,patch:n,ptr:n,espIn:o}:{cur:n,data:n,patch:n,ptr:n,espIn:n};}
   function text(o,st){var n=(o+1)%3;return [
-    "Depth "+o+" has drawn 4 frames: the host's counter calls a switch.",
-    "<b>Save.</b> Depth "+o+"'s changed data, and its patch bytes, go into its snapshot.",
-    "<b>Load.</b> Depth "+n+"'s data and patch bytes come back out of its snapshot.",
-    "<b>Pin.</b> The host points the three pointers at depth "+n+"'s heap and screen.",
-    "<b>Stack.</b> Depth "+o+"'s registers go on its stack, its ESP into the safe. Depth "+n+"'s come back.",
-    "Depth "+n+" runs."][st];}
+    "Depth "+o+" has finished its fourth frame, so at the frame boundary the host's counter asks for a switch.",
+    "<b>Save:</b> every block of depth "+o+"'s data that changed since its last save goes into its snapshot, along with the bytes at the "+fmt(NP)+" patched places.",
+    "<b>Load:</b> depth "+n+"'s data and patch bytes come back out of its snapshot; on a depth's very first entry, the snapshot is filled from the live state instead.",
+    "<b>Pin:</b> whatever the snapshot held, the host points the three pointers at depth "+n+"'s own heap and screen.",
+    "<b>Stack:</b> depth "+o+"'s callee-saved registers go onto its own stack and its ESP into the host's safe, then depth "+n+"'s ESP is loaded and its registers popped, so it returns into the switch it left last time.",
+    "Depth "+n+" runs until its own fourth frame."][st];}
   /* a token: a pictogram of what moves, following a route */
   function tok(pts,kind,col,delay,len){var g=E("g",{class:"a-tok"},bd.fly);
     if(kind==="data")icGrid(g,-14,-10,4,3,7,col,1);else if(kind==="patch")icPlug(g,-3,0,col);else if(kind==="regs")icRegs(g,col);else icNeedle(g,0,0,col,28);
