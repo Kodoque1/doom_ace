@@ -1,4 +1,4 @@
-/* cc.c - the kit's C compiler: a C subset in, D32 assembly out.
+/* cc.c - the kit's C compiler, which turns a subset of C into D32 assembly.
  *
  *   cc [-I dir] [-o out.s] file.c ...      (the files form one translation unit)
  *
@@ -18,10 +18,12 @@
  * Each statement is preceded by a comment "; @file:line", so a listing can map code
  * back to the C.
  *
- * Code: r0 is the accumulator, temporaries go on the stack, r6 is the frame pointer.
- * Arguments are pushed right to left and the caller pops them; parameter i is at
- * [fp + 8 + 4i]; the result comes back in r0. Globals are emitted after the code,
- * between the labels __data_start and __data_end.
+ * The code it generates is a simple stack machine: r0 is the accumulator,
+ * temporaries go on the stack and r6 is the frame pointer. Arguments are pushed right
+ * to left and popped by the caller, parameter i is at [fp + 8 + 4i], and the result
+ * comes back in r0, so nothing but sp and fp survives a call. Globals are emitted
+ * after the code, between the labels __data_start and __data_end, which is how the
+ * kit finds the game's globals.
  */
 #include <ctype.h>
 #include <stdarg.h>

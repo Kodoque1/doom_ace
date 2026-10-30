@@ -1,68 +1,56 @@
 <header class="hero wrap">
   <div class="wide">
-    <p class="eyebrow">Doom inside Doom inside Doom inside the first Doom</p>
+    <p class="eyebrow">Doom inside Doom inside Doom, and round again</p>
     <h1>Doomception</h1>
-    <p class="dek">Three Doom games in one DOOM2.EXE. Each one shows the next on a wall.</p>
-    <p class="credit">By <a href="https://x.com/KODOQUE">@KODOQUE</a> · built on kgsws' <a href="https://github.com/kgsws/doom_ace">ACE Engine</a>, which loads new code into DOS Doom 2. Doomception wouldn't exist without it.</p>
+    <p class="dek">Three instances of Doom running at once inside a single DOOM2.EXE under DOS, each one's level holding a wall that shows the next one's screen.</p>
+    <p class="credit">By <a href="https://x.com/KODOQUE">@KODOQUE</a>, on top of kgsws' <a href="https://github.com/kgsws/doom_ace">ACE Engine</a>, which gets new engine code running inside stock DOS Doom 2 from a WAD file. None of this would be possible without it.</p>
     <figure class="video"><video src="doomception.mp4" controls muted playsinline loop preload="metadata" aria-label="Recording: three Doom instances in one DOOM2.EXE, each wall showing the next"></video>
-      <figcaption>The real thing: stock DOOM2.EXE v1.9 in DOSBox, three depths, each wall a live screen.</figcaption></figure>
+      <figcaption>Recorded from stock DOOM2.EXE v1.9 in DOSBox, with three depths running; every picture on a wall is another instance's live framebuffer.</figcaption></figure>
     <figure class="hero-pic"><canvas id="hero" width="640" height="416" style="cursor:pointer" aria-label="Depth 0's picture: one wall shows depth 1's picture, whose wall shows depth 2's, whose wall shows depth 0 again"></canvas>
-      <figcaption><button type="button" id="teleport" class="tp">Press <b>y</b> to teleport</button> into the game on the wall, as the real one does. Re-enactment; the last wall shows the first game again.</figcaption></figure>
+      <figcaption><button type="button" id="teleport" class="tp">Press <b>y</b> to teleport</button> into the game on the wall, which is what the key does in the real thing. This is a re-enactment, and the third wall shows the first game again.</figcaption></figure>
   </div>
 </header>
 
 <main class="wrap">
 
-<section class="ch col"><p class="sec-tag">Why it's cool</p><h2>Four reasons</h2>
-<ol class="cool">
-<li><b>No operating system.</b> DOS has no processes or threads. It's all done by hand, inside the game.</li>
-<li><b>The nesting is visible.</b> Each game's wall shows the next game, and the picture loops.</li>
-<li><b>A few instructions to pause one game and resume another.</b></li>
-<li><b>A program written to run alone is made to share.</b> Only what differs is swapped: <span id="nCopied">about 1,300</span> bytes per switch out of <span id="nSnap">577 KB</span>.</li>
-</ol></section>
+<section class="ch col"><p class="sec-tag">The idea</p><h2>One process, three games</h2>
+<p>DOS gives a program the whole machine and nothing else: no processes, no threads, no memory protection. Doom 2 was written on the assumption that it is the only thing running, and its state is a few hundred kilobytes of globals at fixed addresses, so running three of it means doing by hand what an operating system would do: give each copy memory of its own, save and restore the parts they have to share, and move the CPU between them.</p>
+<p>The switch happens every four frames, at the end of a frame, so a copy is never stopped in the middle of rendering or thinking. A copy's share of the common state is <span id="nSnap">577,494 bytes</span>, but in the recorded run only <span id="nCopied">1,336</span> of them differed at a switch, so the host compares everything and copies just those.</p>
+<p>Each copy draws into its own framebuffer, which means one copy can use another's framebuffer as a wall texture. Every level has such a wall showing the next copy, and the last one shows the first, so the picture loops.</p>
+</section>
 
 <section class="ch col"><p class="sec-tag">The model</p><h2>How it works</h2>
-<ul class="model">
-<li>One DOOM2.EXE: its code and data are <b>shared</b> by every copy.</li>
-<li>Each copy, a <b>depth</b>, has its own memory: heap, stack, screen buffer, ACE code.</li>
-<li>One CPU runs one depth at a time.</li>
-<li>Every 4 frames a <b>switch</b> swaps in the next depth's data, patches and pointers, then hands it the CPU.</li>
-<li>Each depth draws the next one on a wall.</li>
-</ul>
-<p class="note">ACE: <a href="https://github.com/kgsws/doom_ace">ACE Engine</a> by kgsws, a Doom 2 mod shipped as a WAD that loads new engine code into the game. Doomception adds the switch to it.</p>
+<p>There is one copy of Doom's code, shared by every instance, which the project calls a depth. Each depth has its own heap, stack, screen buffer and copy of the ACE code at addresses of its own, but Doom's data sits at the fixed addresses the code was compiled against, so only one depth's data can be live at a time. A switch saves the outgoing depth's data, loads the incoming one's, points three pointers at the new depth's heap and screen, and hands over the CPU.</p>
 </section>
 
 <div class="wrap"><div class="wide console" id="model"><div class="m3-stage"><canvas aria-label="The model, running: three depths taking turns on one CPU"></canvas></div></div></div>
 
 <section class="ch col" id="anatomy"><p class="sec-tag">Up close</p><h2>Anatomy</h2>
-<p>Three small pictures of the real mechanism: what a depth is, what a switch does, and how the pictures loop.</p>
 <h3>A depth</h3>
-<p>A depth is its own memory, plus a saved copy of everything it shares with the other depths.</p></section>
+<p>What makes a depth a separate game is memory of its own plus a saved copy of the shared state it has changed. Pick a depth to run and everything that has to follow it re-points.</p></section>
 <div class="wrap"><div class="wide anat" id="fig-depth"></div></div>
 <section class="col"><ul class="model">
-<li><b>Data.</b> Doom's data is one live copy. Most of it is the same in every depth; the few bytes that differ (coloured) are the running depth's.</li>
-<li><b>Pointers.</b> Three globals in the shared data, <code>mainzone</code>, ACE's <code>screen_buffer</code> and Doom's <code>screens[0]</code>, point at the running depth's heap and screen.</li>
-<li><b>Patches.</b> ACE patched <span id="nPatch">406</span> places in Doom's memory, most of them in its code. They call the running depth's ACE code; the other depths' patch bytes wait in their snapshots.</li>
-<li><b>Host state.</b> Which depth runs, and every suspended depth's stack pointer, sit in one block that no snapshot covers.</li>
+<li><b>Data.</b> Doom's globals exist once. Most of them are tables that never change after startup, so they are the same in every depth, and the few bytes that do differ (coloured) belong to whichever depth is running.</li>
+<li><b>Pointers.</b> Three of those globals must not come back from a snapshot: <code>mainzone</code>, ACE's <code>screen_buffer</code> and Doom's <code>screens[0]</code>. The host pins them to the running depth's heap and screen after every load. It takes three and not two because Doom's renderer writes through its own <code>screens[0]</code>, not through ACE's copy.</li>
+<li><b>Patches.</b> ACE works by patching Doom, at <span id="nPatch">406</span> places, nearly all of them in the code segment, which no data snapshot covers. Each depth's ACE points those patches at its own copy of the ACE code, so the patch bytes are saved and restored per depth exactly like data.</li>
+<li><b>Host state.</b> Which depth runs, and where every suspended depth's stack pointer is, live in one object that no snapshot includes. The first version kept them in the same <code>.bss</code> it was snapshotting, and the first real switch restored a stack pointer saved before it was written and jumped with ESP&nbsp;=&nbsp;0.</li>
 </ul><p class="incode">In the code: <code>nested/dos_wire.c</code> (<code>mtx_dos_wire_register</code>).</p></section>
 
 <section class="col"><h3>A switch</h3>
-<p>Every 4 frames the host saves one depth, loads the next, re-points the pointers and swaps the stacks.</p></section>
+<p>Every four frames the host saves the running depth, loads the next one, re-pins the pointers and swaps the stacks. Saving compares each registered block against the depth's snapshot and copies only the blocks that changed, and the stack swap is a handful of instructions: push the four callee-saved registers, store ESP, load the other depth's ESP, pop, return into wherever that depth last switched away.</p></section>
 <div class="wrap"><div class="wide anat" id="fig-switch"></div></div>
 <section class="col"><p class="incode">In the code: <code>nested/mtx_core.c</code> (<code>mtx_switch</code>), <code>nested/dos_state.c</code> (<code>mtx_dos_save_state</code>, <code>mtx_dos_load_state</code>), <code>nested/mtx_sched.c</code> (<code>mtx_frame_tick</code>).</p></section>
 
 <section class="col"><h3>The pictures</h3>
-<p>Each depth draws into its own screen buffer. One wall texture reads the next depth's buffer. The monitor shows one buffer.</p></section>
+<p>Each depth renders into its own screen buffer, and the wall texture in its level samples the next depth's buffer, whose address the host hands it every frame (<code>screen_src</code>). The deepest depth's wall points back at depth 0. A suspended depth doesn't render, so what its neighbour shows is its last frame.</p></section>
 <div class="wrap"><div class="wide anat"><div class="a-scroll"><canvas id="fig-ring" width="640" height="400" aria-label="Three screen buffers in a ring, and the monitor"></canvas></div></div></div>
-<section class="col"><ul class="model">
-<li>Every frame the host tells each depth whose buffer its wall shows (<code>screen_src</code>). The deepest depth wraps to depth 0.</li>
-<li>A suspended depth doesn't draw, so its wall picture is that depth's latest frame.</li>
-</ul><p class="incode">In the code: <code>engine/mtx_boot.c</code> (<code>mtx_ring_next</code>, <code>mtx_world_screen</code>, <code>mtx_engine_video</code>).</p></section>
+<section class="col"><p>Only one buffer reaches the monitor: every depth's blit copies the viewed depth's, and <b>y</b> moves the viewer one depth along. The viewed depth also gets every other time slice, which keeps the picture you look at at 30 frames a second while the others run at 15.</p>
+<p class="incode">In the code: <code>engine/mtx_boot.c</code> (<code>mtx_ring_next</code>, <code>mtx_world_screen</code>, <code>mtx_engine_video</code>, <code>mtx_sched_next</code>).</p></section>
 
-<section class="ch col"><p class="sec-tag">Go deeper</p><h2>Where it is in the code</h2>
-<p>The page simplifies; the code doesn't. Everything is in <a href="https://github.com/Kodoque1/doom_ace">one repository</a>, a fork of kgsws' <a href="https://github.com/kgsws/doom_ace">doom_ace</a>: the engine at the root, the switch in <code>nested/</code>.</p>
+<section class="ch col"><p class="sec-tag">The code</p><h2>Where it is</h2>
+<p>Everything is in <a href="https://github.com/Kodoque1/doom_ace">one repository</a>, a fork of kgsws' <a href="https://github.com/kgsws/doom_ace">doom_ace</a>, with the engine at the root and the switching in <code>nested/</code>. The <a href="https://github.com/Kodoque1/doom_ace/tree/HEAD/nested">README there</a> goes through how each piece was built, and what broke along the way.</p>
 <div class="tblwrap"><table class="codemap">
-<thead><tr><th>In the model</th><th>In the code</th><th>Read first</th></tr></thead>
+<thead><tr><th>Part</th><th>Code</th><th>Background</th></tr></thead>
 <tbody>
 <tr><td>Handing over the CPU</td><td><code>nested/mtx_switch.S</code> (<code>mtx_switch_ctx</code>), <code>nested/mtx_core.c</code> (<code>mtx_switch_to</code>)</td><td>README, “The mechanism”</td></tr>
 <tr><td>When it switches</td><td><code>nested/mtx_sched.c</code> (<code>mtx_frame_tick</code>), <code>engine/mtx_boot.c</code> (<code>MTX_DEMO_INTERVAL</code>, <code>mtx_sched_next</code>)</td><td>README, “The yield point”</td></tr>
@@ -77,16 +65,16 @@
 </section>
 
 <section class="ch col" id="challenge"><p class="sec-tag">Your turn</p><h2>The challenge</h2>
-<p>Write the switch yourself. A tiny computer, a TinyDoom and a C compiler, all in one kit: make three copies share one machine.</p>
+<p>The sandbox is a small version of the same problem that you can solve yourself: a made-up 64&nbsp;KiB computer, a C compiler for it, and a tiny Doom-like game whose level scripts patch its code. You write the scheduler that lets several copies of the game share the machine, and a checker runs every level alone first, then compares each copy's state against that solo run, frame by frame:</p>
 <ol class="cool milestones">
 <li>Take turns.</li><li>Keep their data apart.</li><li>Keep their patches apart.</li><li>Keep their pointers apart.</li><li>Survive a hostile level.</li><li>Close the ring.</li>
 </ol>
-<p>A checker proves each step, then scores you on cycles and bytes.</p>
+<p>Once a scheduler passes, it is scored on the cycles and bytes each switch costs, which is where the real optimisation work starts.</p>
 <p><a class="tp play" href="challenge/index.html"><b>▶</b> Play it in your browser</a></p>
-<p class="note">Edit your scheduler, check it, and watch the machine run it, one instruction at a time if you like. Everything on that page is the kit's own C compiled to WebAssembly, so its verdicts are the same as <code>make check</code> in <a href="https://github.com/Kodoque1/doom_ace/tree/HEAD/sandbox"><code>sandbox/</code></a>, which also runs locally.</p>
+<p class="note">The page compiles your scheduler, checks it, and lets you step the machine one instruction at a time. Its compiler, machine and checker are the kit's own C compiled to WebAssembly, so the results are the same as <code>make check</code> in <a href="https://github.com/Kodoque1/doom_ace/tree/HEAD/sandbox"><code>sandbox/</code></a>.</p>
 </section>
 
 </main>
 
-<footer class="wrap mini"><div class="col"><p><b>Doomception</b> is by Kodoque: <a href="https://x.com/KODOQUE">@KODOQUE on X</a>.</p><p><b>Credits:</b> ACE Engine, its loader and everything it does inside Doom are the work of <a href="https://github.com/kgsws/doom_ace">kgsws</a>. Doomception builds on it.</p>
-<p>Scenes are simplified re-enactments, slowed down. Numbers come from the project's run log and README. The scenes use no game data; the video at the top is a recording of the real game.</p></div></footer>
+<footer class="wrap mini"><div class="col"><p><b>Doomception</b> is by Kodoque: <a href="https://x.com/KODOQUE">@KODOQUE on X</a>.</p><p><b>Credits:</b> the ACE Engine, its loader and everything it does inside Doom are the work of <a href="https://github.com/kgsws/doom_ace">kgsws</a>.</p>
+<p>The animated scenes are simplified re-enactments, slowed down, and use no game data; the video is a recording of the real game. The numbers come from the project's run log.</p></div></footer>

@@ -1,9 +1,11 @@
-/* sim.c - the D32 machine for the browser page: tools/vm.c, wrapped so JavaScript can
- * step it, save and restore it whole (for rewinding), and see what happens.
+/* sim.c - the D32 machine for the browser page. It is tools/vm.c wrapped so that
+ * JavaScript can step it, save and restore it whole for rewinding, and see what it does.
  *
- * Everything the machine is lives in one struct, `S`, so a checkpoint is one copy of
- * it. Events (a copy announced, a frame presented, a file loaded) are logged with the
- * instruction count they happened at; the page builds its timeline from them.
+ * Everything the machine is lives in one struct, `S`, so a checkpoint is a single
+ * copy of it, and because the machine is deterministic, restoring a checkpoint and
+ * replaying lands on exactly the same instruction. Events (a copy announced, a frame
+ * presented, a file loaded) are logged with the instruction count they happened at,
+ * and the page builds its timeline from them.
  */
 #include <stdio.h>
 #include <string.h>

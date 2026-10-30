@@ -1,4 +1,6 @@
-/* Level 4: patches two other ways: the imps run away, and the player cannot be hurt. */
+/* Level 4: patches the same two hooks as level 3 in a different way, so the imps run
+ * away and the player cannot be hurt. Running it next to level 3 is what shows
+ * whether a scheduler keeps each copy's patches apart. */
 #include "../script.h"
 
 char level_map[] =

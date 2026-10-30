@@ -1,4 +1,5 @@
-/* Level 2: a plain level with a screen-wall (cell 9). Three imps, no hooks. */
+/* Level 2: a plain level with three imps, no hooks patched, and a screen-wall (cell
+ * 9), which shows static unless a scheduler points it at another copy's screen. */
 #include "../script.h"
 
 char level_map[] =

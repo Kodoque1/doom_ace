@@ -1,14 +1,116 @@
-# matryoshka — nested-instance host for the ACE engine
+# nested: the switch that runs several Doom instances in one DOOM2.EXE
 
-Goal: N live ACE/Doom instances coexisting inside one running `DOOM2.EXE`,
-switched at runtime, without ever re-launching the executable. Depth 0 is the
-root and owns the real hardware; depth d+1 runs inside depth d. Ceiling: 12.
+This directory is the host behind [Doomception](../readme.md): it runs several
+copies of the ACE engine, the *depths*, inside one running `DOOM2.EXE`, and switches
+between them without ever re-launching the executable. It was a separate repository
+(`Kodoque1/nested`) and was merged here with its history. Its working name was
+*matryoshka*, which is why its symbols start with `mtx_`.
 
 The ACE chain (PNAMES/TEXTURE1 → ACE_LDR0 → ACE_LDR1 → ACE_CODE) is only the
-bootstrap that gets ACE resident. Nesting is a context-management problem on top
-of it, and that is all this directory is.
+bootstrap that gets ACE resident: that is [kgsws' work](https://github.com/kgsws/doom_ace).
+Nesting is a context-management problem on top of it, and that is all this
+directory is.
 
-## The mechanism
+## How it works now
+
+- **Depths.** Depth 0 boots from the WAD as ACE always has. It then loads one
+  engine image per further depth from the same open WAD, through the reentrant
+  loaders (`ldr0N.S`, `ldr1n.c`), into memory of that depth's own. Every depth shares
+  Doom's code; each has its own stack, heap (zone), raw memory pool, screen region,
+  code image, and a snapshot slot.
+- **When it switches.** At a frame boundary: a depth runs `MTX_DEMO_INTERVAL` (4)
+  frames, then hands the frame back to the host (`mtx_host_take_frame`), and the
+  host switches (`mtx_frame_tick` → `mtx_switch`).
+- **The switch** (`mtx_core.c`, `dos_state.c`):
+  1. *save* the outgoing depth: Doom's and ACE's writable data, comparing block by
+     block and copying only what differs, plus the bytes at every place ACE patched;
+  2. *load* the incoming depth the same way (the first time, its snapshot is seeded
+     from the live state);
+  3. *pin* three pointers to the incoming depth's own memory: `mainzone`, ACE's
+     `screen_buffer` and Doom's `screens[0]`;
+  4. swap stacks (`mtx_switch_ctx`): push the callee-saved registers, publish ESP,
+     load the other depth's ESP, pop, `ret`.
+- **Who runs next.** The depth the viewer is in takes every other slice, and the
+  others share the rest in turn (`mtx_sched_next`).
+- **The ring.** Each depth's screen-textured walls show the next live depth's
+  buffer, and the deepest wraps round to depth 0 (`mtx_ring_next`, `screen_src`).
+- **The screen.** Every depth's frame blit copies one buffer: the viewed depth's
+  (`mtx_engine_video`). The `y` key moves the viewer to the next depth, with a short
+  transport effect (`MTX_FX_FRAMES`). Doom's key array is per-depth data, so the
+  key is read through a single authority the host owns (`key_auth`).
+- **The host's own state** (who runs, every saved ESP, the pin values, pending
+  requests) is one object, `mtx_hs`, which no snapshot covers.
+
+The engine side is in [`engine/`](../engine/): `mtx_boot.c` (boot, scheduling,
+video, the ring, the key), `mtx_ldr.c` (the loader services), and `main.c`'s
+`Z_Init`, which branches on depth. `engine/makefile` builds this directory
+(`MTX_DIR ?= ../nested`).
+
+## Measured
+
+From the run the article uses ([`docs/mtx-run.json`](docs/mtx-run.json), made from
+`MTX.LOG` by `docs/mtxlog2json.py`):
+
+| | |
+|---|---|
+| depths | 3 |
+| snapshot per depth | 577,494 B, in 4 regions |
+| patches ACE made in Doom's memory | 406 |
+| bytes copied on a switch | 1,336 (the copyless comparison) |
+| stack per depth | 64 KiB |
+| engine image per depth | 419,940 B |
+| frame rate, 3 depths, 4-frame slices | 30.0 frames/s for the viewed depth, 15.2 for the others; vanilla Doom in the same emulator: 35.6 |
+
+## Files
+
+    context.h        interface: context, host ops, depth limits
+    mtx_switch.S     context-switch primitive + fresh-stack trampoline
+    mtx_core.c       scheduler: seeding, switch, depth limits, save/load hand-off
+    mtx_host.h/.c    the host's own control state, in ONE object (`mtx_hs`)
+                     so no guest snapshot can ever cover it
+    mtx_sched.h/.c   the yield point: requests, serviced at the frame boundary
+    dos_state.h/.c   per-depth state: regions (copyless), patches, pins
+    dos_wire.h/.c    the ACE wiring: which regions, which pins, and the hooks read
+                     from the engine's own hook table; the `.bss` split around `mtx_hs`
+    mtx_hooks.h/.c   how many bytes each kind of ACE patch writes
+    dos_alloc.h/.c   arena, budget planner, one-call boot
+    mtx_zone.h/.c    a depth's own zone, built and checked with Doom's heap invariants
+    mtx_raw.h/.c     a depth's own raw (non-zone) memory pool
+    mtx_params.h     the block that tells an instance which depth it is
+    ldr0n.h/ldr0N.S  reentrant first stage: bases as data, announces, hands off
+    ldr1n.h/.c       reentrant second stage: no free(), no close(), so it cannot
+                     damage the parent
+    ldr1N.S          its final hand-off
+    guest.S          a 45-byte test payload, the MTXGUEST lump (`make guest`)
+    test_mtx.c       the host tests (32-bit freestanding, raw syscalls)
+    mutproof.sh      checks that the raw-pool tests fail when what they test is broken
+    dump_probe.py    prints the probe files the engine writes next to MTX.LOG
+    docs/            the article's sources and research notes
+
+    make run         the host tests
+    make doscheck    the DOS-target sources, compiled with the engine's flags
+    make ldr0n       the first stage    ·    make guest   the test payload
+
+## Still open
+
+- **Frame rate.** The viewed depth runs at 30 frames/s, the others at about 15; a
+  switch still compares the whole registered set. The brief is
+  [`doc/dev/HANDOFF.md`](../doc/dev/HANDOFF.md), and the harness that measures it is
+  [`verify/`](../verify/).
+- **Switching is a frame counter.** A depth gives up the machine every 4 frames,
+  whatever it is doing.
+- **Diagnostic probes.** Instruments marked `TEMPORARY` are still in
+  `engine/mtx_boot.c`; `dump_probe.py` reads what they write.
+- **VESA** is not covered: only the mode-13h presentation path is.
+
+## History
+
+How it got here, kept as it was written at each step. The figures in this part are
+from the runs of the time (two depths, a 540,041-byte snapshot, 8 KiB stacks, a
+256 KiB zone), and some of what it calls open has been done since: see above for
+what is true now.
+
+### The mechanism
 
     mtx_switch_ctx(&ctx[prev].esp, ctx[d].esp)      [mtx_switch.S]
 
@@ -29,7 +131,7 @@ stack swap. That pair is the *only* place the DOS layer has to live.
 Depth model: depth index == slot index; slots are reused on return; `mtx_push`
 from depth `max_depth-1` returns `MTX_EDEPTH` rather than corrupting anything.
 
-## What is per-depth (`dos_state.c`)
+### What is per-depth (`dos_state.c`)
 
 Three kinds of state, all registered by the wiring layer so the core stays
 engine-agnostic:
@@ -46,7 +148,7 @@ A depth's snapshot is seeded by cloning the parent's **live** state the first
 time the depth is entered — a child starts as a copy of its parent, then
 diverges. That is what a nested instance wants.
 
-## The second stage (`ldr1n.c`)
+### The second stage (`ldr1n.c`)
 
 Stock ACE_LDR1 is one-shot by construction: it frees the stdin buffer, lumpcache,
 lumpinfo and mainzone, closes every WAD descriptor, then jumps into the engine.
@@ -69,7 +171,7 @@ descriptor walk mirrors ACE_LDR1 exactly (fd field at lumpinfo+8, consecutive
 dedup, previous seeded to -1 so leading `-1` entries drop too, `-1` terminator)
 — and is unit-tested against those semantics.
 
-## The yield point (`mtx_sched.c`)
+### The yield point (`mtx_sched.c`)
 
 A cooperative switch only happens if the running instance reaches the yield
 point — and the running instance is Doom's frame loop, which never returns. So a
@@ -98,7 +200,7 @@ preserves those registers around the switch for us. (This also forces
 `-mgeneral-regs-only`, since a `no_caller_saved_registers` function may not touch
 x87 — which the engine already used.)
 
-## ABI
+### ABI
 
     void mtx_init(uint8_t max_depth, const mtx_host_ops_t *ops,
                   void *stack_base, uint32_t stack_bytes);
@@ -126,7 +228,7 @@ hands each depth its zone and framebuffer.
 takes the bases as parameters: `%esi` = code base, `%edi` = data base, `%ebx` =
 continuation, `4(%esp)` = banner.
 
-## Files
+### Files, as they were then
 
     context.h        interface: context, host ops, depth limits
     mtx_switch.S     context-switch primitive + fresh-stack trampoline
@@ -151,7 +253,7 @@ continuation, `4(%esp)` = banner.
     test_mtx.c       host proof (32-bit freestanding, raw syscalls)
     Makefile         make run | make doscheck | make ldr0n | make guest
 
-The engine side lives in `doom_ace/engine/`: `mtx_boot.c` (boot + demo policy +
+The engine side lives in `engine/`, at the root of this repository: `mtx_boot.c` (boot + demo policy +
 `mtx_engine_zone_init`, the nested half of `Z_Init`, + the video presentation the
 host owns), `mtx_ldr.c` (the three ldr1n services wired to the engine, plus image
 validation), and `main.c`'s `Z_Init`, which branches on depth.
@@ -163,7 +265,7 @@ offsets while `mtx_boot.o` is rebuilt against the new ones — measured as
 `ace image: load FAILED (-1)` with a perfectly good WAD and a clean boot. The rule
 must stay after `build:` or make takes its first target as the default goal.
 
-## Verified (real execution, not description)
+### Verified (real execution, not description)
 
 `make run` — 32-bit freestanding binary, executed:
 
@@ -230,10 +332,10 @@ must stay after `build:` or make takes its first target as the default goal.
     from the thing it checks passes whatever that thing becomes. Verified to FAIL
     with `MTX_SCREEN_BYTES` set back to one frame.
 
-### Wired into the engine, and verified not to regress
+#### Wired into the engine, and verified not to regress
 
 `engine/vesa.c` calls `mtx_frame_tick()` as the first statement of
-`swap_buffers()`, and `engine/makefile` links the host (`MTX_DIR ?= ../../nested`,
+`swap_buffers()`, and `engine/makefile` links the host (`MTX_DIR`, then `../../nested` and now `../nested`,
 overridable; `-DMTX_DOS_NO_STATIC_POOL` so the 7.5 MiB static pool is compiled
 out).
 
@@ -250,7 +352,7 @@ It is that small because nothing calls `mtx_init` yet: `--gc-sections` keeps onl
 (`nm` confirms). So the yield point is installed and inert until a host is booted
 — which is what makes it a safe first integration.
 
-### Booted live in DOOM2.EXE
+#### Booted live in DOOM2.EXE
 
 The host boots for real inside DOOM2.EXE in DOSBox, and depth 1 exists as a running
 instance. `engine/mtx_boot.c` boots it once on the first frame with a reserved
@@ -310,7 +412,7 @@ Three things had to be right, each found the hard way:
    gamestate-conditional, the request/consume pair is what makes it safe: a request
    sits until the next frame that reaches the yield point.
 
-### Live switching, and the illegal-read fix
+#### Live switching, and the illegal-read fix
 
 Booting stopped being the interesting part: the crash came on the *first real
 switch*. Two bugs, and they are the same bug twice — host state that was not
@@ -360,13 +462,13 @@ That left the call targets — and a function-pointer table pointing at a dead f
 `make doscheck` — all nine DOS-target sources (`mtx_core.c`, `mtx_switch.S`,
 `mtx_host.c`, `dos_state.c`, `dos_alloc.c`, `dos_wire.c`, `ldr1n.c`, `ldr1N.S`,
 `mtx_sched.c`) compile clean with the exact flags from
-`doom_ace/engine/makefile` (`-m32 -march=i386 -mgeneral-regs-only …`), with the
+`engine/makefile` (`-m32 -march=i386 -mgeneral-regs-only …`), with the
 static pool compiled out as ACE needs.
 
 `make ldr0n` — assembles to a 39-byte image, well inside the 256-byte ACE_LDR0
 patch budget. (`make guest` builds and installs the 45-byte guest lump.)
 
-## The loaders: a depth runs its own code image
+### The loaders: a depth runs its own code image
 
 `ldr0N.S` (first stage) and `ldr1n.c` (second stage) exist so a depth can fetch,
 allocate for and run a code image of its own. They now do, end to end:
@@ -433,7 +535,7 @@ which is why the boot reports `depths 2`. Sharing one image would be cheaper but
 wrong: ACE patches code at run time, so two depths on one code page would fight
 over the same bytes.
 
-## A depth's own zone (`Z_Init`, per depth)
+### A depth's own zone (`Z_Init`, per depth)
 
 A depth is not an instance until it has a heap of its own. Doom's allocator walks a
 `memzone_t` header and a ring of `memblock_t` blocks, so handing a depth raw arena
@@ -482,7 +584,7 @@ the corruption cases — a checker that cannot see a broken zone would pass ever
 ever built. It was verified to FAIL against a checker neutered to always report
 "intact".
 
-## Video: which depth the screen shows
+### Video: which depth the screen shows
 
 A frame reaches the screen through ONE asm routine, `I_FinishUpdate`
 (`engine/asm.S`): it copies 64000 bytes to 0xA0000. Its copy SOURCE is a dword baked
@@ -526,7 +628,7 @@ depth's bars, `_b` and `_c` are the root's MAP01 after the switch back. (That ru
 directory was not kept; the same mechanism is what the engine-image path above now
 uses, and `verify/trial-confirm/` is its record.)
 
-### A depth's screen region is bigger than a frame
+#### A depth's screen region is bigger than a frame
 
 `MTX_SCREEN_BYTES` used to be one 320x200 framebuffer (64000). That is the minimum a
 depth can render into, not what the engine needs behind the pointer: `main.c` reads
@@ -537,7 +639,7 @@ depth's zone. The region is now the sum of those three parts (297472 B), and tes
 asserts the total against the engine's measured appetite as a **literal**, so shrinking
 it fails the tests instead of silently corrupting a neighbour.
 
-### Doom's OWN screen pointer, not just ACE's copy
+#### Doom's OWN screen pointer, not just ACE's copy
 
 Pinning ACE's `screen_buffer` was not enough. ACE reads Doom's `screens[0]` exactly
 once, at init (main.c's hook list: `0x00074FC4 -> screen_buffer`); after that the two
@@ -569,7 +671,7 @@ lands in depth 1's memory and nowhere near the root's frame. The marker is
 `0x4D545853` ('MTXS'), which is also why the next screen check reads
 `vga 1297373267 vs buffer 1297373267` — the thing on screen is that write.
 
-## Per-depth isolation: what a depth can change, and what it cannot
+### Per-depth isolation: what a depth can change, and what it cannot
 
 A depth is only an instance if the state it shares with the others is exactly the state
 it is allowed to share. Four kinds of machine state move per depth now, and the fourth
@@ -588,7 +690,7 @@ is the one that had to be hunted down.
   4. **Per-depth zone and screen.** Not snapshotted, because they are separate memory
      at separate addresses; that is what makes them per-depth for free.
 
-### 405 patches, and why they were the missing piece
+#### 405 patches, and why they were the missing piece
 
 ACE does not patch its own code: it patches DOOM's. Measured from the built engine's
 hook table (419 entries, `_hooks_start`..`_hooks_end`):
@@ -630,7 +732,7 @@ identical to perfect isolation, which is why both halves are logged.
 The snapshot figure is an independent check on the arithmetic: 529,468 + 9,056 + 1,517
 = 540,041 exactly.
 
-## Entering the real engine image: a depth boots an instance, and what it renders
+### Entering the real engine image: a depth boots an instance, and what it renders
 
 `MTX_CHILD_ENGINE_IMAGE` in `engine/mtx_boot.c` switches depth 1 from the purpose-built
 guest to the real ACE image, and it is **on** in the shipped build: a depth now boots a
@@ -651,7 +753,7 @@ Four things had to be right, and each was found by measurement rather than reaso
   - **A way for an instance to know what it is.** `nested/mtx_params.h`: a block the
     host fills and hands over in `%ebp` at the entry.
 
-### Giving a depth its own raw memory
+#### Giving a depth its own raw memory
 
 The zone was half the job. A depth could build its own heap, and Doom's allocator worked
 in it — but `ace_main` also asks the *raw* allocator for memory, and that one is
@@ -684,7 +786,7 @@ allocator with a per-block header, and its semantics are deliberately honest:
     the DPMI heap — where Doom's `realloc` read the block magic as a size, decided the
     block was already big enough, and returned the pointer untouched.
 
-### Telling an instance what it is
+#### Telling an instance what it is
 
 An instance is a relocated COPY of the engine with its own `.bss`, so its `mtx_hs` is a
 different, empty object: it cannot read the host's control state, and the host cannot
@@ -759,7 +861,7 @@ bluescreen is `dos_exit`). One instance must not be able to kill the others, and
 has no policy for that yet. The depth stack is no longer a suspicion — it was raised from
 8 KiB to 64 KiB (`MTX_STACK_SIZE`), since an instance runs its whole boot on it.
 
-## State footprint and the zone-sizing decision (measured)
+### State footprint and the zone-sizing decision (measured)
 
 From `engine/doom_vars.S` (416 variables, 0x1A84 `finetangent` … 0x75CA0
 `volume_val`), the built engine ELF and the live boot log:
@@ -795,49 +897,3 @@ The levers, in order of effect:
 320x200x8 framebuffer, while the engine also uses `screen_buffer + 64000 + 69632` as
 a parse arena (`textpars.h`). It is now measured from the engine's source rather
 than guessed — see the video section — and it is the third largest item per depth.
-
-## Not done yet (the honest remainder)
-
-* **Entering the real engine image: it boots, and then it renders wrong.** A depth now
-  loads the engine image, enters it, reads its parameter block, builds its own heap and
-  serves its whole boot out of its own raw pool (peak ≈ 591 KB of 2 MiB), and draws into
-  its own framebuffer — see the section above, which ends with the one thing still
-  broken: something hands Doom a pointer into the pool's own metadata, which shows up as
-  a mangled lump name, a lump index of `0x4D54` ('MT') and a 1.5 GB allocation request.
-  The four probe files (`MTXN`/`MTXW`/`MTXL`/`MTXA`, all marked `TEMPORARY` in the source)
-  are the instruments for it, and none of ACE's own lump-cache sites fired — so the
-  suspect is Doom's own code.
-* **Video: the remaining gap is VESA and mode set.** Both screen pointers now follow
-  the depth (ACE's `screen_buffer` and Doom's `screens[0]`), each depth's screen
-  region is sized for the engine's real appetite, and the presentation source is the
-  host's decision — so a depth's frames reach the screen and the visible one is
-  chosen. Not covered: VESA mode is a different presentation path entirely
-  (`swap_buffers` page-flip, and `R_InitBuffer`'s framebuffer patch); and entering a
-  real engine image re-runs `I_InitGraphics`, i.e. a real mode set at a depth, which
-  is not virtualised.
-* `.data` is now in the snapshot region list (9,056 B, split-checked against `mtx_hs`).
-* Hook isolation is no longer empty. `nhok` is 405, populated from the engine's own
-  hook table, and the isolation is verified in DOS by writing over a patch site at a
-  depth and confirming the root never sees it. This was the prerequisite for entering a
-  real engine image: `ace_main` re-patches Doom's shared code at run time.
-* Nothing sets a switch request from the game yet: there is no key bound to
-  `mtx_request_yield()` / `mtx_request_switch()`, so the policy is a frame counter.
-  (And see the input-routing item below — a key alone would not be enough.)
-* **The depth ceiling is a reservation policy, not a wall.** The arena is requested
-  at 3 MiB (`mtx_engine_reserve`, sizes `{3, 2, 0}`) and a depth costs 1,463,277 B,
-  so the live run reports 2. The arithmetic, against ~60 MiB of DPMI RAM: 8 MiB → 5
-  depths, 12 MiB → 8, 16 MiB → 11, 20 MiB → 12. What that costs is the ROOT's zone,
-  which gets whatever is left — so this is a trade to measure, not a limit. Nothing
-  has been tried above 3 MiB yet.
-* Hook registration is manual and nothing registers anything yet (`nhok` is 0).
-  The per-depth hook save/restore exists and is tested; it has no occupants.
-* Nothing sets a switch request from the game yet: there is no key bound to
-  `mtx_request_yield()` / `mtx_request_switch()`, so the policy is a frame counter.
-  (And see the input-routing item below — a key alone would not be enough.)
-* The guest is a purpose-built 96-byte payload, not a second Doom. It proves the
-  loader, the zone, the screen and the pin work; it is not an instance.
-* `zone_per_depth` (256 KiB) is still a policy number rather than a measurement of a
-  real level's working set. `screen_per_depth` is no longer a guess — it is derived
-  from the engine's own use of the pointer (above).
-* Input is not routed per depth at all: the keyboard belongs to the root, and a
-  nested instance has no way to be the one that receives keys.

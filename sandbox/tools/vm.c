@@ -1,5 +1,6 @@
-/* vm.c - the D32 emulator. Deterministic: the same memory, registers and keys give
- * the same run, cycle for cycle. */
+/* vm.c - the D32 emulator. It is deterministic, so the same memory, registers and
+ * keys always give the same run, cycle for cycle; the checker's solo runs and the
+ * browser page's rewind both depend on that. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +12,7 @@ const char *d32_opname[OP_COUNT] = {
 	"bz", "bnz", "call", "callr", "ret", "push", "pop", "sys", "jmpr"
 };
 
-/* What each instruction costs, in cycles: the scores are counted in these. */
+/* What each instruction costs in cycles, which is the unit the scores are counted in. */
 static const uint8_t cost[OP_COUNT] = {
 	1, 1, 1, 1, 1, 1, 3, 8, 8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1,
 	1, 1, 2, 2, 2, 2, 2, 20, 1

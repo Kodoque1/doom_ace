@@ -1,10 +1,10 @@
-/* kit.h - the plumbing your scheduler stands on.
+/* kit.h - everything the scheduler needs that is not the interesting part.
  *
- * Your scheduler is level 0's script: the game boots level 0, loads level0.o (your
- * sched.c and kit.c) and calls script_main() once. From then on, it only runs when
- * the game calls it: through the hooks.
- *
- * What you get here is the grunt work. What is left in sched.c is the concept.
+ * The scheduler is level 0's script. The game boots level 0, loads level0.o (your
+ * sched.c linked with kit.c) and calls script_main() once, and after that the
+ * scheduler only runs when the game calls into it through a hook. Starting copies,
+ * finding the game's globals, the hook table and copying memory are all here, so
+ * that sched.c is left with the actual decisions.
  */
 #ifndef KIT_H
 #define KIT_H
@@ -12,8 +12,8 @@
 
 #define MAX_COPIES 4
 
-/* One copy of the game. copies[0] is the boot copy, playing level 0: it is where
-   your script_main() runs. copies[1] to copies[ncopies] are the copies you start. */
+/* One copy of the game. copies[0] is the boot copy, the one playing level 0, which
+   is where script_main() runs; copies[1] to copies[ncopies] are the ones you start. */
 struct Copy {
 	int sp;           /* while the copy is suspended: its stack pointer (offset 0:
 	                     switch_to's assembly relies on it)                        */
@@ -27,47 +27,54 @@ struct Copy {
 extern struct Copy copies[MAX_COPIES + 1];
 extern int ncopies;
 
-/* Call first in script_main(): sets up level 0 and copies[0], and records the
-   hooks' defaults. */
+/* Call this first in script_main(). It gives level 0 its map, fills in copies[0]
+   from the running copy, and records where every hook points before anyone patches
+   it, which is what a fresh copy should start with. */
 void kit_boot(void);
 
-/* What the checker (or you, with run -A) asked for: the boot arguments. */
+/* What the checker asked for, read from the boot arguments (run -A sets them by hand). */
 int wanted_copies(void);         /* how many copies to start            */
 int wanted_level(int i);         /* the level of copy i, from 1         */
 int wanted_ring(void);           /* 1: each screen-wall shows the next
                                     copy's screen (milestone M6)        */
 
-/* Start a copy: allocate its stack, framebuffer and heap, and lay out its stack
- * as if it were suspended in switch_to() (below). It does not run yet: the first
- * switch_to() into it starts it, in copy_main(level, screen, heap), which loads
- * its level and plays. Returns the new copy. */
+/* Start a copy: allocate its stack, framebuffer and heap, and lay its stack out as if
+ * it had been suspended inside switch_to() (described below). Nothing runs yet. The
+ * first switch_to() into the copy "returns" into copy_main(level, screen, heap),
+ * which loads the level and starts playing, so a new copy and an old one are resumed
+ * the same way. */
 struct Copy *copy_start(int level);
 
-/* How a suspended copy looks, so switch_to() can resume any copy, new or old:
+/* What a suspended copy looks like, which is the contract switch_to() has to keep:
  *
  *    copy->sp  ->  [ its saved fp ]       the rest of its stack above
  *
- * and returning from switch_to(), with that fp, resumes it. The kit's compiler
- * keeps nothing else in registers across a call: sp, fp and pc are the whole
- * context (pc is on the stack, as the return address). */
+ * Load that sp, pop that fp, and returning from switch_to() resumes the copy where it
+ * left. That is the whole context because the kit's compiler keeps nothing in
+ * registers across a call: sp, fp and pc are all there is, and pc is already on the
+ * stack as the return address. */
 
-/* The hook table: the call sites level scripts patch, and where they point at boot. */
+/* The hook table: the call sites in the game's code that level scripts patch, and
+   where each one pointed at boot. frame_end is the one the scheduler uses. */
 #define NHOOKS 4
 extern char *hook_sites[NHOOKS];      /* hook_think, hook_damage, hook_wall_color,
                                          hook_frame_end                           */
 extern int hook_defaults[NHOOKS];
 #define HOOK_FRAME_END 3              /* hook_sites[3]: yours */
 
-/* The game's globals: every byte between these two addresses. */
+/* The game's globals are every byte between these two addresses. */
 extern char GAME_DATA_START[], GAME_DATA_END[];
 #define GLOBALS_START GAME_DATA_START
 #define GLOBALS_SIZE (GAME_DATA_END - GAME_DATA_START)   /* a multiple of 4 */
 
-/* The shared pointers: globals that hold the address of a copy's own block. */
+/* The globals that hold the address of one of a copy's own blocks. They are part of
+   the globals above; they are listed separately because a few schedulers need to
+   treat them differently (the ring does). */
 #define NSHARED 5
 extern char **shared_pointers[NSHARED];   /* &screen, &heap, &script, &map, &wall_tex */
 
-/* Memory. n must be a multiple of 4; blocks must be 4-aligned. */
+/* Copying and comparing work a word at a time, so n must be a multiple of 4 and the
+   blocks 4-aligned; the game's globals are both. */
 void block_copy(char *dst, char *src, int n);
 int block_equal(char *a, char *b, int n);   /* 1 if the same */
 char *kit_alloc(int n);                      /* stops the machine when memory runs out */

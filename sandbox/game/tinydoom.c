@@ -1,9 +1,11 @@
-/* tinydoom.c - TinyDoom: a tiny raycaster, one copy of which is the whole program.
+/* tinydoom.c - TinyDoom, a tiny raycaster, one copy of which is the whole program.
  *
- * Boot: main() takes the level number from boot argument 0, allocates a
- * framebuffer and a heap, then plays. Every frame: update, draw, present, then the
- * frame_end hook. Level scripts (levels/levelN.c, loaded at level start) set the
- * map, the input and the things, and may patch the hooks.
+ * main() takes the level number from boot argument 0, allocates a framebuffer and a
+ * heap, and plays. A frame is update, draw, present, then the frame_end hook. The
+ * level script (levels/levelN.c, loaded when the level starts) sets the map and the
+ * things and may patch hooks, and the player walks by itself from a seeded random
+ * number, so every run of a level is the same run, which is what lets the checker
+ * compare a copy against its solo run.
  */
 #include "game.h"
 

@@ -1,4 +1,4 @@
-/* check.c - the milestones.
+/* check.c - the checker, which decides which milestones a scheduler has reached.
  *
  *   check [-d disk] [-s game.sym] [-m milestone] [-f frames]
  *
@@ -65,7 +65,7 @@ static void load_syms(void)
 	for (int h = 0; h < 4; h++) a_hook[h] = sym(hook_name[h]);
 }
 
-/* --- one frame's state, as compared --- */
+/* --- one frame's state, in the form the comparison uses --- */
 typedef struct {
 	uint8_t g[1024];           /* the globals, pointers normalised */
 	int hooks[3];              /* where think, damage, wall_color point, normalised */

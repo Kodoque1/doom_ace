@@ -9,6 +9,7 @@ so instead of drawing it.
 """
 import json
 import re
+import os
 import sys
 
 
@@ -17,7 +18,9 @@ def ints(s):
 
 
 def main(path):
-    out = {"source": path.split("/")[-2] + "/MTX.LOG", "depths": {}, "regions": [],
+    # "base/MTX.LOG": the log's own name and the directory it is in, whatever the path looks like
+    parent = os.path.basename(os.path.dirname(os.path.abspath(path)))
+    out = {"source": (parent + "/" if parent else "") + os.path.basename(path), "depths": {}, "regions": [],
            "schedule": [], "copyless": [], "suspended": None}
     d = out["depths"]
 

@@ -1,4 +1,5 @@
-/* Level 3: patches two hooks: its own wall colours, and double damage. */
+/* Level 3: patches two hooks, one for its own wall colours and one that doubles the
+ * damage the player takes. */
 #include "../script.h"
 
 char level_map[] =
