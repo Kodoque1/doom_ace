@@ -3,6 +3,7 @@
     <p class="eyebrow">Doom inside Doom inside Doom inside the first Doom</p>
     <h1>Doomception</h1>
     <p class="dek">Three Doom games in one DOOM2.EXE. Each one shows the next on a wall.</p>
+    <p class="credit">Built on kgsws' <a href="https://github.com/kgsws/doom_ace">ACE Engine</a>, which loads new code into DOS Doom 2. Doomception wouldn't exist without it.</p>
     <figure class="hero-pic"><canvas id="hero" width="640" height="416" style="cursor:pointer" aria-label="Depth 0's picture: one wall shows depth 1's picture, whose wall shows depth 2's, whose wall shows depth 0 again"></canvas>
       <figcaption><button type="button" id="teleport" class="tp">Press <b>y</b> to teleport</button> into the game on the wall, as the real one does. Re-enactment; the last wall shows the first game again.</figcaption></figure>
   </div>
@@ -26,7 +27,7 @@
 <li>Every 4 frames a <b>switch</b> swaps in the next depth's data, patches and pointers, then hands it the CPU.</li>
 <li>Each depth draws the next one on a wall.</li>
 </ul>
-<p class="note">ACE: a Doom 2 mod, shipped as a WAD, that adds engine code. The switch is part of it.</p>
+<p class="note">ACE: <a href="https://github.com/kgsws/doom_ace">ACE Engine</a> by kgsws, a Doom 2 mod shipped as a WAD that loads new engine code into the game. Doomception adds the switch to it.</p>
 </section>
 
 <div class="wrap"><div class="wide console" id="model"><div class="m3-stage"><canvas aria-label="The model, running: three depths taking turns on one CPU"></canvas></div></div></div>
@@ -36,7 +37,7 @@
 <div class="wrap"><div class="wide console" id="walk"><div class="m3-stage"><canvas aria-label="The model, built up one piece at a time"></canvas></div><div class="seq-say" aria-live="polite"></div></div></div>
 
 <section class="ch col"><p class="sec-tag">Go deeper</p><h2>Where it is in the code</h2>
-<p>The page simplifies; the code doesn't. Repos: <a href="https://github.com/Kodoque1/nested">nested</a> (the switch) and <a href="https://github.com/Kodoque1/doom_ace">doom_ace</a> (the engine).</p>
+<p>The page simplifies; the code doesn't. Repos: <a href="https://github.com/Kodoque1/nested">nested</a> (the switch) and <a href="https://github.com/Kodoque1/doom_ace">doom_ace</a> (the engine, a fork of kgsws' <a href="https://github.com/kgsws/doom_ace">doom_ace</a>).</p>
 <div class="tblwrap"><table class="codemap">
 <thead><tr><th>In the model</th><th>In the code</th><th>Read first</th></tr></thead>
 <tbody>
@@ -54,4 +55,5 @@
 
 </main>
 
-<footer class="wrap mini"><div class="col"><p>Scenes are simplified re-enactments, slowed down. Numbers come from the project's run log and README. No game data is used.</p></div></footer>
+<footer class="wrap mini"><div class="col"><p><b>Credits:</b> ACE Engine, its loader and everything it does inside Doom are the work of <a href="https://github.com/kgsws/doom_ace">kgsws</a>. Doomception builds on it.</p>
+<p>Scenes are simplified re-enactments, slowed down. Numbers come from the project's run log and README. No game data is used.</p></div></footer>
