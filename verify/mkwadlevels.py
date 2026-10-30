@@ -38,6 +38,7 @@ Usage:
 import argparse
 import hashlib
 import os
+import math
 import struct
 import sys
 
@@ -192,6 +193,184 @@ def plant_screens(map_lumps, screen, count):
     return patched, cands[:20]
 
 
+# THE DEMO LAYOUT (--demo). The default planting above is what the regression
+# (trial_levels3.sh) measures and stays as it is. For a recording the question is a
+# different one: can a viewer READ the next depth in the wall? Measured on the
+# default WADs, not reliably - MAP01's screen is a 32-unit pipe at the top of the
+# view, and MAP03 starts 36 units from one of its twelve screens, facing an
+# ordinary wall. So --demo plants ONE screen per level, the one a player at the
+# start can see whole and head-on, at a readable distance, and turns the player
+# start to face it - or, where nothing big enough is in plain view of the start
+# (MAP01: every big wall is behind one of its two pillars; MAP03: the start is in a
+# recess), moves the start square in front of one. The root gets a MAP01 of its own
+# for this, overriding the IWAD's: its default screen is a six-faceted pipe.
+DEMO_SCREENS = {0: "MARBFAC3", 1: "BIGBRIK2", 2: "MARBFAC2"}
+
+
+def tv_size(length, height):
+    """The engine draws a 4:3 picture centred on the wall (mtx_screen_seg_note):
+    1.6 world units wide per unit of height, 86% of the height, 92% of the length."""
+    fh = min(height * 0.86, 112)                 # MTX_TV_H
+    return min(fh, length * 0.92 / 1.6)
+
+
+def _cross(ax, ay, bx, by):
+    return ax * by - ay * bx
+
+
+def _hits(p, q, a, b):
+    """Does segment p-q properly cross segment a-b?"""
+    d1 = _cross(b[0] - a[0], b[1] - a[1], p[0] - a[0], p[1] - a[1])
+    d2 = _cross(b[0] - a[0], b[1] - a[1], q[0] - a[0], q[1] - a[1])
+    d3 = _cross(q[0] - p[0], q[1] - p[1], a[0] - p[0], a[1] - p[1])
+    d4 = _cross(q[0] - p[0], q[1] - p[1], b[0] - p[0], b[1] - p[1])
+    return d1 * d2 < 0 and d3 * d4 < 0
+
+
+def sector_at(pt, verts, lines, sidedefs_d):
+    """The sector containing `pt`: the side of the nearest line a ray to +x crosses."""
+    best = None
+    for i, v1, v2, s0, s1 in lines:
+        a, b = verts[v1], verts[v2]
+        if (a[1] > pt[1]) == (b[1] > pt[1]):
+            continue
+        x = a[0] + (pt[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1])
+        if x <= pt[0]:
+            continue
+        if best is None or x < best[0]:
+            right = _cross(b[0] - a[0], b[1] - a[1], pt[0] - a[0], pt[1] - a[1]) < 0
+            best = (x, s0 if right else s1)
+    if best is None or best[1] < 0:
+        return None
+    return struct.unpack_from("<h", sidedefs_d, best[1] * 30 + 28)[0]
+
+
+def relocate(verts, lines, blockers, sidedefs_d, sectors_d, things, tidx):
+    """No screen in plain view of the start: move the start in front of the biggest
+    wall that can be seen whole from ~320 units, square on, in an open sector."""
+    best = None
+    for i, v1, v2, s0, s1 in lines:
+        if s0 < 0 or s1 >= 0:
+            continue
+        a, b = verts[v1], verts[v2]
+        length = math.hypot(b[0] - a[0], b[1] - a[1])
+        if length < 160:
+            continue
+        (nx, ny), mid = face_normal(verts, {"v1": v1, "v2": v2})
+        inward = math.degrees(math.atan2(-ny, -nx)) % 360      # from the room to the wall
+        octant = int(round(inward / 45.0)) % 8 * 45
+        if abs((inward - octant + 540) % 360 - 180) > 10:
+            continue
+        tvw = tv_size(length, 0x7fff) * 1.6
+        for D in (int(tvw * 1.15), int(tvw * 1.3), int(tvw * 1.0)):
+            o = math.radians(octant)
+            pt = (mid[0] - D * math.cos(o), mid[1] - D * math.sin(o))
+            sec = sector_at(pt, verts, lines, sidedefs_d)
+            if sec is None:
+                continue
+            fl, ce = struct.unpack_from("<hh", sectors_d, sec * 26)
+            special = struct.unpack_from("<h", sectors_d, sec * 26 + 22)[0]
+            if ce - fl < 72 or special in (4, 5, 7, 9, 11, 16):
+                continue                          # too low, secret, or a damaging floor
+            inner = [(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in (0.12, 0.5, 0.88)]
+            if any(any(j != i and _hits(pt, q, c, d) for j, (c, d) in blockers) for q in inner):
+                continue
+            wf, wc = struct.unpack_from("<hh", sectors_d,
+                                        struct.unpack_from("<h", sidedefs_d, s0 * 30 + 28)[0] * 26)
+            tv = tv_size(length, wc - wf)
+            if tv < 64:
+                continue
+            if best is None or tv > best[7]:
+                best = (tv / D, i, s0, D, int(length), octant, pt, tv)
+            break
+    if best is None:
+        return None
+    return best
+
+
+def plant_demo(map_lumps, screen):
+    """One screen, in plain view of the start, and the start turned to face it."""
+    things = bytearray(map_lumps["THINGS"])
+    verts_d = map_lumps["VERTEXES"]
+    linedefs_d = map_lumps["LINEDEFS"]
+    sidedefs_d = bytearray(map_lumps["SIDEDEFS"])
+    sectors_d = map_lumps["SECTORS"]
+    verts = [struct.unpack_from("<hh", verts_d, i * 4) for i in range(len(verts_d) // 4)]
+
+    start = tidx = None
+    for i in range(len(things) // 10):
+        x, y, ang, typ, flg = struct.unpack_from("<hhHHH", things, i * 10)
+        if typ == 1:
+            start, tidx = (x, y), i
+            break
+    if start is None:
+        raise SystemExit("no player 1 start in THINGS")
+
+    def sector_of(side):
+        return struct.unpack_from("<h", sidedefs_d, side * 30 + 28)[0]
+
+    def closed(sec):
+        fl, ce = struct.unpack_from("<hh", sectors_d, sec * 26)
+        return ce - fl <= 0                   # a shut door: windows and steps are seen through
+
+    lines, blockers = [], []
+    for i in range(len(linedefs_d) // 14):
+        v1, v2, flags, special, tag, s0, s1 = struct.unpack_from("<HHHHHhh", linedefs_d, i * 14)
+        seg = (verts[v1], verts[v2])
+        lines.append((i, v1, v2, s0, s1))
+        if s1 < 0 or closed(sector_of(s0)) or closed(sector_of(s1)):
+            blockers.append((i, seg))
+
+    def visible(i, pt):
+        return not any(j != i and _hits(start, pt, a, b) for j, (a, b) in blockers)
+
+    best = None
+    for tier in ((128, 192, 700, 35, 12), (96, 160, 900, 45, 20)):
+      if best is not None:
+          break
+      min_len, near, far, head_on, off_axis = tier
+      for i, v1, v2, s0, s1 in lines:
+          if s0 < 0 or s1 >= 0:
+              continue
+          a, b = verts[v1], verts[v2]
+          (nx, ny), mid = face_normal(verts, {"v1": v1, "v2": v2})
+          tp = (start[0] - mid[0], start[1] - mid[1])
+          dist = math.hypot(*tp)
+          length = math.hypot(b[0] - a[0], b[1] - a[1])
+          if length < min_len or not (near <= dist <= far):
+              continue
+          cosf = (tp[0] * nx + tp[1] * ny) / (dist * math.hypot(nx, ny))
+          if cosf < math.cos(math.radians(head_on)):
+              continue                          # not head-on enough to read
+          ang = math.degrees(math.atan2(mid[1] - start[1], mid[0] - start[0])) % 360
+          octant = int(round(ang / 45.0)) % 8 * 45   # Doom spawns players on 45-degree steps
+          if abs((ang - octant + 540) % 360 - 180) > off_axis:
+              continue
+          inner = [(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in (0.12, 0.5, 0.88)]
+          if not all(visible(i, pt) for pt in inner):
+              continue
+          fl, ce = struct.unpack_from("<hh", sectors_d, sector_of(s0) * 26)
+          size = tv_size(length, ce - fl) * cosf / dist   # how big the picture looks
+          if best is None or size > best[0]:
+              best = (size, i, s0, int(dist), int(length), octant)
+    moved = relocate(verts, lines, blockers, sidedefs_d, sectors_d, things, tidx)
+    if moved is not None:          # a TV at the distance it was made for beats any found one
+        struct.pack_into("<hh", things, tidx * 10, int(moved[6][0]), int(moved[6][1]))
+        best = moved[:6]
+    if best is None:
+        return None
+
+    size, i, s0, dist, length, octant = best
+    off = s0 * 30 + 20
+    old = bytes(sidedefs_d[off:off + 8]).decode("latin1").rstrip("\0")
+    sidedefs_d[off:off + 8] = screen.encode("ascii").ljust(8, b"\0")
+    struct.pack_into("<H", things, tidx * 10 + 4, octant)
+    map_lumps["SIDEDEFS"] = bytes(sidedefs_d)
+    map_lumps["THINGS"] = bytes(things)
+    return [dict(line=i, side=s0, dist=dist, length=length, old=old, new=screen,
+                 angle=octant)], []
+
+
 def marker_name(idx):
     """The marker lump a DEPTH looks up: MTXLEV00, MTXLEV01, ... (8 chars, Doom's max).
 
@@ -231,7 +410,14 @@ def main(argv=None):
     ap.add_argument("--iwad", default="verify/base/DOOM2.WAD")
     ap.add_argument("--loader", default="doom_ace/loader/loader.wad")
     ap.add_argument("--out", default="verify/levels")
+    ap.add_argument("--demo", action="store_true",
+                    help="one head-on screen per level and the start turned to it (see plant_demo)")
     args = ap.parse_args(argv)
+    if args.demo:
+        for spec in LEVELS:
+            spec["screen"] = DEMO_SCREENS[spec["idx"]]
+            spec["src"] = spec["src"] or "MAP01"
+            spec["map"] = spec["map"] or "MAP01"
 
     _, loader_lumps = read_wad(args.loader)
     have = dict(loader_lumps)
@@ -272,7 +458,14 @@ def main(argv=None):
             if spec["screen"] in used:
                 raise SystemExit("level %d: %s already used in %s"
                                  % (spec["idx"], spec["screen"], spec["src"]))
-            patched, cands = plant_screens(src_map, spec["screen"], spec["faces"])
+            if args.demo:
+                got = plant_demo(src_map, spec["screen"])
+                if got is None:
+                    raise SystemExit("--demo: no wall in plain view of the start in %s"
+                                     % spec["src"])
+                patched, cands = got
+            else:
+                patched, cands = plant_screens(src_map, spec["screen"], spec["faces"])
             # the map MARKER is a zero-size lump NAMED AFTER THE MAP, then the ten
             # lumps in Doom's order; renaming THINGS to the map name would leave the
             # map with no THINGS at all and every lump one place off.
@@ -317,8 +510,9 @@ def main(argv=None):
         if patched:
             print("  planted on %d one-sided walls nearest the start:" % len(patched))
             for p in patched:
-                print("    line %4d side %3d  %-8s -> %-8s  %5d u from start, %4d u long"
-                      % (p["line"], p["side"], p["old"], p["new"], p["dist"], p["length"]))
+                print("    line %4d side %3d  %-8s -> %-8s  %5d u from start, %4d u long%s"
+                      % (p["line"], p["side"], p["old"], p["new"], p["dist"], p["length"],
+                         ", start turned to %d" % p["angle"] if "angle" in p else ""))
         else:
             print("  no map: the root keeps the IWAD's MAP01; its screen surface was")
             print("  chosen by measurement (see the diegetic log), not planted here.")

@@ -212,6 +212,49 @@ static uint8_t mtx_ring_next(uint8_t d)
 	return d;                       /* nothing else live: nothing to show */
 }
 
+/*
+ * WHO RUNS NEXT. Not the ring: the ring is what the screen-walls SHOW, and it
+ * stays the ring. Which depth gets the machine is a separate question, and the
+ * answer is weighted towards the one the viewer is in.
+ *
+ * The viewer sees one depth's frame, full screen, and that picture only changes
+ * when that depth renders. A plain round robin gives it one slice in N, followed
+ * by N - 1 slices of a frozen picture: at three depths the viewed picture changed
+ * in bursts of 4 frames with 8 frozen ones between them. So the viewed depth takes
+ * every other slice, and the others share the rest in turn - V, a, V, b, V, a ...
+ * Every depth still runs; a nested view is a screen-wall, a fraction of the
+ * picture, and it can afford the lower rate.
+ *
+ * Measured (verify/, this host, 3 depths, slice 4): the viewed depth 30.0 frames/s,
+ * each other depth 15.2/s - against 12-16/s for every depth before. Shorter slices
+ * are measured WORSE (slice 2: 18.3/s viewed, slice 1: 8.3/s): a switch still
+ * compares the whole registered set, ~800-1,900 kcycles, more than half a frame.
+ *
+ * Host code: it runs in the root, and in the host service a depth hands back
+ * through; its state is in mtx_hs, which no snapshot covers.
+ */
+static uint8_t mtx_sched_next(uint8_t cur)
+{
+	uint8_t v = mtx_hs.transport, o, k;
+
+	if(v >= MTX_MAX_DEPTH || !mtx_alive(v))
+		return mtx_ring_next(cur);
+	if(cur != v)
+		return v;
+
+	o = mtx_hs.sched_other;
+	for(k = 0; k < MTX_MAX_DEPTH; k++)
+	{
+		o = mtx_ring_next(o);
+		if(o != v)
+			break;
+	}
+	if(o == v)
+		return v;		/* nobody else live: stay */
+	mtx_hs.sched_other = o;
+	return o;
+}
+
 uint8_t *mtx_world_screen(void)
 {
 	mtx_depth_params_t *p = mtx_self();
@@ -230,24 +273,147 @@ uint8_t *mtx_world_screen(void)
  * DIEGETIC RENDERING: one wall texture IS the other instance's screen.
  *
  * Two halves, on purpose. mtx_screen_seg_note (called from the seg loop) only
- * RECORDS the screen rectangle of a screen-textured wall; mtx_screen_paint (called
- * from the frame hook, once the frame is finished) fills it with the other
- * instance's framebuffer. The first version drew columns from inside the seg loop,
- * where Doom's clipping state is mid-flight, and a ylookup[] indexed with an
- * unclipped row is a wild address: measured, 112 writes outside video memory and a
- * black screen. Recording is one comparison per column; painting has every bound in
- * one place.
+ * RECORDS, per screen column, where in the picture that column is; mtx_screen_paint
+ * (called from the frame hook, once the frame is finished) fills the columns from
+ * the other instance's framebuffer. The first version drew columns from inside the
+ * seg loop, where Doom's clipping state is mid-flight, and a ylookup[] indexed with
+ * an unclipped row is a wild address: measured, 112 writes outside video memory and
+ * a black screen. Recording is a few multiplies per column; painting has every bound
+ * in one place.
+ *
+ * THE PICTURE IS PLACED IN WALL SPACE, like a texture. It used to be placed in
+ * SCREEN space - the frame stretched over the span of the marked columns, and each
+ * column over its own VISIBLE height - and that is wrong as soon as the wall is not
+ * one flat, fully visible rectangle: a screen made of several facets (MAP01's pipe)
+ * came out as a row of misaligned rectangles, and a wall whose foot is hidden by a
+ * step had the whole frame squeezed into what was left, so the bottom of the picture
+ * (the gun, the status bar) was never where the wall's bottom is. So each column now
+ * carries its position ALONG the linedef and, per pixel, the depth BELOW the ceiling,
+ * from Doom's own projection; perspective and occlusion are then Doom's.
+ *
+ * The picture is a 4:3 TV centred on the wall, at most MTX_TV_H tall, with a dark
+ * bezel around it - a long wall is a framed screen, not a frame stretched six times
+ * its width. One linedef, one screen.
  */
 static uint8_t  mtx_seg_top[320];
 static uint8_t  mtx_seg_bot[320];
 static uint8_t  mtx_seg_mark[320];
+static int16_t  mtx_seg_u[320];		/* source column, or -1 for the bezel */
+static int32_t  mtx_seg_v0[320];	/* source row at mtx_seg_top, 16.16 */
+static int32_t  mtx_seg_vs[320];	/* source rows per screen row, 16.16 */
 static uint32_t mtx_seg_cols;
 
-void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh)
+#define MTX_BEZEL  5u			/* PLAYPAL: (27,27,27) */
+/* The picture's largest height, and where its centre sits above the floor, in world
+   units. Measured why a cap at all: a picture as big as the wall FILLS the view when
+   the wall is big (MAP03's 768-unit wall), and then the ring's tunnel barely shrinks
+   from one lap to the next, so content from many laps ago - the title screen of the
+   boot - stays large in the middle of the picture. Twice a player's height. */
+#define MTX_TV_H       112
+#define MTX_TV_CENTER  64
+
+static uint32_t mtx_isqrt(uint32_t v)
 {
+	uint32_t r = 0, b = 1u << 30;
+
+	while(b > v)
+		b >>= 2;
+	while(b)
+	{
+		if(v >= r + b)
+		{
+			v -= r + b;
+			r = (r >> 1) + b;
+		} else
+			r >>= 1;
+		b >>= 2;
+	}
+	return r;
+}
+
+void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh, int32_t texcol)
+{
+	static const line_t *ln_c;
+	static fixed_t ceil_c, floor_c;
+	static int32_t len, u0, fw, uscale, v0, vscale;
+	const line_t *ln;
+	const sector_t *fs;
+	int32_t u;
+	int64_t d;
+
 	/* Doom's clipping arithmetic is INPUT here, not something already validated. */
-	if(x >= 320u || yl > 199u || yh > 199u || yh < yl)
+	if(x >= 320u || yl > 199u || yh > 199u || yh < yl || !curline)
 		return;
+	ln = curline->linedef;
+	fs = curline->frontsector;
+	if(!ln || !fs)
+		return;
+
+	/* the TV's geometry, once per wall (and again if a door or lift moves it) */
+	if(ln != ln_c || fs->ceilingheight != ceil_c || fs->floorheight != floor_c)
+	{
+		int32_t dx = ln->dx >> FRACBITS, dy = ln->dy >> FRACBITS;
+		int32_t h = (fs->ceilingheight - fs->floorheight) >> FRACBITS;
+		int32_t fh;
+
+		ln_c = ln;
+		ceil_c = fs->ceilingheight;
+		floor_c = fs->floorheight;
+		len = (int32_t)mtx_isqrt((uint32_t)(dx * dx + dy * dy));
+		if(len < 1 || h < 1)
+		{
+			len = 0;
+			return;
+		}
+		/* 320x200 is shown at 4:3, and Doom's pixels are 1.2 times taller than
+		   wide, so in world units the picture is 1.6 times as wide as it is tall */
+		fh = h * 86 / 100;
+		if(fh > MTX_TV_H)
+			fh = MTX_TV_H;		/* a TV, not a cinema: see MTX_TV_H */
+		fw = fh * 8 / 5;
+		if(fw > len * 92 / 100)
+		{
+			fw = len * 92 / 100;
+			fh = fw * 5 / 8;
+		}
+		if(fw < 1 || fh < 1)
+		{
+			len = 0;
+			return;
+		}
+		u0 = (len - fw) / 2;
+		/* centred at eye level or half the wall, whichever is lower, so a TV on a
+		   tall wall is not up by the ceiling (the eye is 41 units up) */
+		{
+			int32_t c = h / 2 < MTX_TV_CENTER ? h / 2 : MTX_TV_CENTER;
+
+			if(c < fh / 2)
+				c = fh / 2;
+			v0 = h - c - fh / 2;	/* from the ceiling */
+		}
+		uscale = (320 << 16) / fw;
+		vscale = (200 << 16) / fh;
+	}
+	if(!len)
+		return;
+
+	/* along the line from v1: the texture column, less the sidedef's own offset */
+	u = texcol - (curline->sidedef ? (curline->sidedef->textureoffset >> FRACBITS) : 0);
+	u %= len;
+	if(u < 0)
+		u += len;
+	u -= u0;
+	mtx_seg_u[x] = (u >= 0 && u < fw) ? (int16_t)(((int64_t)u * uscale) >> 16) : -1;
+	if(mtx_seg_u[x] > 319)
+		mtx_seg_u[x] = 319;
+
+	/* how far below the ceiling row yl is, in world units (16.16): Doom's own
+	   projection, independent of how the texture is pegged */
+	d = (int64_t)(fs->ceilingheight - viewz) + (int64_t)((int32_t)yl - centery) * (int64_t)dc_iscale;
+	d -= (int64_t)v0 << FRACBITS;
+	mtx_seg_v0[x] = (int32_t)((d * vscale) >> 16);
+	mtx_seg_vs[x] = (int32_t)(((int64_t)dc_iscale * vscale) >> 16);
+
 	mtx_seg_top[x] = (uint8_t)yl;
 	mtx_seg_bot[x] = (uint8_t)yh;
 	mtx_seg_mark[x] = 1;
@@ -255,62 +421,58 @@ void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh)
 }
 
 /*
- * Paint the recorded rectangle with the other instance's frame.
+ * Paint the recorded columns with the other instance's frame.
  *
- * The whole 320x200 frame is mapped across the wall (a screen shows its picture; it
- * does not tile its texture), with the horizontal span taken from the marked columns
- * so a wall that is partly off-screen still maps correctly. No colormap: a screen is
- * emissive, and one that darkened with distance would read as a texture rather than
- * as a picture. Writes go to THIS copy's framebuffer, so a depth's own screens show
- * up inside the inset that composites its frame - the nesting is visible from both
- * sides.
+ * No colormap: a screen is emissive, and one that darkened with distance would read
+ * as a texture rather than as a picture. Writes go to THIS copy's framebuffer, so a
+ * depth's own screens show up inside the picture that the previous depth's screen
+ * shows - the nesting is visible from both sides. The inner loop is per PIXEL and
+ * carries nothing that does not change per pixel; rows 0..199 of the column are
+ * guaranteed by mtx_screen_seg_note, so the only test left is "inside the picture
+ * or on the bezel".
  */
 void mtx_screen_paint(void)
 {
 	const uint8_t *src = mtx_world_screen();
-	uint32_t x, y, x0 = 0xFFFFFFFFu, x1 = 0u, span, done = 0;
+	uint32_t x, y, x0 = 0xFFFFFFFFu, x1 = 0u, done = 0;
 
 	if(!mtx_seg_cols)
 		return;
 
-	for(x = 0; x < 320u; x++)
-		if(mtx_seg_mark[x])
-		{
-			if(x < x0)
-				x0 = x;
-			x1 = x;
-		}
-
-	if(src && x1 >= x0)
+	if(screen_buffer)
 	{
-		span = x1 - x0 + 1u;
-		for(x = x0; x <= x1; x++)
+		uint8_t *dst = (uint8_t *)screen_buffer;
+
+		for(x = 0; x < 320u; x++)
 		{
-			uint32_t u, top, h, vstep, vfrac;
+			uint8_t *d;
+			uint32_t h;
 
 			if(!mtx_seg_mark[x])
 				continue;
+			if(x < x0)
+				x0 = x;
+			x1 = x;
 
-			u = ((x - x0) * 320u) / span;
-			if(u > 319u)
-				u = 319u;
-
-			top = mtx_seg_top[x];
-			h = (uint32_t)mtx_seg_bot[x] - top + 1u;
-			vstep = (200u << 16) / h;
-			vfrac = 0;
-
-			for(y = 0; y < h; y++)
+			h = (uint32_t)mtx_seg_bot[x] - mtx_seg_top[x] + 1u;
+			d = dst + mtx_seg_top[x] * 320u + x;
+			if(!src || mtx_seg_u[x] < 0)
 			{
-				uint32_t v = vfrac >> 16;
+				for(y = h; y; y--, d += 320u)
+					*d = MTX_BEZEL;
+			} else
+			{
+				const uint8_t *col = src + mtx_seg_u[x];
+				int32_t v = mtx_seg_v0[x], vs = mtx_seg_vs[x];
 
-				if(v > 199u)
-					v = 199u;
-				if(screen_buffer && (top + y) < 200u)
-					((uint8_t *)screen_buffer)[(top + y) * 320u + x] = src[v * 320u + u];
-				vfrac += vstep;
-				done++;
+				for(y = h; y; y--, d += 320u, v += vs)
+				{
+					uint32_t r = (uint32_t)(v >> 16);
+
+					*d = r < 200u ? col[r * 320u] : MTX_BEZEL;
+				}
 			}
+			done += h;
 		}
 	}
 
@@ -965,6 +1127,7 @@ static void mtx_params_fill(uint8_t d)
 	   exactly like the raw pool and the screen. Filled for every depth, including
 	   depth 0's own block, because a block is a block. */
 	p->key_auth = (uint32_t)(uintptr_t)&mtx_hs.key_state;
+	p->keys = (uint32_t)(uintptr_t)mtx_hs.keys;
 }
 
 /* The pool the CALLING code must allocate from. Host code uses the pool of the
@@ -2594,7 +2757,7 @@ static void mtx_engine_policy(void)
 	{
 		/* The RING turns: the root hands the frame to the next live level, exactly
 		   as every level hands it back to its own next one. */
-		mtx_request_switch(mtx_ring_next(MTX_ROOT_DEPTH));
+		mtx_request_switch(mtx_sched_next(MTX_ROOT_DEPTH));
 	}
 }
 
@@ -2636,7 +2799,7 @@ void mtx_host_take_frame(void)
 	/* The RING, from a level's side: hand the frame to the NEXT live level, which
 	   at the deepest level is the wrap back to the root. Hardcoding the root here
 	   is what made this a two-body ping-pong rather than a ring of N. */
-	mtx_request_switch(mtx_ring_next((uint8_t)mtx_depth()));
+	mtx_request_switch(mtx_sched_next((uint8_t)mtx_depth()));
 	mtx_log("[MTX] hand-back: request set, servicing\n");
 	mtx_frame_tick();
 	mtx_log("[MTX] hand-back: returned (the host handed the frame back)\n");
@@ -2882,10 +3045,16 @@ static void mtx_engine_switch(void)
 	   screen, and the host has already named it for every depth (mtx_engine_video):
 	   the switch is a change of WHICH frame that is, not a rectangle drawn inside
 	   another one. */
+	uint32_t live = 0;
+
+	for(dl = 0; dl < MTX_MAX_DEPTH; dl++)
+		if(mtx_alive(dl))
+			live++;
 	for(dl = 1; dl < MTX_MAX_DEPTH; dl++)
 	{
 		if(!mtx_alive(dl))
 			continue;
+		mtx_hs.params[dl].ring       = live;
 		mtx_hs.params[dl].canvas     = (uint32_t)(uintptr_t)mtx_hs.screens[0];
 		mtx_hs.params[dl].transport  = mtx_hs.transport;
 		mtx_hs.params[dl].screen_src =
@@ -2972,6 +3141,264 @@ static void MTX_FRAME_TICK_ABI mtx_engine_self_check(mtx_depth_params_t *me)
 	mtx_log((const char *)buf);
 }
 
+/*
+ * ONE KEYBOARD FOR THE WHOLE RING.
+ *
+ * Doom's key array (`gamekeydown`) is Doom DATA, so every depth has its own copy,
+ * and a key event lands in whichever copy is loaded when the interrupt arrives. A
+ * held "forward" therefore walked one depth only: measured, the walking clip's
+ * viewer stood still as soon as it was transported into depth 1. So every depth,
+ * at its frame boundary, pushes what changed in ITS copy since it last looked (an
+ * event that landed here) into one shared state in host memory, then adopts that
+ * state. Every depth sees one keyboard, and the views walk together. The switch
+ * key is left alone: it has its own authority (mtx_key_auth) and edge logic.
+ */
+__attribute__((section(".data"))) static uint8_t mtx_keys_seen[256];
+
+static void mtx_keys_route(mtx_depth_params_t *me)
+{
+	uint8_t *shared = me ? (uint8_t *)(uintptr_t)me->keys : mtx_hs.keys;
+	uint32_t k;
+
+	if(!shared)
+		return;
+	for(k = 0; k < 256u; k++)
+	{
+		uint8_t v = gamekeydown[k] ? 1u : 0u;
+
+		if(k == MTX_SWITCH_KEY)
+			continue;
+		if(v != mtx_keys_seen[k])
+			shared[k] = v;
+		gamekeydown[k] = shared[k];
+		mtx_keys_seen[k] = shared[k];
+	}
+}
+
+/*
+ * THE DEPTH BADGE: which instance a picture is, drawn into the instance's own frame.
+ *
+ * Into the depth's OWN framebuffer, after its screen-walls are painted, on purpose:
+ * that frame is also what the previous depth's screen-walls show, so every nested
+ * picture carries its own label, and a viewer can read the ring - "0 shows 1 shows
+ * 2 shows 0" - off one frame. Top right (Doom's messages are top left), inside the
+ * 3D view, which the renderer redraws every frame. The border is yellow on the
+ * depth the viewer is in and grey on the nested ones; the dots are the ring, this
+ * depth filled; the number under them is this depth's own frame rate, measured on
+ * the BIOS tick (wall time).
+ */
+static const uint8_t mtx_glyphs[][8] =
+{
+	/* char, then 7 rows of 5 bits */
+	{'0', 0x0E,0x11,0x13,0x15,0x19,0x11,0x0E},
+	{'1', 0x04,0x0C,0x04,0x04,0x04,0x04,0x0E},
+	{'2', 0x0E,0x11,0x01,0x02,0x04,0x08,0x1F},
+	{'3', 0x1F,0x02,0x04,0x02,0x01,0x11,0x0E},
+	{'4', 0x02,0x06,0x0A,0x12,0x1F,0x02,0x02},
+	{'5', 0x1F,0x10,0x1E,0x01,0x01,0x11,0x0E},
+	{'6', 0x06,0x08,0x10,0x1E,0x11,0x11,0x0E},
+	{'7', 0x1F,0x01,0x02,0x04,0x08,0x08,0x08},
+	{'8', 0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E},
+	{'9', 0x0E,0x11,0x11,0x0F,0x01,0x02,0x0C},
+	{'D', 0x1C,0x12,0x11,0x11,0x11,0x12,0x1C},
+	{'E', 0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F},
+	{'P', 0x1E,0x11,0x11,0x1E,0x10,0x10,0x10},
+	{'T', 0x1F,0x04,0x04,0x04,0x04,0x04,0x04},
+	{'H', 0x11,0x11,0x11,0x1F,0x11,0x11,0x11},
+	{'F', 0x1F,0x10,0x10,0x1E,0x10,0x10,0x10},
+	{'S', 0x0F,0x10,0x10,0x0E,0x01,0x01,0x1E},
+};
+
+#define MTX_COL_WHITE   4u	/* PLAYPAL indices, read from DOOM2.WAD */
+#define MTX_COL_BLACK   0u
+#define MTX_COL_YELLOW  231u
+#define MTX_COL_GREY    97u
+
+static void mtx_rect(uint8_t *fb, uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint8_t c)
+{
+	uint32_t i, j;
+
+	for(j = y; j < y + h && j < SCREENHEIGHT; j++)
+		for(i = x; i < x + w && i < SCREENWIDTH; i++)
+			fb[j * SCREENWIDTH + i] = c;
+}
+
+static void mtx_text(uint8_t *fb, uint32_t x, uint32_t y, const char *t, uint32_t sc, uint8_t c)
+{
+	for(; *t; t++, x += 6u * sc)
+	{
+		uint32_t g, r, b;
+
+		for(g = 0; g < sizeof(mtx_glyphs) / sizeof(mtx_glyphs[0]); g++)
+			if(mtx_glyphs[g][0] == (uint8_t)*t)
+				break;
+		if(g == sizeof(mtx_glyphs) / sizeof(mtx_glyphs[0]))
+			continue;			/* a space, or a glyph we do not have */
+		for(r = 0; r < 7u; r++)
+			for(b = 0; b < 5u; b++)
+				if(mtx_glyphs[g][1 + r] & (0x10u >> b))
+					mtx_rect(fb, x + b * sc, y + r * sc, sc, sc, c);
+	}
+}
+
+__attribute__((section(".data"))) static uint32_t mtx_badge_frames, mtx_badge_bios, mtx_badge_fps;
+
+static void mtx_badge(mtx_depth_params_t *me)
+{
+	uint8_t *fb = (uint8_t *)screen_buffer;
+	uint32_t d = me ? me->depth : MTX_ROOT_DEPTH;
+	uint32_t viewed = me ? (me->transport == me->depth) : (mtx_hs.transport == MTX_ROOT_DEPTH);
+	uint32_t bios = *(volatile uint32_t *)(uintptr_t)0x46cu;
+	uint32_t i, x0 = 214u, y0 = 4u, ring = 1;
+	char line[8];
+
+	if(!fb)
+		return;
+	if(me)
+		ring = me->ring;
+	else
+		for(i = 0; i < MTX_MAX_DEPTH; i++)
+			if(mtx_alive((uint8_t)i))
+				ring = i + 1u;
+	if(ring < 1u || ring > MTX_MAX_DEPTH)
+		ring = 1u;
+
+	/* frames per second over about a second of wall time (18 BIOS ticks) */
+	mtx_badge_frames++;
+	if(!mtx_badge_bios)
+		mtx_badge_bios = bios;
+	else if(bios - mtx_badge_bios >= 18u)
+	{
+		mtx_badge_fps = (mtx_badge_frames * 182u / (bios - mtx_badge_bios) + 5u) / 10u;
+		mtx_badge_frames = 0;
+		mtx_badge_bios = bios;
+	}
+
+	mtx_rect(fb, x0, y0, 102u, 36u, viewed ? MTX_COL_YELLOW : MTX_COL_GREY);
+	mtx_rect(fb, x0 + 2u, y0 + 2u, 98u, 32u, MTX_COL_BLACK);
+
+	line[0] = 'D'; line[1] = 'E'; line[2] = 'P'; line[3] = 'T'; line[4] = 'H';
+	line[5] = ' '; line[6] = (char)('0' + d % 10u); line[7] = 0;
+	mtx_text(fb, x0 + 6u, y0 + 5u, line, 2u, MTX_COL_WHITE);
+
+	for(i = 0; i < ring; i++)
+	{
+		uint8_t c = (i == d) ? MTX_COL_YELLOW : MTX_COL_GREY;
+
+		mtx_rect(fb, x0 + 6u + i * 10u, y0 + 24u, 7u, 7u, c);
+		if(i != d)
+			mtx_rect(fb, x0 + 7u + i * 10u, y0 + 25u, 5u, 5u, MTX_COL_BLACK);
+	}
+
+	i = mtx_badge_fps > 99u ? 99u : mtx_badge_fps;
+	line[0] = (char)(i >= 10u ? '0' + i / 10u : ' ');
+	line[1] = (char)('0' + i % 10u);
+	line[2] = ' '; line[3] = 'F'; line[4] = 'P'; line[5] = 'S'; line[6] = 0;
+	mtx_text(fb, x0 + 58u, y0 + 24u, line, 1u, MTX_COL_WHITE);
+}
+
+/*
+ * EACH DEPTH'S OWN GAME CLOCK.
+ *
+ * Doom's I_GetTime (load 0x19C10, `mov eax,[0x2913c]; ret`) is redirected here by
+ * the hook below, so while the ring runs the game sees `mtx_vt_now`, and the frame
+ * boundary decides how far it moves. Each depth installs the hook from its own copy
+ * of the engine, so the patch is per-depth like every other one (hook isolation).
+ *
+ * Why. The tick counter is Doom DATA, so it was part of every snapshot: a depth's
+ * clock only moved while that depth was loaded. Measured with rdtsc in emulated
+ * time: the root, whose own work is ~1,800 kcycles a frame, spent ~4,300 a frame -
+ * one 35 Hz tic - spinning in TryRunTics for its next tic, every frame. Sharing the
+ * real counter instead was measured too, and is worse: every depth then simulates
+ * 35 tics a second of its world, catching up 4-8 tics in one frame after a slice
+ * away, and the tic logic eats the machine.
+ *
+ * So, per frame: the depth the viewer is IN follows wall time (0..4 tics), which is
+ * what makes the picture move at Doom's speed - it waits only when it is AHEAD of
+ * wall time, like stock Doom; every other depth moves exactly one tic - slow motion
+ * inside the screen-walls, with no catch-up to pay for and no wait. Wall time is the BIOS tick
+ * (0040:006C, 18.2065 Hz, outside every snapshot): the game counter runs fast in a
+ * ring (measured ~44/s against Doom's 35), so it cannot be the reference.
+ *
+ * Between frame boundaries the clock is frozen, EXCEPT in a loop that waits on time
+ * (the level-start wipe spins on I_GetTime): a frozen clock hangs it - measured, the
+ * root stopped at its frame 2. Many reads inside one frame mean something is
+ * waiting, and then time flows, forwards only.
+ */
+__attribute__((section(".data"))) static uint32_t mtx_vt_now, mtx_vt_on, mtx_vt_real, mtx_vt_calls;
+__attribute__((section(".data"))) static uint32_t mtx_vt_bios0, mtx_vt_off, mtx_vt_was_v;
+
+uint32_t __attribute((regparm(2),no_caller_saved_registers)) mtx_i_gettime(void)
+{
+	uint32_t real = *(volatile uint32_t *)(uintptr_t)(doom_data_segment + 0x2913cu);
+
+	if(!mtx_vt_on)
+		return real;
+	if(++mtx_vt_calls > 256u)
+	{
+		uint32_t v = mtx_vt_now + (real - mtx_vt_real);
+
+		if((int32_t)(v - mtx_vt_now) > 0)
+			mtx_vt_now = v;
+		mtx_vt_real = real;
+	}
+	return mtx_vt_now;
+}
+
+static const hook_t mtx_vt_hooks[] __attribute__((used,section(".hooks"),aligned(4))) =
+{
+	{0x00019C10, CODE_HOOK | HOOK_JMP_ACE, (uint32_t)mtx_i_gettime},
+};
+
+static void mtx_vtime(mtx_depth_params_t *me)
+{
+	uint32_t real = *(volatile uint32_t *)(uintptr_t)(doom_data_segment + 0x2913cu);
+	uint32_t bios = *(volatile uint32_t *)(uintptr_t)0x46cu;
+	uint32_t is_v, d = 1;
+
+	if(me)
+		is_v = (me->transport == me->depth);
+	else
+	{
+		/* the root keeps Doom's own clock until there is a ring to share it with */
+		if(!mtx_booted || mtx_ring_next(MTX_ROOT_DEPTH) == MTX_ROOT_DEPTH)
+			return;
+		is_v = (mtx_hs.transport == MTX_ROOT_DEPTH);
+	}
+	if(!mtx_vt_on)
+	{
+		mtx_vt_now = real;
+		mtx_vt_real = real;
+		mtx_vt_bios0 = bios;
+		mtx_vt_on = 1;
+		return;
+	}
+	if(is_v)
+	{
+		/* wall time in tics: 35 / 18.2065 = 1969 / 1024 */
+		uint32_t t = ((bios - mtx_vt_bios0) * 1969u) >> 10;
+
+		if(!mtx_vt_was_v)
+			mtx_vt_off = t - mtx_vt_now;	/* just became the viewed one: no burst */
+		d = (t - mtx_vt_off) - mtx_vt_now;
+		/* AHEAD of wall time (a frame that is quick to draw - a wall filling the
+		   view rendered at 99 frames/s, measured): no new tic, so the game waits in
+		   TryRunTics like stock Doom, and the spin rule above lets time flow. A
+		   minimum of one tic here would run the viewed world faster than real time. */
+		if((int32_t)d < 0)
+			d = 0;
+		if(d > 4u)
+		{
+			d = 4u;
+			mtx_vt_off = t - (mtx_vt_now + d);	/* drop what cannot be caught up */
+		}
+	}
+	mtx_vt_was_v = is_v;
+	mtx_vt_now += d;
+	mtx_vt_real = real;
+	mtx_vt_calls = 0;
+}
+
 /* Single entry point for the frame path (engine/vesa.c). Same call convention as
    the function that calls it, so it is safe inside swap_buffers(). */
 void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
@@ -2986,6 +3413,9 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 	   increment here is the host's evidence that this depth is not merely
 	   booted: it is drawing. */
 	mtx_depth_params_t *me = mtx_self();
+
+	mtx_vtime(me);
+	mtx_keys_route(me);
 
 	if(me)
 	{
@@ -3026,6 +3456,7 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		   from its parent's frame, so the nesting is visible inside the nested
 		   view as well as around it. */
 		mtx_screen_paint();
+		mtx_badge(me);
 
 		if(me->present_src)
 			*((uint32_t *)((uint8_t *)(void *)I_FinishUpdate + 4)) = me->present_src;
@@ -3134,7 +3565,10 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 	}
 
 	if(!mtx_boot_failed)
+	{
 		mtx_engine_policy();
+		mtx_badge(0);
+	}
 
 	mtx_frame_tick();
 }

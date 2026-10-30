@@ -5,9 +5,9 @@ OPT = -O2 -g0
 BOTH = -fno-pie
 CFLAGS = ${BOTH} ${OPT} -mgeneral-regs-only -fdata-sections -ffunction-sections -fomit-frame-pointer -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-stack-protector -fno-reorder-blocks-and-partition -fcf-protection=none -Wno-address-of-packed-member -U_FORTIFY_SOURCE
 
-# matryoshka nested-instance host (sibling working tree).
+# matryoshka nested-instance host, in nested/ in this repository.
 # Override with `make MTX_DIR=/path/to/nested` if it lives elsewhere.
-MTX_DIR ?= ../../nested
+MTX_DIR ?= ../nested
 MTX_OBJ = ${MTX_DIR}/mtx_core.o ${MTX_DIR}/mtx_switch.o ${MTX_DIR}/mtx_host.o ${MTX_DIR}/dos_state.o ${MTX_DIR}/dos_alloc.o ${MTX_DIR}/dos_wire.o ${MTX_DIR}/ldr1n.o ${MTX_DIR}/ldr0N.o ${MTX_DIR}/ldr1N.o ${MTX_DIR}/mtx_sched.o ${MTX_DIR}/mtx_zone.o ${MTX_DIR}/mtx_hooks.o ${MTX_DIR}/mtx_raw.o
 CFLAGS += -I${MTX_DIR} -DMTX_DOS_NO_STATIC_POOL
 OBJ += ${MTX_OBJ}

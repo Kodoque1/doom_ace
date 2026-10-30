@@ -815,7 +815,7 @@ static void R_RenderSegLoop()
 				   left a black screen. Recording costs one comparison per column and
 				   puts every bound in code we control. */
 				if(midtexture == mtx_screen_tex)
-					mtx_screen_seg_note(x, yl, yh);
+					mtx_screen_seg_note(x, yl, yh, texturecolumn);
 				else
 				{
 					dc_source = texture_get_column(midtexture, texturecolumn);

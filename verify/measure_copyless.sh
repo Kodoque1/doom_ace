@@ -8,7 +8,7 @@
 set -u
 ROOT="${MTX_ROOT:-$HOME/Documents/recursive_doom}"
 LABEL="$1"
-SRC="$ROOT/nested/dos_state.c"
+SRC="$ROOT/doom_ace/nested/dos_state.c"
 
 python3 - "$SRC" "$2" <<'PY'
 import sys

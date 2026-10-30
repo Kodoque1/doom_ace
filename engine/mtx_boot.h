@@ -89,7 +89,7 @@ void mtx_level_wad_add(const uint8_t *map_name);
 // The seg loop RECORDS the screen rectangle of a screen-textured wall; the frame
 // hook PAINTS it from the other instance's framebuffer. Two halves so that every
 // bound lives in one place instead of inside Doom's clipping arithmetic.
-void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh);
+void mtx_screen_seg_note(uint32_t x, uint32_t yl, uint32_t yh, int32_t texcol);
 void mtx_screen_paint(void);
 
 // Which depth this copy of the engine is running as: a nested instance's own
