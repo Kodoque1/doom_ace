@@ -596,6 +596,7 @@ h1{font-size:clamp(64px,13vw,150px)!important}
 .measured li{margin:0 0 6px}
 .tp{font-family:var(--f-hud);font-size:19px;padding:3px 12px;margin-right:6px;background:rgba(241,178,60,.15);border:1px solid var(--hud);color:#fff}.tp b{color:var(--hud)}
 .credit{color:var(--dim);font-size:16px;margin:10px 0 0}.credit a{color:var(--hud)}
+.video{margin:22px 0 0}.video video{width:100%;max-width:760px;display:block;border:2px solid #3d2c23;background:#000}
 </style>
 </head>
 <body>
@@ -606,6 +607,8 @@ h1{font-size:clamp(64px,13vw,150px)!important}
     <h1>Doomception</h1>
     <p class="dek">Three Doom games in one DOOM2.EXE. Each one shows the next on a wall.</p>
     <p class="credit">Built on kgsws' <a href="https://github.com/kgsws/doom_ace">ACE Engine</a>, which loads new code into DOS Doom 2. Doomception wouldn't exist without it.</p>
+    <figure class="video"><video src="doomception.mp4" controls muted playsinline loop preload="metadata" aria-label="Recording: three Doom instances in one DOOM2.EXE, each wall showing the next"></video>
+      <figcaption>The real thing: stock DOOM2.EXE v1.9 in DOSBox, three depths, each wall a live screen. Recorded under the project's earlier name.</figcaption></figure>
     <figure class="hero-pic"><canvas id="hero" width="640" height="416" style="cursor:pointer" aria-label="Depth 0's picture: one wall shows depth 1's picture, whose wall shows depth 2's, whose wall shows depth 0 again"></canvas>
       <figcaption><button type="button" id="teleport" class="tp">Press <b>y</b> to teleport</button> into the game on the wall, as the real one does. Re-enactment; the last wall shows the first game again.</figcaption></figure>
   </div>
@@ -639,17 +642,17 @@ h1{font-size:clamp(64px,13vw,150px)!important}
 <div class="wrap"><div class="wide console" id="walk"><div class="m3-stage"><canvas aria-label="The model, built up one piece at a time"></canvas></div><div class="seq-say" aria-live="polite"></div></div></div>
 
 <section class="ch col"><p class="sec-tag">Go deeper</p><h2>Where it is in the code</h2>
-<p>The page simplifies; the code doesn't. Repos: <a href="https://github.com/Kodoque1/nested">nested</a> (the switch) and <a href="https://github.com/Kodoque1/doom_ace">doom_ace</a> (the engine, a fork of kgsws' <a href="https://github.com/kgsws/doom_ace">doom_ace</a>).</p>
+<p>The page simplifies; the code doesn't. Everything is in <a href="https://github.com/Kodoque1/doom_ace">one repository</a>, a fork of kgsws' <a href="https://github.com/kgsws/doom_ace">doom_ace</a>: the engine at the root, the switch in <code>nested/</code>.</p>
 <div class="tblwrap"><table class="codemap">
 <thead><tr><th>In the model</th><th>In the code</th><th>Read first</th></tr></thead>
 <tbody>
 <tr><td>Handing over the CPU</td><td><code>nested/mtx_switch.S</code> (<code>mtx_switch_ctx</code>), <code>nested/mtx_core.c</code> (<code>mtx_switch_to</code>)</td><td>README, “The mechanism”</td></tr>
-<tr><td>When it switches</td><td><code>nested/mtx_sched.c</code> (<code>mtx_frame_tick</code>), <code>doom_ace/engine/mtx_boot.c</code> (<code>MTX_DEMO_INTERVAL</code>, <code>mtx_sched_next</code>)</td><td>README, “The yield point”</td></tr>
+<tr><td>When it switches</td><td><code>nested/mtx_sched.c</code> (<code>mtx_frame_tick</code>), <code>engine/mtx_boot.c</code> (<code>MTX_DEMO_INTERVAL</code>, <code>mtx_sched_next</code>)</td><td>README, “The yield point”</td></tr>
 <tr><td>Swapping data, patches, pointers</td><td><code>nested/dos_state.c</code> (<code>mtx_dos_save_state</code>, <code>mtx_dos_load_state</code>), <code>nested/mtx_hooks.c</code></td><td>README, “What is per-depth” and “405 patches”</td></tr>
 <tr><td>The switch's own state</td><td><code>nested/mtx_host.h</code> (<code>mtx_hs</code>)</td><td>README, “Live switching, and the illegal-read fix”</td></tr>
 <tr><td>A depth's own memory</td><td><code>nested/mtx_zone.c</code>, <code>nested/mtx_raw.c</code>, stack slots in <code>nested/mtx_core.c</code> (<code>mtx_seed</code>)</td><td>README, “A depth's own zone”</td></tr>
-<tr><td>Starting a depth</td><td><code>nested/ldr0N.S</code>, <code>nested/ldr1n.c</code>, <code>doom_ace/engine/mtx_ldr.c</code></td><td>README, “The loaders”</td></tr>
-<tr><td>The walls and the loop</td><td><code>doom_ace/engine/mtx_boot.c</code> (<code>mtx_ring_next</code>, <code>mtx_screen_paint</code>), <code>nested/mtx_params.h</code> (<code>screen_src</code>)</td><td>comments in that code</td></tr>
+<tr><td>Starting a depth</td><td><code>nested/ldr0N.S</code>, <code>nested/ldr1n.c</code>, <code>engine/mtx_ldr.c</code></td><td>README, “The loaders”</td></tr>
+<tr><td>The walls and the loop</td><td><code>engine/mtx_boot.c</code> (<code>mtx_ring_next</code>, <code>mtx_screen_paint</code>), <code>nested/mtx_params.h</code> (<code>screen_src</code>)</td><td>comments in that code</td></tr>
 </tbody></table></div>
 <h3>Measured</h3>
 <ul class="measured" id="measured"></ul>
@@ -658,7 +661,7 @@ h1{font-size:clamp(64px,13vw,150px)!important}
 </main>
 
 <footer class="wrap mini"><div class="col"><p><b>Credits:</b> ACE Engine, its loader and everything it does inside Doom are the work of <a href="https://github.com/kgsws/doom_ace">kgsws</a>. Doomception builds on it.</p>
-<p>Scenes are simplified re-enactments, slowed down. Numbers come from the project's run log and README. No game data is used.</p></div></footer>
+<p>Scenes are simplified re-enactments, slowed down. Numbers come from the project's run log and README. The scenes use no game data; the video at the top is a recording of the real game.</p></div></footer>
 
 <script type="application/json" id="mtxrun">{
  "source": "base/MTX.LOG",
