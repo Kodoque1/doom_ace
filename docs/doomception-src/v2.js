@@ -11,13 +11,13 @@ function fmt(n){return Number(n).toLocaleString("en-US");}
 (function(){
   if(RUNX.copyless&&RUNX.copyless.length)$("nCopied").textContent=fmt(RUNX.copyless[0].save);
   if(RUNX.snapshot_bytes)$("nSnap").textContent=fmt(RUNX.snapshot_bytes)+" bytes";
-  if(RUNX.patches)$("nPatch").textContent=fmt(RUNX.patches);
+  
   var d1=RUNX.depths&&RUNX.depths[1]||{},li=[];
   if(RUNX.depth_count)li.push("<b>"+RUNX.depth_count+"</b> depths running, one CPU");
-  if(RUNX.snapshot_bytes)li.push("<b>"+fmt(RUNX.snapshot_bytes)+"</b> bytes of Doom's writable data per depth, of which <b>"+(RUNX.copyless&&RUNX.copyless.length?fmt(RUNX.copyless[0].save):"?")+"</b> were copied on a switch");
-  if(RUNX.patches)li.push("<b>"+fmt(RUNX.patches)+"</b> places in Doom's code patched by each depth's ACE");
-  if(d1.zone)li.push("a private heap of <b>"+fmt(d1.zone[1]-d1.zone[0])+"</b> bytes and a stack of <b>"+fmt(RUNX.stack_pool?RUNX.stack_pool.per_depth:65536)+"</b> bytes per depth");
-  li.push("the depth on screen ran at <b>30.0</b> frames/s and each other depth at <b>15.2</b> (the comment above <code>mtx_sched_next</code> in <code>mtx_boot.c</code>)");
+  if(RUNX.snapshot_bytes)li.push("<b>"+(RUNX.copyless&&RUNX.copyless.length?fmt(RUNX.copyless[0].save):"?")+"</b> of <b>"+fmt(RUNX.snapshot_bytes)+"</b> bytes copied on a switch");
+  if(RUNX.patches)li.push("<b>"+fmt(RUNX.patches)+"</b> code patches per depth");
+  if(d1.zone)li.push("<b>"+Math.round((d1.zone[1]-d1.zone[0])/1048576)+" MB</b> heap and <b>"+Math.round((RUNX.stack_pool?RUNX.stack_pool.per_depth:65536)/1024)+" KB</b> stack per depth");
+  li.push("<b>30.0</b> frames/s for the depth on screen, <b>15.2</b> for the others");
   $("measured").innerHTML=li.map(function(x){return "<li>"+x+"</li>";}).join("");
 })();
 
@@ -139,17 +139,17 @@ Model("walk",function(M,root){
   var p=new Seq(root,{loop:false,say:say,reset:function(){M.reset();}});
   root.insertBefore(root.querySelector(".seqc"),say);
   p.load([
-    {ms:9000,say:"<b>One game.</b> DOOM2.EXE's code and data sit at fixed addresses. The CPU runs that code and reads and writes that data, and the game has memory of its own: a heap, a stack, and the screen buffer it draws into.",
+    {ms:7000,say:"<b>One game.</b> The CPU runs Doom's code on Doom's data. The game also has its own heap, stack and screen buffer.",
       run:function(){M.reset();M.set({n:1,show:{code:1,data:1,cpu:1,stack:1,heap:1,pic:1}});}},
-    {ms:10000,say:"<b>A second copy, depth 1,</b> gets its own memory: a heap, a stack, a screen buffer and its own copy of ACE's code. It does not get a second Doom: it uses the same code and data, at the same addresses. Booting, its ACE <b>patches Doom's code</b> to call into its own copy of ACE.",
+    {ms:8000,say:"<b>A second depth.</b> Its own memory, the <i>same</i> Doom code and data. Its ACE patches Doom's code to call itself.",
       run:function(){M.set({n:2,boot:1,show:{code:1,data:1,shared:1,cpu:1,ace:1,patch:1}});}},
-    {ms:14000,say:"<b>If the two simply took turns,</b> they would trample each other. Both write the same Doom data. The patched code calls whichever ACE patched last. And Doom's shared pointers name one depth's memory, so the other draws into the wrong picture.",
+    {ms:12000,say:"<b>Just taking turns breaks.</b> Shared data, the wrong ACE, the wrong picture.",
       run:function(){M.set({turns:true,swap:false,sim:true,show:{code:1,data:1,cpu:1,patch:1,ptr:1}});}},
-    {ms:16000,say:"<b>So every 4 frames a switch runs.</b> It saves the running depth's copy of Doom's writable data and of the code patches into that depth's own memory, loads the next depth's, and points Doom's heap and screen pointers at the next depth's memory. Only what changed is copied: "+(RUNX.copyless&&RUNX.copyless.length?fmt(RUNX.copyless[0].save)+" bytes of "+fmt(RUNX.snapshot_bytes):"a small part")+" in the measured run.",
+    {ms:14000,say:"<b>The switch swaps.</b> Data, patches and pointers go to the right depth. Only "+(RUNX.copyless&&RUNX.copyless.length?fmt(RUNX.copyless[0].save)+" of "+fmt(RUNX.snapshot_bytes)+" bytes":"what changed")+" moved in the run.",
       run:function(){M.set({swap:true,sim:false,show:{code:1,data:1,cpu:1,saved:1,ptr:1,patch:1}});}},
-    {ms:14000,say:"<b>Then it hands over the CPU.</b> The running depth's registers go onto its own stack, and its stack pointer into the switch's own state. That state lives outside every depth, so no swap can overwrite it. The next depth's stack pointer comes back, and that depth resumes exactly where it stopped.",
-      run:function(){M.set({show:{cpu:1,stack:1,sw:1,sw2:1,saved:1}});M.look(-3.5,1.2,0.8,15);}},
-    {ms:14000,say:"<b>A third depth works the same way.</b> Each depth draws the next depth's latest frame onto a wall, and the deepest draws the first: the loop in the picture at the top.",
+    {ms:12000,say:"<b>Then it hands over the CPU.</b> Registers go onto the depth's own stack, the stack pointer into the switch's state, outside every depth.",
+      run:function(){M.set({show:{cpu:1,stack:1,sw:1,sw2:1,saved:1}});M.look(-3.5,1.2,0.8,14);}},
+    {ms:12000,say:"<b>Three depths, one loop.</b> Each draws the next on a wall; the last draws the first.",
       run:function(){M.set({n:3,loop:true,show:{pic:1,cpu:1,code:1,data:1,sw:1}});M.home();}}
   ]);
 });

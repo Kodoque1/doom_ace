@@ -3,7 +3,7 @@ h1{font-size:clamp(64px,13vw,150px)!important}
 .hero-pic{margin:26px 0 0}
 .hero-pic canvas{width:100%;max-width:640px;height:auto;display:block;image-rendering:pixelated;border:2px solid #3d2c23;box-shadow:0 0 0 4px #0b0807,0 0 40px rgba(209,52,31,.25)}
 .cool{padding-left:1.2em;margin:0}.cool li{margin:0 0 14px;padding-left:4px}.cool li::marker{color:var(--hud);font-family:var(--f-hud)}
-.model{font-size:20px;line-height:1.65;border-left:4px solid var(--hud);padding:4px 0 4px 18px;margin:8px 0 14px}
+.model{font-size:19px;line-height:1.5;border-left:4px solid var(--hud);padding:4px 0 4px 34px;margin:8px 0 14px}.model li{margin:0 0 8px}
 .note{color:var(--dim);font-size:16px}
 .m3-status{position:absolute;left:10px;bottom:8px;z-index:2;font-family:var(--f-hud);font-size:17px;color:#ffd27a;background:rgba(11,8,7,.7);padding:2px 8px;max-width:70%}
 #model .m3-stage{height:min(62vh,560px)}

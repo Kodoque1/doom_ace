@@ -585,7 +585,7 @@ h1{font-size:clamp(64px,13vw,150px)!important}
 .hero-pic{margin:26px 0 0}
 .hero-pic canvas{width:100%;max-width:640px;height:auto;display:block;image-rendering:pixelated;border:2px solid #3d2c23;box-shadow:0 0 0 4px #0b0807,0 0 40px rgba(209,52,31,.25)}
 .cool{padding-left:1.2em;margin:0}.cool li{margin:0 0 14px;padding-left:4px}.cool li::marker{color:var(--hud);font-family:var(--f-hud)}
-.model{font-size:20px;line-height:1.65;border-left:4px solid var(--hud);padding:4px 0 4px 18px;margin:8px 0 14px}
+.model{font-size:19px;line-height:1.5;border-left:4px solid var(--hud);padding:4px 0 4px 34px;margin:8px 0 14px}.model li{margin:0 0 8px}
 .note{color:var(--dim);font-size:16px}
 .m3-status{position:absolute;left:10px;bottom:8px;z-index:2;font-family:var(--f-hud);font-size:17px;color:#ffd27a;background:rgba(11,8,7,.7);padding:2px 8px;max-width:70%}
 #model .m3-stage{height:min(62vh,560px)}
@@ -602,55 +602,59 @@ h1{font-size:clamp(64px,13vw,150px)!important}
   <div class="wide">
     <p class="eyebrow">Doom inside Doom inside Doom inside the first Doom</p>
     <h1>Doomception</h1>
-    <p class="dek">Three copies of Doom running inside one DOOM2.EXE under DOS, with no operating system to help, each one showing the next on a wall.</p>
+    <p class="dek">Three Doom games in one DOOM2.EXE. Each one shows the next on a wall.</p>
     <figure class="hero-pic"><canvas id="hero" width="640" height="416" aria-label="Depth 0's picture: one wall shows depth 1's picture, whose wall shows depth 2's, whose wall shows depth 0 again"></canvas>
-      <figcaption>A re-enactment of the picture: each depth's wall shows the next depth's latest frame, and the last wraps back to the first.</figcaption></figure>
+      <figcaption>Re-enactment. The last wall shows the first game again.</figcaption></figure>
   </div>
 </header>
 
 <main class="wrap">
 
-<section class="ch col"><p class="sec-tag">Why it's cool</p><h2>Four things worth the trip</h2>
+<section class="ch col"><p class="sec-tag">Why it's cool</p><h2>Four reasons</h2>
 <ol class="cool">
-<li><b>Three games in one program, with no operating system.</b> DOS has no processes, no threads, no memory protection. Everything an operating system would do for you is done by hand, inside the game.</li>
-<li><b>The nesting is literally visible.</b> Each game's walls show the next game's live picture, and the deepest one shows the first, so the picture loops.</li>
-<li><b>Pausing a running game and resuming another takes a handful of instructions.</b> Save a few registers, swap one stack pointer, and a different game carries on where it stopped.</li>
-<li><b>A program written to be alone is made to share.</b> All three games use the same code and the same data addresses. They are kept apart by swapping only what differs: <span id="nCopied">about 1,300</span> bytes per switch out of <span id="nSnap">577 KB</span>, plus <span id="nPatch">406</span> code patches and a few pointers.</li>
+<li><b>No operating system.</b> DOS has no processes or threads. It's all done by hand, inside the game.</li>
+<li><b>The nesting is visible.</b> Each game's wall shows the next game, and the picture loops.</li>
+<li><b>A few instructions to pause one game and resume another.</b></li>
+<li><b>A program written to run alone is made to share.</b> Only what differs is swapped: <span id="nCopied">about 1,300</span> bytes per switch out of <span id="nSnap">577 KB</span>.</li>
 </ol></section>
 
-<section class="ch col"><p class="sec-tag">The model</p><h2>How it works, in one paragraph</h2>
-<p class="model">DOOM2.EXE is loaded once: its code and data sit at fixed addresses, and every copy of the game uses those same addresses. Each copy, a <b>depth</b>, also gets private memory of its own: a heap, a stack, a screen buffer and its own copy of ACE's code. The CPU runs one depth at a time. Every 4 frames, a <b>switch</b> runs: host code whose own state lives outside every depth. It saves the running depth's copy of Doom's writable data and of the code patches its ACE made, loads the next depth's, points Doom's shared heap and screen pointers at that depth's private memory, and swaps the CPU's stack pointer, so the next depth resumes exactly where it stopped. Each depth draws the next depth's latest frame onto a wall, and the deepest draws the first.</p>
-<p class="note">ACE is a mod for DOS Doom 2 that comes as a WAD file. It adds its own engine code to the game, and the code that runs the copies is part of it.</p>
+<section class="ch col"><p class="sec-tag">The model</p><h2>How it works</h2>
+<ul class="model">
+<li>One DOOM2.EXE: its code and data are <b>shared</b> by every copy.</li>
+<li>Each copy, a <b>depth</b>, has its own memory: heap, stack, screen buffer, ACE code.</li>
+<li>One CPU runs one depth at a time.</li>
+<li>Every 4 frames a <b>switch</b> swaps in the next depth's data, patches and pointers, then hands it the CPU.</li>
+<li>Each depth draws the next one on a wall.</li>
+</ul>
+<p class="note">ACE: a Doom 2 mod, shipped as a WAD, that adds engine code. The switch is part of it.</p>
 </section>
 
 <div class="wrap"><div class="wide console" id="model"><div class="m3-stage"><canvas aria-label="The model, running: three depths taking turns on one CPU"></canvas></div></div></div>
 
-<section class="ch col"><p class="sec-tag">Step by step</p><h2>The same picture, one piece at a time</h2></section>
+<section class="ch col"><p class="sec-tag">Step by step</p><h2>One piece at a time</h2></section>
 
 <div class="wrap"><div class="wide console" id="walk"><div class="m3-stage"><canvas aria-label="The model, built up one piece at a time"></canvas></div><div class="seq-say" aria-live="polite"></div></div></div>
 
 <section class="ch col"><p class="sec-tag">Go deeper</p><h2>Where it is in the code</h2>
-<p>Everything above is a simplification. The code is the real thing: here is where each part of the model lives, and what to read first. <a href="https://github.com/Kodoque1/nested">nested</a> holds the host (the switch and its helpers); <a href="https://github.com/Kodoque1/doom_ace">doom_ace</a> holds the engine with the host wired in.</p>
+<p>The page simplifies; the code doesn't. Repos: <a href="https://github.com/Kodoque1/nested">nested</a> (the switch) and <a href="https://github.com/Kodoque1/doom_ace">doom_ace</a> (the engine).</p>
 <div class="tblwrap"><table class="codemap">
 <thead><tr><th>In the model</th><th>In the code</th><th>Read first</th></tr></thead>
 <tbody>
-<tr><td>Handing over the CPU: registers onto the depth's own stack, swap the stack pointer</td><td><code>nested/mtx_switch.S</code> (<code>mtx_switch_ctx</code>), <code>nested/mtx_core.c</code> (<code>mtx_switch_to</code>)</td><td>README, “The mechanism”</td></tr>
-<tr><td>When it switches: at a frame boundary, every 4 frames</td><td><code>nested/mtx_sched.c</code> (<code>mtx_frame_tick</code>), <code>doom_ace/engine/mtx_boot.c</code> (<code>MTX_DEMO_INTERVAL</code>, <code>mtx_sched_next</code>)</td><td>README, “The yield point”</td></tr>
-<tr><td>Saving and loading Doom's writable data, the code patches and the pointers</td><td><code>nested/dos_state.c</code> (<code>mtx_dos_save_state</code>, <code>mtx_dos_load_state</code>), <code>nested/mtx_hooks.c</code></td><td>README, “What is per-depth” and “405 patches”</td></tr>
-<tr><td>The switch's own state, outside every depth</td><td><code>nested/mtx_host.h</code> (<code>mtx_hs</code>)</td><td>README, “Live switching, and the illegal-read fix”</td></tr>
-<tr><td>A depth's private memory</td><td><code>nested/mtx_zone.c</code>, <code>nested/mtx_raw.c</code>, stack slots in <code>nested/mtx_core.c</code> (<code>mtx_seed</code>)</td><td>README, “A depth's own zone”</td></tr>
-<tr><td>Starting a depth: loading its copy of ACE</td><td><code>nested/ldr0N.S</code>, <code>nested/ldr1n.c</code>, <code>doom_ace/engine/mtx_ldr.c</code></td><td>README, “The loaders”</td></tr>
-<tr><td>The walls and the loop</td><td><code>doom_ace/engine/mtx_boot.c</code> (<code>mtx_ring_next</code>, <code>mtx_screen_paint</code>), <code>nested/mtx_params.h</code> (<code>screen_src</code>)</td><td>the comments above those functions</td></tr>
+<tr><td>Handing over the CPU</td><td><code>nested/mtx_switch.S</code> (<code>mtx_switch_ctx</code>), <code>nested/mtx_core.c</code> (<code>mtx_switch_to</code>)</td><td>README, “The mechanism”</td></tr>
+<tr><td>When it switches</td><td><code>nested/mtx_sched.c</code> (<code>mtx_frame_tick</code>), <code>doom_ace/engine/mtx_boot.c</code> (<code>MTX_DEMO_INTERVAL</code>, <code>mtx_sched_next</code>)</td><td>README, “The yield point”</td></tr>
+<tr><td>Swapping data, patches, pointers</td><td><code>nested/dos_state.c</code> (<code>mtx_dos_save_state</code>, <code>mtx_dos_load_state</code>), <code>nested/mtx_hooks.c</code></td><td>README, “What is per-depth” and “405 patches”</td></tr>
+<tr><td>The switch's own state</td><td><code>nested/mtx_host.h</code> (<code>mtx_hs</code>)</td><td>README, “Live switching, and the illegal-read fix”</td></tr>
+<tr><td>A depth's own memory</td><td><code>nested/mtx_zone.c</code>, <code>nested/mtx_raw.c</code>, stack slots in <code>nested/mtx_core.c</code> (<code>mtx_seed</code>)</td><td>README, “A depth's own zone”</td></tr>
+<tr><td>Starting a depth</td><td><code>nested/ldr0N.S</code>, <code>nested/ldr1n.c</code>, <code>doom_ace/engine/mtx_ldr.c</code></td><td>README, “The loaders”</td></tr>
+<tr><td>The walls and the loop</td><td><code>doom_ace/engine/mtx_boot.c</code> (<code>mtx_ring_next</code>, <code>mtx_screen_paint</code>), <code>nested/mtx_params.h</code> (<code>screen_src</code>)</td><td>comments in that code</td></tr>
 </tbody></table></div>
-<h3>Measured in a real run</h3>
+<h3>Measured</h3>
 <ul class="measured" id="measured"></ul>
 </section>
 
 </main>
 
-<footer class="wrap mini"><div class="col">
-<p>The pictures and the 3D scenes are simplified re-enactments written for this page, not recordings: the games are drawn as a corridor and a health number, and the switch is slowed down so it can be followed. The numbers under “Measured” come from the project's own log of a real run (<code>MTX.LOG</code>) and its README. No game data is used.</p>
-</div></footer>
+<footer class="wrap mini"><div class="col"><p>Scenes are simplified re-enactments, slowed down. Numbers come from the project's run log and README. No game data is used.</p></div></footer>
 
 <script type="application/json" id="mtxrun">{
  "source": "base/MTX.LOG",
@@ -1379,13 +1383,13 @@ function fmt(n){return Number(n).toLocaleString("en-US");}
 (function(){
   if(RUNX.copyless&&RUNX.copyless.length)$("nCopied").textContent=fmt(RUNX.copyless[0].save);
   if(RUNX.snapshot_bytes)$("nSnap").textContent=fmt(RUNX.snapshot_bytes)+" bytes";
-  if(RUNX.patches)$("nPatch").textContent=fmt(RUNX.patches);
+  
   var d1=RUNX.depths&&RUNX.depths[1]||{},li=[];
   if(RUNX.depth_count)li.push("<b>"+RUNX.depth_count+"</b> depths running, one CPU");
-  if(RUNX.snapshot_bytes)li.push("<b>"+fmt(RUNX.snapshot_bytes)+"</b> bytes of Doom's writable data per depth, of which <b>"+(RUNX.copyless&&RUNX.copyless.length?fmt(RUNX.copyless[0].save):"?")+"</b> were copied on a switch");
-  if(RUNX.patches)li.push("<b>"+fmt(RUNX.patches)+"</b> places in Doom's code patched by each depth's ACE");
-  if(d1.zone)li.push("a private heap of <b>"+fmt(d1.zone[1]-d1.zone[0])+"</b> bytes and a stack of <b>"+fmt(RUNX.stack_pool?RUNX.stack_pool.per_depth:65536)+"</b> bytes per depth");
-  li.push("the depth on screen ran at <b>30.0</b> frames/s and each other depth at <b>15.2</b> (the comment above <code>mtx_sched_next</code> in <code>mtx_boot.c</code>)");
+  if(RUNX.snapshot_bytes)li.push("<b>"+(RUNX.copyless&&RUNX.copyless.length?fmt(RUNX.copyless[0].save):"?")+"</b> of <b>"+fmt(RUNX.snapshot_bytes)+"</b> bytes copied on a switch");
+  if(RUNX.patches)li.push("<b>"+fmt(RUNX.patches)+"</b> code patches per depth");
+  if(d1.zone)li.push("<b>"+Math.round((d1.zone[1]-d1.zone[0])/1048576)+" MB</b> heap and <b>"+Math.round((RUNX.stack_pool?RUNX.stack_pool.per_depth:65536)/1024)+" KB</b> stack per depth");
+  li.push("<b>30.0</b> frames/s for the depth on screen, <b>15.2</b> for the others");
   $("measured").innerHTML=li.map(function(x){return "<li>"+x+"</li>";}).join("");
 })();
 
@@ -1507,17 +1511,17 @@ Model("walk",function(M,root){
   var p=new Seq(root,{loop:false,say:say,reset:function(){M.reset();}});
   root.insertBefore(root.querySelector(".seqc"),say);
   p.load([
-    {ms:9000,say:"<b>One game.</b> DOOM2.EXE's code and data sit at fixed addresses. The CPU runs that code and reads and writes that data, and the game has memory of its own: a heap, a stack, and the screen buffer it draws into.",
+    {ms:7000,say:"<b>One game.</b> The CPU runs Doom's code on Doom's data. The game also has its own heap, stack and screen buffer.",
       run:function(){M.reset();M.set({n:1,show:{code:1,data:1,cpu:1,stack:1,heap:1,pic:1}});}},
-    {ms:10000,say:"<b>A second copy, depth 1,</b> gets its own memory: a heap, a stack, a screen buffer and its own copy of ACE's code. It does not get a second Doom: it uses the same code and data, at the same addresses. Booting, its ACE <b>patches Doom's code</b> to call into its own copy of ACE.",
+    {ms:8000,say:"<b>A second depth.</b> Its own memory, the <i>same</i> Doom code and data. Its ACE patches Doom's code to call itself.",
       run:function(){M.set({n:2,boot:1,show:{code:1,data:1,shared:1,cpu:1,ace:1,patch:1}});}},
-    {ms:14000,say:"<b>If the two simply took turns,</b> they would trample each other. Both write the same Doom data. The patched code calls whichever ACE patched last. And Doom's shared pointers name one depth's memory, so the other draws into the wrong picture.",
+    {ms:12000,say:"<b>Just taking turns breaks.</b> Shared data, the wrong ACE, the wrong picture.",
       run:function(){M.set({turns:true,swap:false,sim:true,show:{code:1,data:1,cpu:1,patch:1,ptr:1}});}},
-    {ms:16000,say:"<b>So every 4 frames a switch runs.</b> It saves the running depth's copy of Doom's writable data and of the code patches into that depth's own memory, loads the next depth's, and points Doom's heap and screen pointers at the next depth's memory. Only what changed is copied: "+(RUNX.copyless&&RUNX.copyless.length?fmt(RUNX.copyless[0].save)+" bytes of "+fmt(RUNX.snapshot_bytes):"a small part")+" in the measured run.",
+    {ms:14000,say:"<b>The switch swaps.</b> Data, patches and pointers go to the right depth. Only "+(RUNX.copyless&&RUNX.copyless.length?fmt(RUNX.copyless[0].save)+" of "+fmt(RUNX.snapshot_bytes)+" bytes":"what changed")+" moved in the run.",
       run:function(){M.set({swap:true,sim:false,show:{code:1,data:1,cpu:1,saved:1,ptr:1,patch:1}});}},
-    {ms:14000,say:"<b>Then it hands over the CPU.</b> The running depth's registers go onto its own stack, and its stack pointer into the switch's own state. That state lives outside every depth, so no swap can overwrite it. The next depth's stack pointer comes back, and that depth resumes exactly where it stopped.",
-      run:function(){M.set({show:{cpu:1,stack:1,sw:1,sw2:1,saved:1}});M.look(-3.5,1.2,0.8,15);}},
-    {ms:14000,say:"<b>A third depth works the same way.</b> Each depth draws the next depth's latest frame onto a wall, and the deepest draws the first: the loop in the picture at the top.",
+    {ms:12000,say:"<b>Then it hands over the CPU.</b> Registers go onto the depth's own stack, the stack pointer into the switch's state, outside every depth.",
+      run:function(){M.set({show:{cpu:1,stack:1,sw:1,sw2:1,saved:1}});M.look(-3.5,1.2,0.8,14);}},
+    {ms:12000,say:"<b>Three depths, one loop.</b> Each draws the next on a wall; the last draws the first.",
       run:function(){M.set({n:3,loop:true,show:{pic:1,cpu:1,code:1,data:1,sw:1}});M.home();}}
   ]);
 });
