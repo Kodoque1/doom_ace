@@ -274,8 +274,10 @@ uint8_t *mtx_world_screen(void)
  *
  * Two halves, on purpose. mtx_screen_seg_note (called from the seg loop) only
  * RECORDS, per screen column, where in the picture that column is; mtx_screen_paint
- * (called from the frame hook, once the frame is finished) fills the columns from
- * the other instance's framebuffer. The first version drew columns from inside the
+ * (called by render_player_view once the solid walls are done, before the sprites,
+ * masked midtextures and weapon that may stand in front of the screen) fills the
+ * columns from the other instance's framebuffer. It used to run at the frame hook,
+ * once the frame was finished, and the picture was drawn over everything in front. The first version drew columns from inside the
  * seg loop, where Doom's clipping state is mid-flight, and a ylookup[] indexed with
  * an unclipped row is a wild address: measured, 112 writes outside video memory and
  * a black screen. Recording is a few multiplies per column; painting has every bound
@@ -2202,6 +2204,37 @@ static void mtx_demo_child(void *arg)
 	mtx_finish();
 }
 
+/*
+ * THE SWITCH IS NOT INTERRUPTIBLE.
+ *
+ * Doom's keyboard handler writes its queue (and the timer its tic count) into Doom's
+ * DATA, i.e. into whichever depth's copy is live when the interrupt arrives. A save
+ * compares and copies block by block, so a key event that lands after its block was
+ * saved is in neither the outgoing snapshot nor, once the load has overwritten it,
+ * the incoming depth: it is simply gone. Two passes over ~577 KB are a real share of
+ * the wall time at 12 switches a second, and a lost KEYUP is a key held forever -
+ * measured, the switch key reported down in every depth for ~40 s of a human's run,
+ * and a turn that never stopped.
+ *
+ * So interrupts are off from the first byte saved to the last byte loaded. The
+ * keyboard controller holds the scancode and the PIC the request, and the handler
+ * runs as soon as the incoming depth is live, so the event lands in a copy that is
+ * kept. mtx_switch always pairs the two calls (save, then load), which is what lets
+ * one turn them off and the other back on. Here and not in mtx_core.c: the core is
+ * engine-agnostic and its tests run as a Linux process, where `cli` is a fault.
+ */
+static void mtx_switch_save(mtx_context_t *outgoing)
+{
+	__asm__ __volatile__("cli" ::: "memory");
+	mtx_dos_save_state(outgoing);
+}
+
+static void mtx_switch_load(mtx_context_t *incoming)
+{
+	mtx_dos_load_state(incoming);
+	__asm__ __volatile__("sti" ::: "memory");
+}
+
 static void mtx_engine_boot(void)
 {
 	mtx_boot_t bt;
@@ -2272,8 +2305,8 @@ static void mtx_engine_boot(void)
 
 	// mtx_init takes the table by value; see the note in mtx_host.h about why a
 	// retained pointer to a caller local would be a wild jump.
-	ops.save_state = mtx_dos_save_state;
-	ops.load_state = mtx_dos_load_state;
+	ops.save_state = mtx_switch_save;
+	ops.load_state = mtx_switch_load;
 	mtx_init(bt.depth, &ops, bt.stack_base, bt.stack_bytes);
 
 	/* Depth 1's own stack slot, for the high-water measurement below and in the
@@ -2661,7 +2694,6 @@ static void mtx_engine_policy(void)
 
 	/* early frames = the room the demo starts in, which is the room the effect has
 	   to be visible in */
-	mtx_screen_paint();      /* the world's screens, after the frame is rendered */
 	mtx_engine_video();
 	mtx_engine_switch();
 	mtx_engine_stack_water();
@@ -2860,23 +2892,29 @@ void mtx_host_take_frame(void)
  * single word in HOST memory, reachable from the root directly and from a depth
  * through `params->key_auth`, and the rule is the same on both sides:
  *
- *   1. at the FIRST frame of a slice, the loaded copy is FORCED to agree with the
- *      authority (`gamekeydown[key] = authority`). The restored value is what this
- *      depth last saw and the events since went to another copy, so it is not merely
- *      untrustworthy - it is knowably wrong, and the authority is the one value that
- *      is not. Forcing rather than clearing is the whole fix: a stale "down" is
- *      overwritten with the truth instead of being turned into a fresh edge.
- *   2. every frame, an edge is just `copy != authority`. Whoever sees it writes the
- *      authority and reports the edge - the host toggles, a depth sets `switch_req`
- *      for the host to apply. Because the authority is shared, the OTHER side cannot
- *      report the same press: its copy is either already equal, or forced equal at
- *      its own slice start.
+ *   1. every frame, the copy is compared with what THIS copy said the last time it
+ *      was looked at (`mtx_key_last`, which lives and is restored with the copy). If
+ *      it moved, an event landed HERE: the copy is the news, and it is written to the
+ *      authority - a press the authority had not seen is the edge, which the host
+ *      toggles on or a depth reports as `switch_req`.
+ *   2. if it did not move, nothing landed here, and the restored value is merely what
+ *      this depth saw before the events went to another copy - knowably stale. The
+ *      copy is FORCED to the authority, and a stale "down" is overwritten with the
+ *      truth instead of being turned into a fresh edge.
+ *   Either way the tracker is left equal to the authority, never cleared: clearing is
+ *   what turned a still-held key into a second edge (above).
  *
- * No guard, no dead time, no per-depth tracker. A held key is one edge because the
- * authority reads "down" from the first frame of the press to the release, and
- * typematic repeats are not edges at all. A press and a release that both land inside
- * ONE frame of one context are still missed - a sub-frame tap, which is why the
- * recorder holds the key instead of tapping it.
+ * This replaced "force the copy at the FIRST frame of a slice", which was blind to
+ * events: Doom handles the tic's events before the frame boundary, so a release the
+ * depth received on the first frame of its slice was overwritten with the stale
+ * "down" - measured, in a human's run, the switch key down in every depth for ~40 s,
+ * i.e. until a press and release happened to land in later frames. It is the same
+ * rule the other keys already follow (mtx_keys_route).
+ *
+ * A held key is one edge because the authority reads "down" from the first frame of
+ * the press to the release, and typematic repeats do not move the copy. A press and a
+ * release that both land inside ONE frame of one context are still missed - a
+ * sub-frame tap, which is why the recorder holds the key instead of tapping it.
  */
 static uint32_t *mtx_key_auth(void)
 {
@@ -2890,26 +2928,28 @@ static uint32_t *mtx_key_auth(void)
 	return &mtx_hs.key_state;
 }
 
-/* Force the loaded copy of Doom's key array to agree with the authority. Called at
-   the first frame of a slice, before anything reads the key. */
-static void mtx_key_adopt(void)
-{
-	gamekeydown[MTX_SWITCH_KEY] = *mtx_key_auth() ? 1u : 0u;
-}
+/* What this copy of the key array said the last time it was looked at. Same section
+   as mtx_keys_seen, for the same reason: it belongs to the copy. */
+__attribute__((section(".data"))) static uint8_t mtx_key_last;
 
 /* 1 on a LEADING EDGE - a press the authority had not seen - and 0 otherwise
    (including on a release, which still updates the authority: that is what re-arms
-   the next press). */
+   the next press). A copy that has not moved is forced to the authority. */
 static uint32_t mtx_key_observe(void)
 {
 	uint32_t *auth = mtx_key_auth();
 	uint32_t down = gamekeydown[MTX_SWITCH_KEY] ? 1u : 0u;
+	uint32_t edge = 0;
 
-	if(down == *auth)
-		return 0;
+	if(down != mtx_key_last)
+	{
+		edge = down && !*auth;
+		*auth = down;
+	} else
+		gamekeydown[MTX_SWITCH_KEY] = *auth ? 1u : 0u;
 
-	*auth = down;
-	return down;
+	mtx_key_last = *auth ? 1u : 0u;
+	return edge;
 }
 
 /*
@@ -2947,28 +2987,14 @@ static void mtx_engine_switch(void)
 	   does not chain to the BIOS one, and the ring is dead. That leaves Doom's own
 	   key array as the only channel, and that array is snapshot state.) */
 	uint8_t  dl;
-	/* EVERY live depth, not one fixed child. With a ring, any of the children can
-	   have begun a slice since the host last looked, and each has its own stamp;
-	   a single shared stamp let one child's slice start consume the other's. Note
-	   this code runs only in the ROOT's copy of the engine - an instance returns
-	   earlier in the frame path (its own branch) - so `mtx_alive` here is the
-	   host's answer, not an empty object's.
-
-	   The host is a slice too, and this is where its own copy of Doom's key array
-	   has just been restored - saved BEFORE the child consumed the events that
-	   followed. So the first thing after noticing a child's slice is to adopt the
-	   authority, before anything reads the key. This is the same step the child
-	   does on its own slice start (see mtx_key_auth), and it is the step that
-	   replaced the old "clear the entry and the tracker" - clearing turned a stale
-	   "down" into a fresh edge, which is the double toggle. */
-	for(dl = 1; dl < MTX_MAX_DEPTH; dl++)
-	{
-		if(!mtx_alive(dl) || mtx_hs.slice_seen[dl] == mtx_hs.params[dl].slice_gen)
-			continue;
-
-		mtx_hs.slice_seen[dl] = mtx_hs.params[dl].slice_gen;
-		mtx_key_adopt();
-	}
+	/* The host is a slice too, and its own copy of Doom's key array has just been
+	   restored - saved BEFORE the children consumed the events that followed.
+	   mtx_key_observe tells that stale copy from a fresh event by itself (see
+	   mtx_key_auth), so nothing has to be adopted here first. Note this code runs
+	   only in the ROOT's copy of the engine - an instance returns earlier in the
+	   frame path (its own branch) - so `mtx_alive` below is the host's answer, not
+	   an empty object's. (`slice_gen` / `slice_seen` fed the adoption that used to
+	   be here; the fields stay so the parameter block keeps its layout.) */
 
 	/* The key, from either side: the root's own edge, or a press a child saw while
 	   it was the active one and reported in its own block. Both go through the SAME
@@ -3452,10 +3478,10 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		   they take turns: the running depth renders into its own buffer and
 		   presents the root's, and the nested picture reaches the screen where the
 		   host puts it - in the inset. */
-		/* This depth's own screen is a world too: paint its screen-textured walls
-		   from its parent's frame, so the nesting is visible inside the nested
-		   view as well as around it. */
-		mtx_screen_paint();
+		/* This depth's own screen is a world too: its screen-textured walls show
+		   its parent's frame, so the nesting is visible inside the nested view as
+		   well as around it. They are painted by the renderer (render_player_view,
+		   before the sprites), so by this point they are already in the frame. */
 		mtx_badge(me);
 
 		if(me->present_src)
@@ -3472,17 +3498,20 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 		   reads as a fresh press - measured, one held key toggling the inset once
 		   per slice (ON 372, OFF 391, ON 421, OFF 451...), i.e. a flicker instead
 		   of a switch. A real press lasts far longer than the guard window. */
-		/* This depth's slice begins when its own frame count starts a new run - and
-		   that is the frame on which its key array must NOT be trusted: what was
-		   just restored is what THIS depth last saw, and the events since went to
-		   another depth's copy. So adopt the one authority FIRST, before anything
-		   below reads the key. (This used to clear the entry and the tracker, which
-		   turned a stale "down" into a fresh edge - the double toggle.) */
-		if((me->frames % MTX_DEMO_INTERVAL) == 1u)
-		{
-			me->slice_gen++;
-			mtx_key_adopt();
-		}
+		/* What was just restored is what THIS depth last saw, and the events since
+		   may have gone to another depth's copy - mtx_key_observe tells a stale
+		   value from an event that landed here, and leaves the copy true. It runs
+		   BEFORE the sighting below, so a stale copy is not reported as a press.
+		   (This used to force the authority at the first frame of a slice, which
+		   also overwrote a release received on that frame: the stuck key.)
+
+		   One authority, one edge. A press this depth is the first to see becomes a
+		   REQUEST in host memory for the host to apply - the depth cannot toggle the
+		   inset itself, the inset belongs to the host's composite. The authority is
+		   what stops the other side from reporting the same press again. */
+		if(mtx_key_observe())
+			me->switch_req = 1u;
+		me->key_down = *mtx_key_auth() ? 1u : 0u;	/* mirror, for the log */
 
 		if(gamekeydown[MTX_SWITCH_KEY])
 		{
@@ -3502,14 +3531,6 @@ void MTX_FRAME_TICK_ABI mtx_engine_frame(void)
 				mtx_log((const char *)msg);
 			}
 		}
-
-		/* One authority, one edge. A press this depth is the first to see becomes a
-		   REQUEST in host memory for the host to apply - the depth cannot toggle the
-		   inset itself, the inset belongs to the host's composite. The authority is
-		   what stops the other side from reporting the same press again. */
-		if(mtx_key_observe())
-			me->switch_req = 1u;
-		me->key_down = *mtx_key_auth() ? 1u : 0u;	/* mirror, for the log */
 
 		/* Hand the frame back, every MTX_DEMO_INTERVAL frames, through the HOST's
 		   own service (see the parameter block). This is what makes the two

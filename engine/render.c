@@ -808,8 +808,8 @@ static void R_RenderSegLoop()
 				   mtx_screen_wall_column. Everything else about the seg (clipping,
 				   occlusion, the planes) is Doom's and is untouched. */
 				/* matryoshka: this wall is a SCREEN. The column is not drawn here - the
-				   rectangle is RECORDED, and the frame hook paints it after the whole
-				   frame is rendered. Drawing from inside the seg loop means writing to
+				   rectangle is RECORDED, and render_player_view paints it once the
+				   solid pass is done, before the sprites. Drawing from inside the seg loop means writing to
 				   Doom's screen while its clipping state is mid-flight, and a version
 				   that did that wrote 112 times to an address outside video memory and
 				   left a black screen. Recording costs one comparison per column and
@@ -2792,6 +2792,11 @@ void render_player_view(player_t *pl)
 	spanfunc = R_DrawSpan;
 	// 3D view
 	R_RenderPlayerView(pl);
+	// matryoshka: the screen walls, while they are still walls - after the solid
+	// pass that recorded them and before sprites, masked midtextures and the
+	// weapon, which are in front of them (painting at the frame hook drew the
+	// picture over all three)
+	mtx_screen_paint();
 	// masked
 	draw_masked_range();
 	// weapon sprites
