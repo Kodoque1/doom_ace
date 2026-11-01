@@ -1604,6 +1604,7 @@ function Model(rootId,build){after3d(function(){
     ctl.querySelector('[data-c=slower]').disabled=speed===SPEEDS[0];ctl.querySelector('[data-c=faster]').disabled=speed===SPEEDS[SPEEDS.length-1];}
   ctl.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;e.stopPropagation();var c=b.getAttribute("data-c");
     if(c==="pause"){paused=!paused;stepUnits=-1;}if(c==="step"){stepUnits=1;paused=false;}if(c==="slower")speed=SPEEDS[Math.max(0,SPEEDS.indexOf(speed)-1)];if(c==="faster")speed=SPEEDS[Math.min(SPEEDS.length-1,SPEEDS.indexOf(speed)+1)];if(c==="back")back();if(c==="legend"){legOn=!legOn;try{localStorage.setItem("dc-legend",legOn?"1":"0");}catch(e){}legShow();}ctlLabel();});
+  ctlLabel();
   /* what moves looks like what it is: an instruction, a sheet of data, a CALL patch, a
      pointer, the 4 saved registers, or the picture itself */
   function tokMesh(kind,c,txt,tex){var G=new T.Group(),m,i;
